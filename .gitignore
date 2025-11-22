@@ -1,9 +1,4 @@
-# Ignore everything...
-*
 
-# ...except this file
-!.gitignore
-!README.md
 
 venv/
 __pycache__/
