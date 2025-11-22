@@ -1,0 +1,601 @@
+from flask import Flask, render_template, request, redirect, url_for, jsonify, session
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
+from dotenv import load_dotenv
+from datetime import datetime
+import openai
+import stripe
+import os
+import sqlite3
+import base64
+from PIL import Image
+import io
+
+load_dotenv()
+
+app = Flask(__name__)
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-this')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URI', 'sqlite:///database.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+db = SQLAlchemy(app)
+stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+
+# OpenRouter client
+openrouter_client = openai.OpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=os.getenv('OPENROUTER_API_KEY'),
+)
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+# ============ DATABASE MODELS ============
+
+class User(UserMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(100), unique=True, nullable=False)
+    password = db.Column(db.String(200), nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    is_premium = db.Column(db.Boolean, default=False)
+    subscription_id = db.Column(db.String(100))
+    deepseek_count = db.Column(db.Integer, default=0)
+    deepseek_date = db.Column(db.String(10))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    chats = db.relationship('Chat', backref='user', lazy=True, cascade='all, delete-orphan')
+
+class Chat(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    title = db.Column(db.String(200), default='New Chat')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    messages = db.relationship('Message', backref='chat', lazy=True, cascade='all, delete-orphan')
+
+class Message(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    chat_id = db.Column(db.Integer, db.ForeignKey('chat.id'), nullable=False)
+    role = db.Column(db.String(20), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    model = db.Column(db.String(50))
+    has_image = db.Column(db.Boolean, default=False)
+    image_path = db.Column(db.String(500))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+@login_manager.user_loader
+def load_user(user_id):
+    return db.session.get(User, int(user_id))
+
+# ============ DATABASE MIGRATION ============
+
+def migrate_database():
+    try:
+        db_path = 'database.db'
+        if not os.path.exists(db_path):
+            return
+        
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute("PRAGMA table_info(user)")
+        columns = [column[1] for column in cursor.fetchall()]
+        
+        if 'deepseek_count' not in columns:
+            cursor.execute("ALTER TABLE user ADD COLUMN deepseek_count INTEGER DEFAULT 0")
+            print("✅ Added deepseek_count column")
+        
+        if 'deepseek_date' not in columns:
+            today = datetime.utcnow().strftime('%Y-%m-%d')
+            cursor.execute(f"ALTER TABLE user ADD COLUMN deepseek_date TEXT DEFAULT '{today}'")
+            print("✅ Added deepseek_date column")
+        
+        if 'created_at' not in columns:
+            cursor.execute("ALTER TABLE user ADD COLUMN created_at TIMESTAMP")
+            print("✅ Added created_at column")
+        
+        cursor.execute("PRAGMA table_info(message)")
+        msg_columns = [column[1] for column in cursor.fetchall()]
+        
+        if 'has_image' not in msg_columns:
+            cursor.execute("ALTER TABLE message ADD COLUMN has_image BOOLEAN DEFAULT 0")
+            print("✅ Added has_image column")
+        
+        if 'image_path' not in msg_columns:
+            cursor.execute("ALTER TABLE message ADD COLUMN image_path TEXT")
+            print("✅ Added image_path column")
+        
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"⚠️ Migration warning: {str(e)}")
+
+# ============ AI MODEL CONFIGURATION ============
+
+FREE_MODELS = {
+    'gpt-3.5-turbo': {
+        'path': 'openai/gpt-3.5-turbo',
+        'name': 'GPT-3.5 Turbo',
+        'limit': None,
+        'vision': False
+    },
+    'claude-3-haiku': {
+        'path': 'anthropic/claude-3-haiku',
+        'name': 'Claude 3 Haiku',
+        'limit': None,
+        'vision': False
+    },
+    'gemini-flash': {
+        'path': 'google/gemini-2.0-flash-lite-001',
+        'name': 'Gemini Flash 2.0 lite',
+        'limit': None,
+        'vision': False
+    },
+    'deepseek-chat': {
+        'path': 'deepseek/deepseek-chat',
+        'name': 'DeepSeek Chat',
+        'limit': None,
+        'vision': False
+    }
+}
+
+PREMIUM_MODELS = {
+    'gpt-4o': {
+        'path': 'openai/gpt-4o',
+        'name': 'GPT-4o',
+        'vision': False
+    },
+    'gpt-4o-mini': {
+        'path': 'openai/gpt-4o-mini',
+        'name': 'GPT-4o Mini',
+        'vision': False
+    },
+    'claude-3.5-sonnet': {
+        'path': 'anthropic/claude-3.5-sonnet',
+        'name': 'Claude 3.5 Sonnet',
+        'vision': False
+    },
+    'claude-3-opus': {
+        'path': 'anthropic/claude-3-opus',
+        'name': 'Claude 3 Opus',
+        'vision': False
+    },
+    'gemini-pro': {
+        'path': 'google/gemini-pro-1.5',
+        'name': 'Gemini Pro 1.5',
+        'vision': False
+    },
+    'deepseek-r1': {
+        'path': 'deepseek/deepseek-r1',
+        'name': 'DeepSeek R1',
+        'vision': False
+    }
+}
+
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf', 'txt', 'doc', 'docx'}
+
+# ============ HELPER FUNCTIONS ============
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def encode_image(image_path):
+    """Encode image to base64 for API"""
+    with open(image_path, 'rb') as image_file:
+        return base64.b64encode(image_file.read()).decode('utf-8')
+
+def compress_image(image_path, max_size=(1024, 1024)):
+    """Compress image to reduce file size"""
+    img = Image.open(image_path)
+    img.thumbnail(max_size, Image.Resampling.LANCZOS)
+    img.save(image_path, optimize=True, quality=85)
+
+def check_deepseek_limit(user):
+    today = datetime.utcnow().strftime('%Y-%m-%d')
+    if user.deepseek_date != today:
+        user.deepseek_count = 0
+        user.deepseek_date = today
+        db.session.commit()
+    return user.deepseek_count < 50
+
+def generate_chat_title(first_message):
+    title = first_message[:50]
+    if len(first_message) > 50:
+        title += '...'
+    return title
+
+def get_chat_history(chat_id, limit=10):
+    messages = Message.query.filter_by(chat_id=chat_id) \
+        .order_by(Message.created_at.desc()) \
+        .limit(limit) \
+        .all()
+    
+    history = []
+    for msg in reversed(messages):
+        if msg.has_image and msg.image_path:
+            try:
+                image_base64 = encode_image(msg.image_path)
+                history.append({
+                    "role": msg.role,
+                    "content": [
+                        {"type": "text", "text": msg.content},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}}
+                    ]
+                })
+            except:
+                history.append({"role": msg.role, "content": msg.content})
+        else:
+            history.append({"role": msg.role, "content": msg.content})
+    
+    return history
+
+# ============ ROUTES ============
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/demo-chat', methods=['POST'])
+def demo_chat():
+    user_message = request.json.get('message')
+    
+    try:
+        response = openrouter_client.chat.completions.create(
+            model=FREE_MODELS['gpt-3.5-turbo']['path'],
+            messages=[{"role": "user", "content": user_message}],
+        )
+        
+        return jsonify({
+            'response': response.choices[0].message.content,
+            'demo': True,
+            'model': 'GPT-3.5 Turbo (Demo)',
+            'message': 'Sign up for image uploads, document analysis & more!'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if request.method == 'POST':
+        data = request.get_json() if request.is_json else request.form
+        email = data.get('email')
+        name = data.get('name')
+        password = data.get('password')
+        
+        if User.query.filter_by(email=email).first():
+            return jsonify({'error': 'Email already exists'}), 400
+        
+        new_user = User(
+            email=email,
+            name=name,
+            password=generate_password_hash(password, method='pbkdf2:sha256'),
+            deepseek_date=datetime.utcnow().strftime('%Y-%m-%d')
+        )
+        db.session.add(new_user)
+        db.session.commit()
+        
+        if request.is_json:
+            return jsonify({'success': True, 'redirect': 'login'})
+        return redirect(url_for('login'))
+    
+    return render_template('signup.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        data = request.get_json() if request.is_json else request.form
+        email = data.get('email')
+        password = data.get('password')
+        
+        user = User.query.filter_by(email=email).first()
+        
+        if user and check_password_hash(user.password, password):
+            login_user(user)
+            if request.is_json:
+                return jsonify({'success': True, 'redirect': 'dashboard'})
+            return redirect(url_for('dashboard'))
+        
+        if request.is_json:
+            return jsonify({'error': 'Invalid credentials'}), 401
+        return render_template('login.html', error='Invalid credentials')
+    
+    return render_template('login.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('index'))
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    chats = Chat.query.filter_by(user_id=current_user.id) \
+        .order_by(Chat.updated_at.desc()).all()
+    
+    if current_user.is_premium:
+        available_models = {**FREE_MODELS, **PREMIUM_MODELS}
+    else:
+        available_models = FREE_MODELS
+    
+    return render_template('dashboard.html', user=current_user, chats=chats, models=available_models)
+
+@app.route('/upload', methods=['POST'])
+@login_required
+def upload_file():
+    """Handle file uploads"""
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+    
+    file = request.files['file']
+    
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+    
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+        filename = f"{current_user.id}_{timestamp}_{filename}"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        
+        file.save(filepath)
+        
+        if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
+            try:
+                compress_image(filepath)
+            except:
+                pass
+        
+        return jsonify({
+            'success': True,
+            'filename': filename,
+            'filepath': filepath
+        })
+    
+    return jsonify({'error': 'File type not allowed'}), 400
+
+@app.route('/chat/new', methods=['POST'])
+@login_required
+def new_chat():
+    new_chat_obj = Chat(user_id=current_user.id, title='New Chat')
+    db.session.add(new_chat_obj)
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'chat_id': new_chat_obj.id,
+        'title': new_chat_obj.title
+    })
+
+@app.route('/chat/<int:chat_id>/rename', methods=['POST'])
+@login_required
+def rename_chat(chat_id):
+    chat = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first()
+    
+    if not chat:
+        return jsonify({'error': 'Chat not found'}), 404
+    
+    new_title = request.json.get('title')
+    chat.title = new_title
+    db.session.commit()
+    
+    return jsonify({'success': True})
+
+@app.route('/chat/<int:chat_id>/delete', methods=['DELETE'])
+@login_required
+def delete_chat(chat_id):
+    chat = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first()
+    
+    if not chat:
+        return jsonify({'error': 'Chat not found'}), 404
+    
+    for message in chat.messages:
+        if message.has_image and message.image_path:
+            try:
+                os.remove(message.image_path)
+            except:
+                pass
+    
+    db.session.delete(chat)
+    db.session.commit()
+    
+    return jsonify({'success': True})
+
+@app.route('/chat/<int:chat_id>/messages', methods=['GET'])
+@login_required
+def get_chat_messages(chat_id):
+    chat = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first()
+    
+    if not chat:
+        return jsonify({'error': 'Chat not found'}), 404
+    
+    messages = Message.query.filter_by(chat_id=chat_id) \
+        .order_by(Message.created_at.asc()).all()
+    
+    return jsonify({
+        'messages': [{
+            'role': msg.role,
+            'content': msg.content,
+            'model': msg.model,
+            'has_image': msg.has_image,
+            'image_path': msg.image_path,
+            'created_at': msg.created_at.isoformat()
+        } for msg in messages],
+        'title': chat.title
+    })
+
+@app.route('/chat', methods=['POST'])
+@login_required
+def chat():
+    user_message = request.json.get('message')
+    selected_model = request.json.get('model', 'gpt-3.5-turbo')
+    chat_id = request.json.get('chat_id')
+    uploaded_file = request.json.get('uploaded_file')
+    
+    if chat_id:
+        chat_obj = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first()
+        if not chat_obj:
+            return jsonify({'error': 'Chat not found'}), 404
+    else:
+        chat_obj = Chat(user_id=current_user.id, title='New Chat')
+        db.session.add(chat_obj)
+        db.session.commit()
+        chat_id = chat_obj.id
+    
+    if selected_model in PREMIUM_MODELS and not current_user.is_premium:
+        return jsonify({
+            'error': 'This model requires Premium subscription',
+            'upgrade_url': 'checkout'
+        }), 403
+    
+    if selected_model == 'deepseek-chat' and not current_user.is_premium:
+        if not check_deepseek_limit(current_user):
+            return jsonify({
+                'error': '⚠️ Daily DeepSeek limit reached (50/day). Try tomorrow or upgrade to Premium!'
+            }), 429
+    
+    if selected_model in FREE_MODELS:
+        model_path = FREE_MODELS[selected_model]['path']
+        model_name = FREE_MODELS[selected_model]['name']
+        has_vision = FREE_MODELS[selected_model]['vision']
+    elif selected_model in PREMIUM_MODELS:
+        model_path = PREMIUM_MODELS[selected_model]['path']
+        model_name = PREMIUM_MODELS[selected_model]['name']
+        has_vision = PREMIUM_MODELS[selected_model]['vision']
+    else:
+        return jsonify({'error': 'Invalid model'}), 400
+    
+    user_msg = Message(
+        chat_id=chat_id,
+        role='user',
+        content=user_message,
+        has_image=bool(uploaded_file),
+        image_path=uploaded_file
+    )
+    db.session.add(user_msg)
+    
+    if chat_obj.title == 'New Chat':
+        chat_obj.title = generate_chat_title(user_message)
+    
+    history = get_chat_history(chat_id)
+    
+    if uploaded_file and has_vision:
+        try:
+            image_base64 = encode_image(uploaded_file)
+            history.append({
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": user_message},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}}
+                ]
+            })
+        except Exception as e:
+            return jsonify({'error': f'Image processing error: {str(e)}'}), 500
+    else:
+        history.append({"role": "user", "content": user_message})
+    
+    try:
+        response = openrouter_client.chat.completions.create(
+            model=model_path,
+            messages=history,
+        )
+        
+        bot_response = response.choices[0].message.content
+        
+        assistant_msg = Message(
+            chat_id=chat_id,
+            role='assistant',
+            content=bot_response,
+            model=model_name
+        )
+        db.session.add(assistant_msg)
+        
+        if selected_model == 'deepseek-chat' and not current_user.is_premium:
+            current_user.deepseek_count += 1
+        
+        chat_obj.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        return jsonify({
+            'response': bot_response,
+            'model': model_name,
+            'chat_id': chat_id,
+            'chat_title': chat_obj.title,
+            'premium': current_user.is_premium,
+            'deepseek_remaining': 50 - current_user.deepseek_count if selected_model == 'deepseek-chat' else None
+        })
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'AI Error: {str(e)}'}), 500
+
+@app.route('/checkout')
+@login_required
+def checkout():
+    try:
+        session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            customer_email=current_user.email,
+            line_items=[{
+                'price_data': {
+                    'currency': 'usd',
+                    'product_data': {
+                        'name': 'NexaAI Premium',
+                        'description': 'Unlimited access to GPT-4, Claude, Gemini & all premium AI models',
+                    },
+                    'unit_amount': 1999,
+                    'recurring': {
+                        'interval': 'month',
+                    },
+                },
+                'quantity': 1,
+            }],
+            mode='subscription',
+            success_url=url_for('payment_success', _external=True),
+            cancel_url=url_for('dashboard', _external=True),
+        )
+        return redirect(session.url)
+    except Exception as e:
+        return str(e), 500
+
+@app.route('/payment-success')
+@login_required
+def payment_success():
+    return 'Payment successful! <a href="/dashboard">Go to Dashboard</a>'
+
+@app.route('/webhook', methods=['POST'])
+def stripe_webhook():
+    payload = request.data
+    sig_header = request.headers.get('Stripe-Signature')
+    
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, os.getenv('STRIPE_WEBHOOK_SECRET')
+        )
+    except Exception as e:
+        return str(e), 400
+    
+    if event['type'] == 'checkout.session.completed':
+        session = event['data']['object']
+        user = User.query.filter_by(email=session['customer_email']).first()
+        if user:
+            user.is_premium = True
+            user.subscription_id = session.get('subscription')
+            db.session.commit()
+    
+    return '', 200
+
+if __name__ == '__main__':
+    with app.app_context():
+        migrate_database()
+        db.create_all()
+        print("✅ Database ready!")
+        print("🚀 Starting NexaAI with advanced features...")
+    
+    app.run(debug=True, port=5000)
