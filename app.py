@@ -10,7 +10,7 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from datetime import datetime
-import openai
+import requests
 import stripe
 import sqlite3
 import base64
@@ -33,16 +33,13 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 db = SQLAlchemy(app)
 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 
-# OpenRouter client
-openrouter_client = openai.OpenAI(
-    base_url="https://openrouter.ai/api/v1",
-    api_key=os.getenv('OPENROUTER_API_KEY'),
-)
+# OpenRouter API configuration
+OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
-
 
 # ============ DATABASE MODELS ============
 
@@ -139,8 +136,8 @@ FREE_MODELS = {
         'vision': False
     },
     'gemini-flash': {
-        'path': 'google/gemini-2.0-flash-lite-001',
-        'name': 'Gemini Flash 2.0 lite',
+        'path': 'google/gemini-2.0-flash-exp-free',
+        'name': 'Gemini Flash 2.0',
         'limit': None,
         'vision': False
     },
@@ -242,6 +239,24 @@ def get_chat_history(chat_id, limit=10):
     
     return history
 
+def call_openrouter_api(model_path, messages):
+    """Call OpenRouter API using requests"""
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    
+    payload = {
+        "model": model_path,
+        "messages": messages,
+    }
+    
+    response = requests.post(OPENROUTER_BASE_URL, headers=headers, json=payload, timeout=60)
+    response.raise_for_status()
+    response_data = response.json()
+    
+    return response_data['choices'][0]['message']['content']
+
 # ============ ROUTES ============
 
 @app.route('/')
@@ -253,13 +268,13 @@ def demo_chat():
     user_message = request.json.get('message')
     
     try:
-        response = openrouter_client.chat.completions.create(
-            model=FREE_MODELS['gpt-3.5-turbo']['path'],
-            messages=[{"role": "user", "content": user_message}],
+        bot_response = call_openrouter_api(
+            FREE_MODELS['gpt-3.5-turbo']['path'],
+            [{"role": "user", "content": user_message}]
         )
         
         return jsonify({
-            'response': response.choices[0].message.content,
+            'response': bot_response,
             'demo': True,
             'model': 'GPT-3.5 Turbo (Demo)',
             'message': 'Sign up for image uploads, document analysis & more!'
@@ -508,12 +523,7 @@ def chat():
         history.append({"role": "user", "content": user_message})
     
     try:
-        response = openrouter_client.chat.completions.create(
-            model=model_path,
-            messages=history,
-        )
-        
-        bot_response = response.choices[0].message.content
+        bot_response = call_openrouter_api(model_path, history)
         
         assistant_msg = Message(
             chat_id=chat_id,
@@ -545,7 +555,7 @@ def chat():
 @app.route('/checkout')
 @login_required
 def checkout():
-    return render_template('checkout.html')
+        return render_template('checkout.html')
 
 @app.route('/payment-success')
 @login_required
