@@ -241,22 +241,25 @@ def get_chat_history(chat_id, limit=10):
     return history
 
 def call_openrouter_api(model_path, messages):
-    """Call OpenRouter API using requests"""
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
     }
-    
+
     payload = {
         "model": model_path,
         "messages": messages,
+        "max_tokens": 800,      # cap response length
+        "temperature": 0.7,
     }
-    
-    response = requests.post(OPENROUTER_BASE_URL, headers=headers, json=payload, timeout=60)
+
+    response = requests.post(
+        OPENROUTER_BASE_URL, headers=headers, json=payload, timeout=60
+    )
     response.raise_for_status()
-    response_data = response.json()
-    
-    return response_data['choices'][0]['message']['content']
+    data = response.json()
+    return data["choices"][0]["message"]["content"]
+
 
 # ============ ROUTES ============
 
@@ -593,4 +596,5 @@ if __name__ == '__main__':
         print("🚀 Starting NexaAI with advanced features...")
     
     app.run(debug=True, port=5000)
+
 
