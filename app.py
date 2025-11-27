@@ -136,7 +136,7 @@ FREE_MODELS = {
         'vision': False
     },
     'gemini-flash': {
-        'path': 'google/gemini-2.0-flash-exp-free',
+        'path': 'google/gemini-2.0-flash-001',
         'name': 'Gemini Flash 2.0',
         'limit': None,
         'vision': False
@@ -148,6 +148,7 @@ FREE_MODELS = {
         'vision': False
     }
 }
+
 
 PREMIUM_MODELS = {
     'gpt-4o': {
@@ -592,3 +593,4 @@ if __name__ == '__main__':
         print("🚀 Starting NexaAI with advanced features...")
     
     app.run(debug=True, port=5000)
+
