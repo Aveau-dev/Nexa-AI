@@ -133,7 +133,7 @@ FREE_MODELS = {
         'path': 'openai/gpt-3.5-turbo',
         'name': 'GPT-3.5 Turbo',
         'limit': None,
-        'vision': False
+        'vision': True
     },
     'claude-3-haiku': {
         'path': 'anthropic/claude-3-haiku',
@@ -687,6 +687,7 @@ if __name__ == '__main__':
         print("🚀 Starting NexaAI with advanced features...")
     
     app.run(debug=True, port=5000)
+
 
 
 
