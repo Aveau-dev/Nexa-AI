@@ -2311,3 +2311,84 @@ body {
         margin: 0.375rem 0;
     }
 }
+
+.message-row {
+  width: 100%;
+  margin-bottom: 12px;
+  display: flex;
+}
+
+.user-row {
+  justify-content: flex-end;
+}
+
+.assistant-row {
+  justify-content: flex-start;
+}
+
+.message {
+  max-width: 720px;
+  border-radius: 16px;
+  padding: 10px 14px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.user-message {
+  background: #1f2933;
+  color: #e5e7eb;
+}
+
+.assistant-message {
+  background: #111827;
+  color: #e5e7eb;
+  display: flex;
+  gap: 10px;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: #111827;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.markdown-content {
+  max-width: 650px;
+}
+
+.markdown-content p {
+  margin: 0 0 8px;
+}
+
+.markdown-content code {
+  font-family: "JetBrains Mono", Menlo, Monaco, Consolas, "Courier New", monospace;
+}
+
+pre {
+  position: relative;
+  background: #0d1117;
+  color: #e6edf3;
+  padding: 12px 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-size: 13px;
+}
+
+.copy-code-btn {
+  background: #2f81f7;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.copy-code-btn:hover {
+  background: #1b63c9;
+}
