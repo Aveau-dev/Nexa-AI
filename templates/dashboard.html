@@ -544,6 +544,24 @@ function addMessage(text, role, model = '', useTyping = false) {
     c.appendChild(row);
     c.scrollTop = c.scrollHeight;
 }
+    
+function addImageMessage(url) {
+  const c = document.getElementById('messages-container');
+  const row = document.createElement('div');
+  row.className = 'message-row assistant-row';
+  row.innerHTML = `
+    <div class="message assistant-message">
+      <div class="avatar">...</div>
+      <div class="message-content">
+        <div class="message-text markdown-content">
+          <img src="${url}" alt="Generated image" style="max-width:100%;border-radius:12px;">
+          <p><a href="${url}" download>Download image</a></p>
+        </div>
+      </div>
+    </div>`;
+  c.appendChild(row);
+  c.scrollTop = c.scrollHeight;
+}
 
 /* typing indicator */
 function showTypingIndicator(){
@@ -701,5 +719,6 @@ document.getElementById('chat-input')?.addEventListener('input',function(){
 
 </body>
 </html>
+
 
 
