@@ -516,22 +516,20 @@
             // USER MESSAGE: prompt bar with icons
             if (role === 'user') {
                 row.innerHTML = `
-        <div class="message user-message">
-            <div class="message-header">
-                <div class="message-prompt-text">${escapeHtml(text)}</div>
-                <div class="message-header-actions">
-                    <button class="msg-copy-btn" title="Copy prompt">
-                        📋
-                    </button>
-                    <button class="msg-edit-btn" title="Edit & resend">
-                        ✏️
-                    </button>
-                </div>
-            </div>
-        </div>`;
+      <div class="message user-message">
+        <div class="message-header" data-original="${escapeHtml(text)}">
+          <div class="message-prompt-text">${escapeHtml(text)}</div>
+          <div class="message-header-actions">
+            <button class="msg-copy-btn" title="Copy prompt">📋</button>
+            <button class="msg-edit-btn" title="Edit prompt">✏️</button>
+          </div>
+        </div>
+      </div>`;
                 c.appendChild(row);
                 c.scrollTop = c.scrollHeight;
                 return;
+
+
             }
 
             // ASSISTANT MESSAGE (unchanged)
@@ -902,54 +900,135 @@
         const row = document.createElement('div');
         row.className = `message-row ${role}-row`;
 
-        // USER MESSAGE: with Copy + Edit buttons
+        // USER MESSAGE: single header bar with copy + edit
         if (role === 'user') {
             row.innerHTML = `
-        <div class="message user-message">
-            <div class="message-content">
-                <div class="message-text">${escapeHtml(text)}</div>
-                <div class="message-actions">
-                    <button class="msg-copy-btn">Copy</button>
-                    <button class="msg-edit-btn">Edit</button>
-                </div>
+          <div class="message user-message">
+            <div class="message-header" data-original="${escapeHtml(text)}">
+              <div class="message-prompt-text">${escapeHtml(text)}</div>
+              <div class="message-header-actions">
+                <button class="msg-copy-btn" title="Copy prompt">📋</button>
+                <button class="msg-edit-btn" title="Edit prompt">✏️</button>
+              </div>
             </div>
-        </div>`;
+          </div>`;
             c.appendChild(row);
             c.scrollTop = c.scrollHeight;
             return;
         }
 
-        // ASSISTANT MESSAGE: same as you had
+        // ASSISTANT MESSAGE
         if (role === 'assistant') {
             row.innerHTML = `
-        <div class="message assistant-message">
+          <div class="message assistant-message">
             <div class="avatar">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                    <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
-                </svg>
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
+              </svg>
             </div>
             <div class="message-content">
-                ${model ? `<div class="model-badge">${escapeHtml(model)}</div>` : ''}
-                <div class="message-text markdown-content"></div>
+              ${model ? `<div class="model-badge">${escapeHtml(model)}</div>` : ''}
+              <div class="message-text markdown-content"></div>
             </div>
-        </div>`;
+          </div>`;
             c.appendChild(row);
+
             const el = row.querySelector('.message-text');
             el.innerHTML = formatMessage(text);
             el.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
-            addCopyButtons(el);
+            addCopyButtons(el);          // code-block copy buttons
             c.scrollTop = c.scrollHeight;
             return;
         }
 
         // ERROR MESSAGE
         row.innerHTML = `
-    <div class="message error-message">
+      <div class="message error-message">
         <div class="message-content">⚠️ ${escapeHtml(text)}</div>
-    </div>`;
+      </div>`;
         c.appendChild(row);
         c.scrollTop = c.scrollHeight;
     }
+
+    document.addEventListener('click', (e) => {
+        // ----- user prompt header actions -----
+        const copyBtn = e.target.closest('.msg-copy-btn');
+        const editBtn = e.target.closest('.msg-edit-btn');
+        const doneBtn = e.target.closest('.msg-edit-done-btn');
+        const cancelBtn = e.target.closest('.msg-edit-cancel-btn');
+
+        // 1) COPY – keep features
+        if (copyBtn) {
+            const header = copyBtn.closest('.message-header');
+            const textEl = header.querySelector('.message-prompt-text');
+            const txt = textEl.innerText;
+            navigator.clipboard.writeText(txt);
+            copyBtn.textContent = 'Copied';
+            setTimeout(() => (copyBtn.textContent = '📋'), 1200);
+            return;
+        }
+
+        // 2) ENTER EDIT MODE – replace header with textarea + Done/Cancel
+        if (editBtn) {
+            const header = editBtn.closest('.message-header');
+            const textEl = header.querySelector('.message-prompt-text');
+            const current = textEl.innerText;
+            header.dataset.original = current;
+
+            header.innerHTML = `
+          <textarea class="msg-edit-area">${escapeHtml(current)}</textarea>
+          <div class="message-header-actions">
+            <button class="msg-edit-cancel-btn">Cancel</button>
+            <button class="msg-edit-done-btn">Done</button>
+          </div>
+        `;
+
+            const ta = header.querySelector('.msg-edit-area');
+            ta.focus();
+            ta.selectionStart = ta.selectionEnd = ta.value.length;
+            return;
+        }
+
+        // 3) CANCEL EDIT – restore original text, don’t resend
+        if (cancelBtn) {
+            const header = cancelBtn.closest('.message-header');
+            const original = header.dataset.original || '';
+            header.innerHTML = `
+          <div class="message-prompt-text">${escapeHtml(original)}</div>
+          <div class="message-header-actions">
+            <button class="msg-copy-btn" title="Copy prompt">📋</button>
+            <button class="msg-edit-btn" title="Edit prompt">✏️</button>
+          </div>
+        `;
+            return;
+        }
+
+        // 4) DONE – update text + send new answer (old one stays)
+        if (doneBtn) {
+            const header = doneBtn.closest('.message-header');
+            const ta = header.querySelector('.msg-edit-area');
+            const updated = ta.value.trim();
+            if (!updated) return;
+
+            // Update header display
+            header.innerHTML = `
+          <div class="message-prompt-text">${escapeHtml(updated)}</div>
+          <div class="message-header-actions">
+            <button class="msg-copy-btn" title="Copy prompt">📋</button>
+            <button class="msg-edit-btn" title="Edit prompt">✏️</button>
+          </div>
+        `;
+
+            // Put into input and send new message
+            const input = document.getElementById('chat-input');
+            input.value = updated;
+            sendMessage();              // uses updated text, creates ONE new answer
+            return;
+        }
+
+        // ----- existing click logic for chat items, rename, delete, sidebar, etc. continues here -----
+        // (keep all the code you already had after this)
+    });
 
     document.addEventListener('click', (e) => {
         if (!e.target.classList.contains('msg-copy-btn') &&
