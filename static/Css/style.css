@@ -2312,62 +2312,6 @@ body {
     }
 }
 
-.message-row {
-  width: 100%;
-  margin-bottom: 12px;
-  display: flex;
-}
-
-.user-row {
-  justify-content: flex-end;
-}
-
-.assistant-row {
-  justify-content: flex-start;
-}
-
-.message {
-  max-width: 720px;
-  border-radius: 16px;
-  padding: 10px 14px;
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-.user-message {
-  background: #1f2933;
-  color: #e5e7eb;
-}
-
-.assistant-message {
-  background: #111827;
-  color: #e5e7eb;
-  display: flex;
-  gap: 10px;
-}
-
-.avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 999px;
-  background: #111827;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.markdown-content {
-  max-width: 650px;
-}
-
-.markdown-content p {
-  margin: 0 0 8px;
-}
-
-.markdown-content code {
-  font-family: "JetBrains Mono", Menlo, Monaco, Consolas, "Courier New", monospace;
-}
 
 
 
