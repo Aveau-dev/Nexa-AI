@@ -139,9 +139,9 @@ def migrate_database():
 # ============ AI MODEL CONFIGURATION ============
 
 FREE_MODELS = {
-    'gpt-3.5-turbo': {
-        'path': 'openai/gpt-3.5-turbo',
-        'name': 'GPT-3.5 Turbo',
+    'gpt-4o-mini': {
+        'path': ''openai/gpt-4o-mini'',
+        'name': 'GPT-4o-mini',
         'limit': None,
         'vision': True
     },
@@ -155,7 +155,7 @@ FREE_MODELS = {
         'path': 'google/gemini-2.0-flash-exp',
         'name': 'Gemini Flash 2.0',
         'limit': None,
-        'vision': False
+        'vision': True
     },
     'deepseek-chat': {
         'path': 'deepseek/deepseek-chat',
@@ -654,3 +654,4 @@ if __name__ == '__main__':
         print("✅ Database ready!")
         print("🚀 Starting NexaAI with advanced features...")
     app.run(debug=True, port=5000)
+
