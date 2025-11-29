@@ -585,6 +585,27 @@ function formatMessage(text) {
     });
     return marked.parse(text);
 }
+        
+function addCopyButtons(messageDiv) {
+    messageDiv.querySelectorAll('pre code').forEach((codeBlock) => {
+        const pre = codeBlock.parentElement;
+        const btn = document.createElement('button');
+        btn.className = 'copy-code-btn';
+        btn.textContent = 'Copy';
+
+        btn.addEventListener('click', () => {
+            navigator.clipboard.writeText(codeBlock.textContent);
+            btn.textContent = 'Copied!';
+            setTimeout(() => (btn.textContent = 'Copy'), 1500);
+        });
+
+        pre.style.position = 'relative';
+        btn.style.position = 'absolute';
+        btn.style.top = '8px';
+        btn.style.right = '8px';
+        pre.appendChild(btn);
+    });
+}
 
 function typeWriter(text, element, speed = 15) {
     // Fix: Use different quote style or escape backticks
@@ -823,5 +844,6 @@ console.log('🤖 All AI models ready');
     </script>
 </body>
 </html>
+
 
 
