@@ -2383,53 +2383,51 @@ body {
 
 
 
-/* User message row alignment */
-.message-row.user-row {
-    display: flex;
-    justify-content: flex-end;      /* right side */
-    padding: 4px 12px;
-}
-
-/* User bubble */
-.message.user-message {
-    max-width: 70%;                 /* bubble never wider than 70% of chat area */
-    display: inline-flex;
-    justify-content: flex-end;
-}
-
-/* Header containing text + icons */
+/* User prompt header bar */
 .message-header {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 10px;
-    border-radius: 16px;
-    background: #1f2937;            /* your dark gray */
-    color: #f9fafb;
-    /* auto width based on content, but wrap when long */
-    max-width: 100%;
+  display: inline-flex;          /* shrink to content instead of full width */
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  border-radius: 999px;
+  background: #020617;
+  border: 1px solid #1f2937;
+  max-width: 100%;               /* never overflow container */
 }
 
-/* The text itself – allows wrapping */
+/* Text inside the prompt bar */
 .message-prompt-text {
-    white-space: normal;            /* allow wrapping */
-    word-wrap: break-word;
-    word-break: break-word;
+  flex: 1 1 auto;
+  font-size: 0.9rem;
+  color: #e5e7eb;
+  white-space: normal;           /* allow wrapping to next line */
+  word-break: break-word;        /* break long words/URLs */
 }
 
-/* Copy / edit buttons */
+/* Right-side icons */
 .message-header-actions {
-    display: inline-flex;
-    gap: 4px;
-    flex-shrink: 0;                 /* don’t shrink icons */
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.msg-copy-btn,
-.msg-edit-btn {
-    border: none;
-    background: transparent;
-    cursor: pointer;
-    font-size: 14px;
-    padding: 0 2px;
+.user-message {
+  display: inline-block;
+  max-width: 75%;    /* like typical chat bubble */
 }
+
+
+
+
+
+
+
+
+
+
+
+
 
