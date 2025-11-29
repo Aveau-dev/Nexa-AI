@@ -263,6 +263,7 @@
         <div class="input-wrapper">
             <div class="input-box">
                 <div class="input-inner">
+                    <input type="file" id="image-input" accept="image/*">
                     <textarea id="chat-input" placeholder="Ask anything..." rows="1"></textarea>
                     <button class="send-button" id="send-btn">
                         <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
@@ -463,7 +464,13 @@ async function sendMessage(){
         const res=await fetch('/chat',{
             method:'POST',
             headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({message,model:currentModel,chat_id:currentChatId})
+            body: JSON.stringify({
+              message,
+              model: currentModel,
+              chat_id: currentChatId,
+              uploaded_file: currentUploadedFilename || null
+            })
+
         });
         const d=await res.json();
         removeTypingIndicator();
@@ -719,6 +726,7 @@ document.getElementById('chat-input')?.addEventListener('input',function(){
 
 </body>
 </html>
+
 
 
 
