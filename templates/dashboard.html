@@ -515,16 +515,28 @@
 
             if (role === 'user') {
                 row.innerHTML = `
-            <div class="message user-message">
-                <div class="message-content"><div class="message-text">${escapeHtml(text)}</div></div>
-            </div>`;
+      <div class="message user-message">
+        <div class="message-header">
+          <div class="message-prompt-text">${escapeHtml(text)}</div>
+          <div class="message-header-actions">
+            <button class="msg-copy-btn" title="Copy">
+              📋
+            </button>
+            <button class="msg-edit-btn" title="Edit & resend">
+              ✏️
+            </button>
+          </div>
+        </div>
+      </div>`;
                 c.appendChild(row);
                 c.scrollTop = c.scrollHeight;
                 return;
             }
 
-            if (role === 'assistant') {
-                row.innerHTML = `
+        }
+
+        if (role === 'assistant') {
+            row.innerHTML = `
             <div class="message assistant-message">
                 <div class="avatar">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
@@ -536,22 +548,22 @@
                     <div class="message-text markdown-content"></div>
                 </div>
             </div>`;
-                c.appendChild(row);
-                const el = row.querySelector('.message-text');
-                el.innerHTML = formatMessage(text);
-                el.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
-                addCopyButtons(el);
-                c.scrollTop = c.scrollHeight;
-                return;
-            }
+            c.appendChild(row);
+            const el = row.querySelector('.message-text');
+            el.innerHTML = formatMessage(text);
+            el.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
+            addCopyButtons(el);
+            c.scrollTop = c.scrollHeight;
+            return;
+        }
 
-            // error
-            row.innerHTML = `
+        // error
+        row.innerHTML = `
         <div class="message error-message">
             <div class="message-content">⚠️ ${escapeHtml(text)}</div>
         </div>`;
-            c.appendChild(row);
-            c.scrollTop = c.scrollHeight;
+        c.appendChild(row);
+        c.scrollTop = c.scrollHeight;
         }
 
         /* ============ TYPING INDICATOR ============ */
@@ -1037,6 +1049,29 @@
                     input.focus();
                     // Optional: move cursor to end
                     input.selectionStart = input.selectionEnd = input.value.length;
+                    // User prompt header: copy / edit
+                    if (e.target.closest('.msg-copy-btn') || e.target.closest('.msg-edit-btn')) {
+                        const btn = e.target.closest('.msg-copy-btn') || e.target.closest('.msg-edit-btn');
+                        const header = btn.closest('.message-header');
+                        const textEl = header?.querySelector('.message-prompt-text');
+                        if (!textEl) return;
+                        const promptText = textEl.innerText;
+
+                        if (btn.classList.contains('msg-copy-btn')) {
+                            navigator.clipboard.writeText(promptText);
+                            btn.textContent = 'Copied';
+                            setTimeout(() => (btn.textContent = '📋'), 1200);
+                        }
+
+                        if (btn.classList.contains('msg-edit-btn')) {
+                            const input = document.getElementById('chat-input');
+                            input.value = promptText;
+                            input.focus();
+                            input.selectionStart = input.selectionEnd = input.value.length;
+                        }
+                        return;
+                    }
+
                 }
             }
 
