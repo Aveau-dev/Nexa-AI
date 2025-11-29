@@ -580,6 +580,98 @@
                 document.getElementById('typing-indicator')?.remove();
             }
 
+
+            let currentUploadedFile = null;
+
+            // Attach button handler
+            document.getElementById('attach-btn')?.addEventListener('click', () => {
+                document.getElementById('file-input').click();
+            });
+
+            // File input handler
+            document.getElementById('file-input')?.addEventListener('change', async function (e) {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const formData = new FormData();
+                formData.append('file', file);
+
+                try {
+                    const res = await fetch('/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await res.json();
+
+                    if (data.success) {
+                        currentUploadedFile = data.filename;
+                        // Show file attached indicator
+                        const attachBtn = document.getElementById('attach-btn');
+                        attachBtn.style.color = '#19c37d';
+                        attachBtn.title = `Attached: ${file.name}`;
+                    } else {
+                        alert(data.error || 'Upload failed');
+                    }
+                } catch (err) {
+                    alert('Failed to upload file');
+                }
+
+                // Reset input
+                e.target.value = '';
+            });
+
+            // Update sendMessage to include uploaded file
+            async function sendMessage() {
+                const input = document.getElementById('chat-input');
+                const message = input.value.trim();
+                if (!message || isLoading) return;
+                isLoading = true;
+
+                document.getElementById('welcome-section').style.display = 'none';
+                addMessage(message, 'user', '', false);
+                input.value = ''; input.style.height = 'auto';
+                showTypingIndicator();
+
+                try {
+                    const res = await fetch('/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            message,
+                            model: currentModel,
+                            chat_id: currentChatId,
+                            uploaded_file: currentUploadedFile  // Add this line
+                        })
+                    });
+                    const d = await res.json();
+                    removeTypingIndicator();
+
+                    // Reset attach button
+                    currentUploadedFile = null;
+                    const attachBtn = document.getElementById('attach-btn');
+                    attachBtn.style.color = '#9ca3af';
+                    attachBtn.title = 'Attach file';
+
+                    if (d.error) {
+                        addMessage(d.error, 'error', '', false);
+                    } else {
+                        addMessage(d.response, 'assistant', d.model, true);
+                        currentChatId = d.chat_id;
+                        if (d.chat_title) {
+                            const ex = document.querySelector(`[data-chat-id="${d.chat_id}"]`);
+                            if (ex) ex.querySelector('.chat-title').textContent = d.chat_title;
+                            else addChatToSidebar(d.chat_id, d.chat_title, true);
+                        }
+                    }
+                } catch {
+                    removeTypingIndicator();
+                    addMessage('Network error talking to server.', 'error', '', false);
+                } finally {
+                    isLoading = false;
+                }
+            }
+
+
             /* Global click: chat list + menus */
             document.addEventListener('click', (e) => {
                 if (e.target.closest('.chat-item') && !e.target.closest('.chat-actions')) {
