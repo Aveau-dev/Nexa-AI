@@ -292,6 +292,8 @@ function formatMessage(text) {
     }
 
     marked.setOptions({
+        gfm: true,
+        breaks: true,
         highlight: function (code, lang) {
             if (typeof hljs !== 'undefined' && lang && hljs.getLanguage(lang)) {
                 return hljs.highlight(code, { language: lang }).value;
@@ -299,13 +301,12 @@ function formatMessage(text) {
             return typeof hljs !== 'undefined'
                 ? hljs.highlightAuto(code).value
                 : code;
-        },
-        breaks: true,
-        gfm: true
+        }
     });
 
     return marked.parse(text);
 }
+
 
 
 function addCopyButtons(container) {
@@ -472,6 +473,11 @@ async function sendMessage(){
 function addMessage(text,role,model='',useTyping=false){
   const c=document.getElementById('messages-container');
   const row=document.createElement('div');
+  const el = row.querySelector('.message-text');
+  el.innerHTML = formatMessage(text);
+  el.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
+  addCopyButtons(el);
+
   row.className=`message-row ${role}-row`;
   if(role==='user'){
     row.innerHTML=`
@@ -591,5 +597,6 @@ document.addEventListener('click',e=>{
     </script>
 </body>
 </html>
+
 
 
