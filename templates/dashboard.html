@@ -494,20 +494,26 @@ function addMessage(text, role, model = '', useTyping = false) {
 
     // USER: header bar with copy + edit
     if (role === 'user') {
-        row.innerHTML = `
-          <div class="message user-message">
-            <div class="message-header" data-original="${escapeHtml(text)}">
-              <div class="message-prompt-text">${escapeHtml(text)}</div>
-              <div class="message-header-actions">
-                <button class="msg-copy-btn" title="Copy prompt">📋</button>
-                <button class="msg-edit-btn" title="Edit prompt">✏️</button>
-              </div>
-            </div>
-          </div>`;
-        c.appendChild(row);
-        c.scrollTop = c.scrollHeight;
-        return;
-    }
+    row.innerHTML = `
+      <div class="message user-message">
+        <div class="message-content">
+          <div class="message-text">${escapeHtml(text)}</div>
+        </div>
+      </div>`;
+    c.appendChild(row);
+
+    // add tools on top of the bubble (copy + edit icons)
+    const tools = document.createElement('div');
+    tools.className = 'user-tools';
+    tools.innerHTML = `
+      <button class="user-tool-btn msg-copy-btn" title="Copy">📋</button>
+      <button class="user-tool-btn msg-edit-btn" title="Edit">✏️</button>
+    `;
+    row.querySelector('.user-message').appendChild(tools);
+
+    c.scrollTop = c.scrollHeight;
+    return;
+}
 
     // ASSISTANT
     if (role === 'assistant') {
@@ -697,3 +703,4 @@ document.getElementById('chat-input')?.addEventListener('input',function(){
 
 </body>
 </html>
+
