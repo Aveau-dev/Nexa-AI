@@ -1,26 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta name="google-site-verification" content="1xRfZx8fEbwT18xMYj4l1UFl5jRckIrbs2uk4STqF6Y" />
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NexaAI – Modern AI Assistant</title>
-    <meta name="description"
-        content="NexaAI is a modern, free, multi-model AI assistant platform. Chat with GPT-4, Claude, Gemini, DeepSeek, and more. Save your history, upload images, and get premium AI features!">
-    <meta name="keywords"
-        content="AI, NexaAI, chatbot, GPT-4, Claude, Gemini, DeepSeek, OpenRouter, AI assistant, LLM, FOSS, paywall, chat history, free, ai tools">
+    <meta name="description" content="NexaAI is a modern, free, multi-model AI assistant platform. Chat with GPT-4, Claude, Gemini, DeepSeek, and more. Save your history, upload images, and get premium AI features!">
+    <meta name="keywords" content="AI, NexaAI, chatbot, GPT-4, Claude, Gemini, DeepSeek, OpenRouter, AI assistant, LLM, FOSS, paywall, chat history, free, ai tools">
     <link rel="canonical" href="https://yoursite.com/">
     <meta name="robots" content="index, follow">
-    <link rel="icon" type="image/svg+xml"
-        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2319c37d' d='M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z'/></svg>">
-    <!-- NOTE: css folder name should be lowercase on disk: static/css/style.css -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2319c37d' d='M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z'/></svg>">
     <link rel="stylesheet" href="{{ url_for('static', filename='Css/style.css') }}">
 
     <!-- Open Graph / Twitter -->
     <meta property="og:title" content="NexaAI – AI Chat Assistant" />
-    <meta property="og:description"
-        content="A smart, free AI chat dashboard supporting GPT-4, Claude, Gemini, and more." />
+    <meta property="og:description" content="A smart, free AI chat dashboard supporting GPT-4, Claude, Gemini, and more." />
     <meta property="og:url" content="https://nexaai.js.org/" />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="https://nexaai.js.org/static/og-image.png" />
@@ -31,7 +25,7 @@
 
     <!-- Markdown + syntax highlighting -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 </head>
 
@@ -49,8 +43,7 @@
         <div class="nav-right">
             <button class="nav-button secondary" onclick="location.href='/login'">Log in</button>
             <button class="nav-button primary" onclick="location.href='/signup'">Sign up for free</button>
-            <button class="nav-button icon-only" <a href="javascript:void(0)" onclick="openTermsModal()"
-                                style="text-decoration:underline;cursor:pointer;"></a>>
+            <button class="nav-button icon-only" onclick="openTermsModal()">
                 <svg viewBox="0 0 24 24" width="20" height="20">
                     ircle cx="12" cy="12" r="10" stroke="currentColor" fill="none" stroke-width="2"/>
                     <text x="12" y="16" text-anchor="middle" fill="currentColor" font-size="12">?</text>
@@ -73,8 +66,7 @@
             <div class="input-wrapper">
                 <div class="input-box">
                     <div class="input-inner">
-                        <textarea id="chat-input" placeholder="Ask anything" rows="1"
-                            onkeydown="handleKeyDown(event)"></textarea>
+                        <textarea id="chat-input" placeholder="Ask anything" rows="1" onkeydown="handleKeyDown(event)"></textarea>
                         <button class="send-button" onclick="sendMessage()" id="send-btn">
                             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                                 <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
@@ -84,18 +76,14 @@
                     <div class="input-footer">
                         <span class="demo-notice">
                             🎁 Demo Mode - Limited features.
-                            <a href="javascript:void(0)" onclick="openTermsModal()"
-                                style="text-decoration:underline;cursor:pointer;">Terms & Policies</a> ·
+                            <a href="javascript:void(0)" onclick="openTermsModal()" style="text-decoration:underline;cursor:pointer;">Terms & Policies</a> ·
                             <a href="/signup">Sign up</a> for full access
                         </span>
-
                     </div>
                 </div>
             </div>
         </div>
     </div>
-
-
 
     <!-- Terms & Policies Modal -->
     <div id="terms-modal" class="modal-overlay" style="display:none;">
@@ -150,11 +138,9 @@
                 <section class="terms-section">
                     <h3>⚡ Usage Limits</h3>
                     <ul>
-                        <li><strong>Demo Mode:</strong> Limited to 3 messages per session</li>
-                        <li><strong>Free Users:</strong> Access to GPT-3.5, Claude Haiku, Gemini Flash, DeepSeek
-                            (50/day)</li>
-                        <li><strong>Premium Users:</strong> Unlimited access to all models including GPT-4, Claude 3.5,
-                            and more</li>
+                        <li><strong>Demo Mode:</strong> Unlimited messages with conversation memory</li>
+                        <li><strong>Free Users:</strong> Access to GPT-3.5, Claude Haiku, Gemini Flash, DeepSeek</li>
+                        <li><strong>Premium Users:</strong> Unlimited access to all models including GPT-4, Claude 3.5, and more</li>
                     </ul>
                 </section>
 
@@ -170,8 +156,7 @@
 
                 <section class="terms-section">
                     <h3>📜 Terms Updates</h3>
-                    <p>We may update these terms periodically. Continued use of NexaAI constitutes acceptance of any
-                        changes. Last updated: November 2025.</p>
+                    <p>We may update these terms periodically. Continued use of NexaAI constitutes acceptance of any changes. Last updated: November 2025.</p>
                 </section>
             </div>
             <div class="modal-footer">
@@ -179,7 +164,6 @@
             </div>
         </div>
     </div>
-
 
     <script>
         let messageCount = 0;
@@ -196,7 +180,6 @@
             const message = input.value.trim();
             if (!message) return;
 
-
             document.querySelector('.welcome-section').style.display = 'none';
             addMessage(message, 'user');
             input.value = '';
@@ -209,24 +192,23 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: message })
             })
-                .then(res => res.json())
-                .then(data => {
-                    removeTypingIndicator();
-                    if (data.response) {
-                        addMessage(data.response, 'assistant');
-                        messageCount++;
-                        }
-                    } else if (data.error) {
-                        addMessage(data.error, 'error');
-                    }
-                })
-                .catch(err => {
-                    removeTypingIndicator();
-                    addMessage('Error connecting to AI. Please try again.', 'error');
-                });
+            .then(res => res.json())
+            .then(data => {
+                removeTypingIndicator();
+                if (data.response) {
+                    addMessage(data.response, 'assistant');
+                    messageCount++;
+                } else if (data.error) {
+                    addMessage(data.error, 'error');
+                }
+            })
+            .catch(err => {
+                removeTypingIndicator();
+                addMessage('Error connecting to AI. Please try again.', 'error');
+            });
         }
 
-        // ----- Markdown helpers -----
+        // Markdown helpers
         function formatDemoMessage(text) {
             if (typeof marked === 'undefined') {
                 const div = document.createElement('div');
@@ -238,9 +220,7 @@
                     if (typeof hljs !== 'undefined' && lang && hljs.getLanguage(lang)) {
                         return hljs.highlight(code, { language: lang }).value;
                     }
-                    return typeof hljs !== 'undefined'
-                        ? hljs.highlightAuto(code).value
-                        : code;
+                    return typeof hljs !== 'undefined' ? hljs.highlightAuto(code).value : code;
                 },
                 breaks: true,
                 gfm: true
@@ -269,7 +249,7 @@
             });
         }
 
-        // ----- Messaging -----
+        // Messaging
         function addMessage(text, role) {
             const container = document.getElementById('messages-container');
             const messageDiv = document.createElement('div');
@@ -326,7 +306,6 @@
             }
         });
 
-
         function showTypingIndicator() {
             const container = document.getElementById('messages-container');
             const typingDiv = document.createElement('div');
@@ -366,7 +345,4 @@
         });
     </script>
 </body>
-
 </html>
-
-
