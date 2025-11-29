@@ -513,58 +513,85 @@
             const row = document.createElement('div');
             row.className = `message-row ${role}-row`;
 
+            // USER MESSAGE: prompt bar with icons
             if (role === 'user') {
                 row.innerHTML = `
-      <div class="message user-message">
-        <div class="message-header">
-          <div class="message-prompt-text">${escapeHtml(text)}</div>
-          <div class="message-header-actions">
-            <button class="msg-copy-btn" title="Copy">
-              📋
-            </button>
-            <button class="msg-edit-btn" title="Edit & resend">
-              ✏️
-            </button>
-          </div>
-        </div>
-      </div>`;
+        <div class="message user-message">
+            <div class="message-header">
+                <div class="message-prompt-text">${escapeHtml(text)}</div>
+                <div class="message-header-actions">
+                    <button class="msg-copy-btn" title="Copy prompt">
+                        📋
+                    </button>
+                    <button class="msg-edit-btn" title="Edit & resend">
+                        ✏️
+                    </button>
+                </div>
+            </div>
+        </div>`;
                 c.appendChild(row);
                 c.scrollTop = c.scrollHeight;
                 return;
             }
 
-        }
-
-        if (role === 'assistant') {
-            row.innerHTML = `
-            <div class="message assistant-message">
-                <div class="avatar">
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                        <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
-                    </svg>
-                </div>
-                <div class="message-content">
-                    ${model ? `<div class="model-badge">${escapeHtml(model)}</div>` : ''}
-                    <div class="message-text markdown-content"></div>
-                </div>
-            </div>`;
-            c.appendChild(row);
-            const el = row.querySelector('.message-text');
-            el.innerHTML = formatMessage(text);
-            el.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
-            addCopyButtons(el);
-            c.scrollTop = c.scrollHeight;
-            return;
-        }
-
-        // error
-        row.innerHTML = `
-        <div class="message error-message">
-            <div class="message-content">⚠️ ${escapeHtml(text)}</div>
+            // ASSISTANT MESSAGE (unchanged)
+            if (role === 'assistant') {
+                row.innerHTML = `
+        <div class="message assistant-message">
+            <div class="avatar">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                    <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
+                </svg>
+            </div>
+            <div class="message-content">
+                ${model ? `<div class="model-badge">${escapeHtml(model)}</div>` : ''}
+                <div class="message-text markdown-content"></div>
+            </div>
         </div>`;
-        c.appendChild(row);
-        c.scrollTop = c.scrollHeight;
+                c.appendChild(row);
+                const el = row.querySelector('.message-text');
+                el.innerHTML = formatMessage(text);
+                el.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
+                addCopyButtons(el);
+                c.scrollTop = c.scrollHeight;
+                return;
+            }
+
+            // ERROR MESSAGE
+            row.innerHTML = `
+    <div class="message error-message">
+        <div class="message-content">⚠️ ${escapeHtml(text)}</div>
+    </div>`;
+            c.appendChild(row);
+            c.scrollTop = c.scrollHeight;
         }
+        document.addEventListener('click', (e) => {
+            // User prompt header: copy / edit
+            if (e.target.closest('.msg-copy-btn') || e.target.closest('.msg-edit-btn')) {
+                const btn = e.target.closest('.msg-copy-btn') || e.target.closest('.msg-edit-btn');
+                const header = btn.closest('.message-header');
+                const textEl = header?.querySelector('.message-prompt-text');
+                if (!textEl) return;
+                const promptText = textEl.innerText;
+
+                if (btn.classList.contains('msg-copy-btn')) {
+                    navigator.clipboard.writeText(promptText);
+                    btn.textContent = 'Copied';
+                    setTimeout(() => (btn.textContent = '📋'), 1200);
+                }
+
+                if (btn.classList.contains('msg-edit-btn')) {
+                    const input = document.getElementById('chat-input');
+                    input.value = promptText;
+                    input.focus();
+                    input.selectionStart = input.selectionEnd = input.value.length;
+                }
+                return;
+            }
+
+            // … keep your existing click logic for chat-item, rename, delete, etc …
+        });
+
 
         /* ============ TYPING INDICATOR ============ */
         function showTypingIndicator() {
