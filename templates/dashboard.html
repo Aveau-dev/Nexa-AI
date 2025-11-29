@@ -506,8 +506,6 @@ function addMessage(text, role, model = '', useTyping = false) {
     const tools = document.createElement('div');
     tools.className = 'user-tools';
     tools.innerHTML = `
-      <button class="user-tool-btn msg-copy-btn" title="Copy">📋</button>
-      <button class="user-tool-btn msg-edit-btn" title="Edit">✏️</button>
     `;
     row.querySelector('.user-message').appendChild(tools);
 
@@ -703,4 +701,5 @@ document.getElementById('chat-input')?.addEventListener('input',function(){
 
 </body>
 </html>
+
 
