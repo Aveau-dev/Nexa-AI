@@ -16,9 +16,15 @@ import sqlite3
 import base64
 from PIL import Image
 import io
+from flask import send_from_directory
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-this')
+
+@app.route('/uploads/<path:filename>')
+@login_required
+def uploaded_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 # Use DATABASE_URL (Postgres etc.) if present, otherwise fallback to SQLite
 uri = os.getenv("DATABASE_URL")
@@ -183,6 +189,13 @@ PREMIUM_MODELS = {
     }
 }
 
+IMAGE_MODELS = {
+    "openai-dall-e": {
+        "path": "openai/dall-e-3",
+        "name": "DALL·E 3"
+    }
+}
+
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf', 'txt', 'doc', 'docx'}
 
 # ============ HELPER FUNCTIONS ============
@@ -236,6 +249,38 @@ def generate_chat_title_ai(first_message):
     except Exception:
         # Fall back to your existing simple function
         return generate_chat_title(first_message)
+
+
+@app.route('/generate-image', methods=['POST'])
+@login_required
+def generate_image():
+    data = request.get_json()
+    prompt = data.get('prompt', '').strip()
+    if not prompt:
+        return jsonify({'error': 'Empty prompt'}), 400
+
+    try:
+        resp = openrouter_client.images.generate(
+            model=IMAGE_MODELS['openai-dall-e']['path'],
+            prompt=prompt,
+            size="1024x1024"
+        )
+        # Assume base64 response; adapt if URL is returned
+        b64 = resp.data[0].b64_json
+        img_bytes = base64.b64decode(b64)
+        filename = f"{current_user.id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.png"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        with open(filepath, 'wb') as f:
+            f.write(img_bytes)
+
+        return jsonify({
+            'success': True,
+            'filename': filename,
+            'url': f"/uploads/{filename}"
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 
 def get_chat_history(chat_id, limit=10):
@@ -642,6 +687,7 @@ if __name__ == '__main__':
         print("🚀 Starting NexaAI with advanced features...")
     
     app.run(debug=True, port=5000)
+
 
 
 
