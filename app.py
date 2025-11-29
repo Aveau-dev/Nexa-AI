@@ -241,7 +241,6 @@ def get_chat_history(chat_id, limit=10):
     return history
 
 def call_openrouter_api(model_path, messages):
-    """Call OpenRouter with a Markdown-focused system prompt and higher token cap."""
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
@@ -250,23 +249,35 @@ def call_openrouter_api(model_path, messages):
     system_msg = {
         "role": "system",
         "content": (
-            "You are NexaAI. Always respond in clean, well‑structured Markdown. "
-            "Use headings, bullet lists, code blocks, and tables when helpful. "
-            "For big coding tasks, send as much working code as possible."
+            "You are NexaAI. Always respond in well‑structured Markdown "
+            "with headings, lists, and fenced code blocks for code. "
+            "For long tasks, answer in as much detail as possible."
         ),
     }
 
     payload = {
         "model": model_path,
         "messages": [system_msg] + messages,
-        "max_tokens": 4096,   # higher cap, within common model limits
+        "max_tokens": 4096,       # safe high cap, models still enforce their own limit
         "temperature": 0.7,
     }
 
-    response = requests.post(
-        OPENROUTER_BASE_URL, headers=headers, json=payload, timeout=120
-    )
-    response.raise_for_status()
+    try:
+        response = requests.post(
+            OPENROUTER_BASE_URL, headers=headers, json=payload, timeout=120
+        )
+        response.raise_for_status()
+    except requests.HTTPError as e:
+        # Try to surface OpenRouter's error text
+        try:
+            err = e.response.json()
+            msg = err.get("error", {}).get("message", str(e))
+        except Exception:
+            msg = str(e)
+        raise RuntimeError(f"AI error: {msg}")
+    except requests.Timeout:
+        raise RuntimeError("AI timeout: your request is very large, please try a smaller step.")
+    
     data = response.json()
     return data["choices"][0]["message"]["content"]
 
@@ -607,6 +618,7 @@ if __name__ == '__main__':
         print("🚀 Starting NexaAI with advanced features...")
     
     app.run(debug=True, port=5000)
+
 
 
 
