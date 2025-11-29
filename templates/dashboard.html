@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NexaAI - Dashboard</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2319c37d' d='M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z'/></svg>">
-    <link rel="stylesheet" href="{{ url_for('static', filename='Css/style.css') }}">
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- IMPORTANT: css folder name on disk must be static/css/style.css -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" crossorigin="anonymous"></script>
 </head>
 <body>
     <!-- Top Navigation Bar -->
@@ -278,7 +278,6 @@
     <!-- Main Content Area -->
     <div class="main-container with-sidebar" id="main-content">
         <div class="center-content">
-            <!-- Welcome Section -->
             <div class="welcome-section" id="welcome-section">
                 <h1 class="main-heading">What can I help with?</h1>
                 <div class="suggestion-cards">
@@ -301,11 +300,9 @@
                 </div>
             </div>
 
-            <!-- Chat Messages Container -->
             <div id="messages-container"></div>
         </div>
 
-        <!-- Input Area (Fixed at Bottom) -->
         <div class="input-wrapper">
             <div class="input-box">
                 <div class="input-inner">
@@ -326,25 +323,18 @@
         </div>
     </div>
 
-    <!-- JavaScript Libraries -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" crossorigin="anonymous"></script>
-
-    <!-- Main JavaScript -->
     <script>
-// ============ GLOBAL VARIABLES ============
 let currentModel = 'gpt-3.5-turbo';
 let currentChatId = null;
 let isLoading = false;
 
-// ============ UTILITY FUNCTIONS ============
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
 }
 
-// ============ UI TOGGLE FUNCTIONS ============
+// ---- UI toggles ----
 function toggleSidebar() {
     const sidebar = document.getElementById('sidebar');
     const mainContent = document.getElementById('main-content');
@@ -370,15 +360,12 @@ function selectModel(modelKey, modelName) {
     currentModel = modelKey;
     document.getElementById('selected-model-name').textContent = modelName;
     document.getElementById('model-info').textContent = modelName;
-    
     document.querySelectorAll('.model-card').forEach(card => card.classList.remove('active'));
     document.querySelector(`[data-model="${modelKey}"]`)?.classList.add('active');
-    
     toggleModelSelector();
-    console.log('✅ Selected model:', modelKey);
 }
 
-// ============ CHAT MANAGEMENT ============
+// ---- Chat management ----
 async function newChat() {
     try {
         const response = await fetch('/chat/new', {
@@ -386,17 +373,14 @@ async function newChat() {
             headers: { 'Content-Type': 'application/json' }
         });
         const data = await response.json();
-
         if (data.success) {
             currentChatId = data.chat_id;
             document.getElementById('messages-container').innerHTML = '';
             document.getElementById('welcome-section').style.display = 'block';
             document.getElementById('chat-input').value = '';
             addChatToSidebar(data.chat_id, data.title, true);
-            console.log('✅ New chat created:', data.chat_id);
         }
-    } catch (error) {
-        console.error('❌ Error creating chat:', error);
+    } catch {
         alert('Failed to create new chat');
     }
 }
@@ -404,27 +388,17 @@ async function newChat() {
 async function loadChat(chatId) {
     if (isLoading) return;
     isLoading = true;
-
     try {
         const response = await fetch(`/chat/${chatId}/messages`);
         const data = await response.json();
-
         currentChatId = chatId;
         document.getElementById('messages-container').innerHTML = '';
         document.getElementById('welcome-section').style.display = 'none';
-
         data.messages.forEach(msg => addMessage(msg.content, msg.role, msg.model, false));
-
         document.querySelectorAll('.chat-item').forEach(el => el.classList.remove('active'));
         document.querySelector(`[data-chat-id="${chatId}"]`)?.classList.add('active');
-        
-        if (window.innerWidth <= 1024) {
-            document.getElementById('sidebar').classList.remove('show');
-        }
-        
-        console.log('✅ Chat loaded:', chatId);
-    } catch (error) {
-        console.error('❌ Error loading chat:', error);
+        if (window.innerWidth <= 1024) document.getElementById('sidebar').classList.remove('show');
+    } catch {
         alert('Failed to load chat');
     } finally {
         isLoading = false;
@@ -434,45 +408,35 @@ async function loadChat(chatId) {
 async function renameChat(chatId) {
     const newTitle = prompt('Enter new chat title:');
     if (!newTitle || !newTitle.trim()) return;
-
     try {
         const response = await fetch(`/chat/${chatId}/rename`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ title: newTitle.trim() })
         });
-
         const data = await response.json();
         if (data.success) {
             document.querySelector(`[data-chat-id="${chatId}"] .chat-title`).textContent = newTitle.trim();
-            console.log('✅ Chat renamed:', chatId);
         }
-    } catch (error) {
-        console.error('❌ Error renaming chat:', error);
+    } catch {
         alert('Failed to rename chat');
     }
 }
 
 async function deleteChat(chatId) {
     if (!confirm('Delete this chat? This cannot be undone.')) return;
-
     try {
         const response = await fetch(`/chat/${chatId}/delete`, { method: 'DELETE' });
         const data = await response.json();
-        
         if (data.success) {
             document.querySelector(`[data-chat-id="${chatId}"]`)?.remove();
-
             if (currentChatId === chatId) {
                 currentChatId = null;
                 document.getElementById('messages-container').innerHTML = '';
                 document.getElementById('welcome-section').style.display = 'block';
             }
-            
-            console.log('✅ Chat deleted:', chatId);
         }
-    } catch (error) {
-        console.error('❌ Error deleting chat:', error);
+    } catch {
         alert('Failed to delete chat');
     }
 }
@@ -481,7 +445,6 @@ function addChatToSidebar(chatId, title, prepend = false) {
     const chatHistory = document.querySelector('.chat-history');
     const emptyState = chatHistory.querySelector('.empty-state');
     if (emptyState) emptyState.remove();
-
     const chatItem = document.createElement('div');
     chatItem.className = 'chat-item active';
     chatItem.setAttribute('data-chat-id', chatId);
@@ -495,84 +458,54 @@ function addChatToSidebar(chatId, title, prepend = false) {
             <button class="icon-btn delete-chat-btn" data-chat-id="${chatId}" title="Delete">🗑️</button>
         </div>
     `;
-
     document.querySelectorAll('.chat-item').forEach(el => el.classList.remove('active'));
-    
-    if (prepend) {
-        chatHistory.insertBefore(chatItem, chatHistory.firstChild);
-    } else {
-        chatHistory.appendChild(chatItem);
-    }
+    if (prepend) chatHistory.insertBefore(chatItem, chatHistory.firstChild);
+    else chatHistory.appendChild(chatItem);
 }
 
-// ============ MESSAGE FUNCTIONS ============
+// ---- Sending messages ----
 async function sendMessage() {
     const input = document.getElementById('chat-input');
     const message = input.value.trim();
-
     if (!message || isLoading) return;
-
     isLoading = true;
     document.getElementById('welcome-section').style.display = 'none';
     addMessage(message, 'user', '', false);
-
     input.value = '';
     input.style.height = 'auto';
     showTypingIndicator();
-
     try {
         const response = await fetch('/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                message: message,
-                model: currentModel,
-                chat_id: currentChatId
-            })
+            body: JSON.stringify({ message, model: currentModel, chat_id: currentChatId })
         });
-
         const data = await response.json();
         removeTypingIndicator();
-
         if (data.error) {
             addMessage(data.error, 'error', '', false);
         } else {
             addMessage(data.response, 'assistant', data.model, true);
             currentChatId = data.chat_id;
-
             if (data.chat_title) {
                 const existingChat = document.querySelector(`[data-chat-id="${data.chat_id}"]`);
-                if (existingChat) {
-                    existingChat.querySelector('.chat-title').textContent = data.chat_title;
-                } else {
-                    addChatToSidebar(data.chat_id, data.chat_title, true);
-                }
+                if (existingChat) existingChat.querySelector('.chat-title').textContent = data.chat_title;
+                else addChatToSidebar(data.chat_id, data.chat_title, true);
             }
-
-            if (data.deepseek_remaining !== null) {
-                const usageValue = document.querySelector('.usage-value');
-                if (usageValue) {
-                    usageValue.textContent = `${50 - data.deepseek_remaining}/50`;
-                }
-            }
-            
-            console.log('✅ Message sent successfully');
         }
-    } catch (error) {
+    } catch {
         removeTypingIndicator();
         addMessage('Error connecting to AI. Please try again.', 'error', '', false);
-        console.error('❌ Error sending message:', error);
     } finally {
         isLoading = false;
     }
 }
 
-// ============ MARKDOWN & FORMATTING ============
+// ---- Markdown + copy (same style as index) ----
 function formatMessage(text) {
     if (typeof marked === 'undefined') {
         return escapeHtml(text).replace(/\n/g, '<br>');
     }
-    
     marked.setOptions({
         highlight: function (code, lang) {
             if (typeof hljs !== 'undefined' && lang && hljs.getLanguage(lang)) {
@@ -585,20 +518,18 @@ function formatMessage(text) {
     });
     return marked.parse(text);
 }
-        
-function addCopyButtons(messageDiv) {
-    messageDiv.querySelectorAll('pre code').forEach((codeBlock) => {
+
+function addCopyButtons(container) {
+    container.querySelectorAll('pre code').forEach((codeBlock) => {
         const pre = codeBlock.parentElement;
         const btn = document.createElement('button');
         btn.className = 'copy-code-btn';
         btn.textContent = 'Copy';
-
         btn.addEventListener('click', () => {
             navigator.clipboard.writeText(codeBlock.textContent);
             btn.textContent = 'Copied!';
             setTimeout(() => (btn.textContent = 'Copy'), 1500);
         });
-
         pre.style.position = 'relative';
         btn.style.position = 'absolute';
         btn.style.top = '8px';
@@ -608,94 +539,35 @@ function addCopyButtons(messageDiv) {
 }
 
 function typeWriter(text, element, speed = 15) {
-    // Fix: Use different quote style or escape backticks
-    const isMarkdown = text.includes('```') || text.includes('#') || text.includes('**');
-    
+    const isMarkdown = text.includes('```
     if (isMarkdown) {
         element.innerHTML = formatMessage(text);
-        element.style.opacity = '0';
-        setTimeout(() => {
-            element.style.transition = 'opacity 0.5s';
-            element.style.opacity = '1';
-        }, 50);
-        setTimeout(() => addCopyButtons(element.closest('.message-row')), 100);
+        addCopyButtons(element);
     } else {
         let i = 0;
         element.textContent = '';
-        function type() {
+        (function type() {
             if (i < text.length) {
-                element.textContent += text.charAt(i);
-                i++;
-                if (i % 5 === 0) window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+                element.textContent += text.charAt(i++);
                 setTimeout(type, speed);
-            } else {
-                window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
             }
-        }
-        type();
+        })();
     }
-}
-
-
-function addCopyButtons(messageDiv) {
-    messageDiv.querySelectorAll('pre code').forEach((codeBlock) => {
-        const pre = codeBlock.parentElement;
-        const language = codeBlock.className.replace(/language-|hljs /g, '') || 'code';
-        
-        const wrapper = document.createElement('div');
-        wrapper.className = 'code-block-wrapper';
-        
-        const header = document.createElement('div');
-        header.className = 'code-block-header';
-        header.innerHTML = `
-            <span class="code-language">${language}</span>
-            <button class="copy-code-btn" onclick="copyCode(this)">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                    <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
-                </svg>
-                Copy
-            </button>
-        `;
-        
-        pre.parentNode.insertBefore(wrapper, pre);
-        wrapper.appendChild(header);
-        wrapper.appendChild(pre);
-    });
-}
-
-function copyCode(button) {
-    const code = button.closest('.code-block-wrapper').querySelector('code').textContent;
-    navigator.clipboard.writeText(code).then(() => {
-        const originalHTML = button.innerHTML;
-        button.innerHTML = `
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-            </svg>
-            Copied!
-        `;
-        button.classList.add('copied');
-        setTimeout(() => {
-            button.innerHTML = originalHTML;
-            button.classList.remove('copied');
-        }, 2000);
-    });
 }
 
 function addMessage(text, role, model = '', useTyping = false) {
     const container = document.getElementById('messages-container');
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message-row ${role}-row`;
-
+    const row = document.createElement('div');
+    row.className = `message-row ${role}-row`;
     if (role === 'user') {
-        messageDiv.innerHTML = `
+        row.innerHTML = `
             <div class="message user-message">
                 <div class="message-content">
                     <div class="message-text">${escapeHtml(text)}</div>
                 </div>
-            </div>
-        `;
+            </div>`;
     } else if (role === 'assistant') {
-        messageDiv.innerHTML = `
+        row.innerHTML = `
             <div class="message assistant-message">
                 <div class="avatar">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
@@ -706,56 +578,49 @@ function addMessage(text, role, model = '', useTyping = false) {
                     ${model ? `<div class="model-badge">${escapeHtml(model)}</div>` : ''}
                     <div class="message-text markdown-content"></div>
                 </div>
-            </div>
-        `;
-        container.appendChild(messageDiv);
-        
-        const messageTextElement = messageDiv.querySelector('.message-text');
-        if (useTyping) {
-            typeWriter(text, messageTextElement, 15);
-        } else {
-            messageTextElement.innerHTML = formatMessage(text);
-            setTimeout(() => addCopyButtons(messageDiv), 0);
+            </div>`;
+        container.appendChild(row);
+        const el = row.querySelector('.message-text');
+        if (useTyping) typeWriter(text, el, 15);
+        else {
+            el.innerHTML = formatMessage(text);
+            addCopyButtons(el);
         }
+        container.scrollTop = container.scrollHeight;
         return;
-    } else if (role === 'error') {
-        messageDiv.innerHTML = `
+    } else {
+        row.innerHTML = `
             <div class="message error-message">
                 <div class="message-content">⚠️ ${escapeHtml(text)}</div>
-            </div>
-        `;
+            </div>`;
     }
-
-    container.appendChild(messageDiv);
-    setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 100);
+    container.appendChild(row);
+    container.scrollTop = container.scrollHeight;
 }
 
+// ---- typing indicator ----
 function showTypingIndicator() {
     const container = document.getElementById('messages-container');
-    const typingDiv = document.createElement('div');
-    typingDiv.className = 'message-row assistant-row typing-indicator';
-    typingDiv.id = 'typing-indicator';
-    typingDiv.innerHTML = `
+    const div = document.createElement('div');
+    div.className = 'message-row assistant-row typing-indicator';
+    div.id = 'typing-indicator';
+    div.innerHTML = `
         <div class="message assistant-message">
             <div class="avatar">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                    <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
-                </svg>
+                <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/></svg>
             </div>
-            <div class="typing-dots">
-                <span></span><span></span><span></span>
-            </div>
-        </div>
-    `;
-    container.appendChild(typingDiv);
-    setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 100);
+            <div class="typing-dots"><span></span><span></span><span></span></div>
+        </div>`;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
 }
 
 function removeTypingIndicator() {
     document.getElementById('typing-indicator')?.remove();
 }
 
-// ============ EVENT LISTENERS ============
+// ---- events ----
 document.getElementById('sidebar-toggle')?.addEventListener('click', toggleSidebar);
 document.getElementById('new-chat-btn')?.addEventListener('click', newChat);
 document.getElementById('model-selector-btn')?.addEventListener('click', toggleModelSelector);
@@ -763,7 +628,7 @@ document.getElementById('close-selector-btn')?.addEventListener('click', toggleM
 document.getElementById('user-menu-btn')?.addEventListener('click', toggleUserMenu);
 document.getElementById('send-btn')?.addEventListener('click', sendMessage);
 
-document.getElementById('chat-input')?.addEventListener('keydown', function(e) {
+document.getElementById('chat-input')?.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         sendMessage();
@@ -775,14 +640,12 @@ document.getElementById('chat-input')?.addEventListener('input', function() {
     this.style.height = Math.min(this.scrollHeight, 200) + 'px';
 });
 
-// Model cards click
 document.querySelectorAll('.model-card').forEach(card => {
     card.addEventListener('click', function() {
         selectModel(this.dataset.model, this.dataset.name);
     });
 });
 
-// Suggestion cards click
 document.querySelectorAll('.suggestion-card').forEach(card => {
     card.addEventListener('click', function() {
         document.getElementById('chat-input').value = this.dataset.suggestion;
@@ -790,60 +653,33 @@ document.querySelectorAll('.suggestion-card').forEach(card => {
     });
 });
 
-// Delegated event listeners for dynamic content
-document.addEventListener('click', function(e) {
-    // Chat item clicks
+document.addEventListener('click', e => {
     if (e.target.closest('.chat-item') && !e.target.closest('.chat-actions')) {
-        const chatId = e.target.closest('.chat-item').dataset.chatId;
-        if (chatId) loadChat(parseInt(chatId));
+        const id = e.target.closest('.chat-item').dataset.chatId;
+        if (id) loadChat(parseInt(id));
     }
-    
-    // Rename button
     if (e.target.closest('.rename-chat-btn')) {
         e.stopPropagation();
-        const chatId = e.target.closest('.rename-chat-btn').dataset.chatId;
-        if (chatId) renameChat(parseInt(chatId));
+        renameChat(parseInt(e.target.closest('.rename-chat-btn').dataset.chatId));
     }
-    
-    // Delete button
     if (e.target.closest('.delete-chat-btn')) {
         e.stopPropagation();
-        const chatId = e.target.closest('.delete-chat-btn').dataset.chatId;
-        if (chatId) deleteChat(parseInt(chatId));
+        deleteChat(parseInt(e.target.closest('.delete-chat-btn').dataset.chatId));
     }
-    
-    // Close user menu when clicking outside
     const menu = document.getElementById('user-menu');
-    if (!e.target.closest('#user-menu-btn') && !menu.contains(e.target)) {
-        menu.style.display = 'none';
-    }
-    
-    // Close model selector when clicking outside
-    const selector = document.getElementById('model-selector');
-    if (selector.style.display === 'block' && 
-        !e.target.closest('#model-selector-btn') && 
+    if (!e.target.closest('#user-menu-btn') && menu && !menu.contains(e.target)) menu.style.display = 'none';
+    const sel = document.getElementById('model-selector');
+    if (sel.style.display === 'block' &&
+        !e.target.closest('#model-selector-btn') &&
         !e.target.closest('#close-selector-btn') &&
-        !selector.contains(e.target)) {
-        selector.style.display = 'none';
-    }
-    
-    // Close sidebar on mobile when clicking outside
+        !sel.contains(e.target)) sel.style.display = 'none';
     if (window.innerWidth <= 1024) {
         const sidebar = document.getElementById('sidebar');
-        if (sidebar.classList.contains('show') && 
-            !e.target.closest('#sidebar-toggle') && 
-            !sidebar.contains(e.target)) {
-            sidebar.classList.remove('show');
-        }
+        if (sidebar.classList.contains('show') &&
+            !e.target.closest('#sidebar-toggle') &&
+            !sidebar.contains(e.target)) sidebar.classList.remove('show');
     }
 });
-
-console.log('✅ NexaAI Dashboard loaded successfully!');
-console.log('📱 Responsive design active');
-console.log('🤖 All AI models ready');
     </script>
 </body>
 </html>
-
-
-
