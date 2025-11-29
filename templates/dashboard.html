@@ -5,287 +5,45 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NexaAI - Dashboard</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2319c37d' d='M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z'/></svg>">
-    <!-- Folder must be static/css/style.css -->
+    <!-- IMPORTANT: folder name matches your project: static/Css/style.css -->
     <link rel="stylesheet" href="{{ url_for('static', filename='Css/style.css') }}">
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NexaAI - Dashboard</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2319c37d' d='M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z'/></svg>">
+    <!-- IMPORTANT: folder name matches your project: static/Css/style.css -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='Css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
-    <!-- Top Navigation Bar -->
-    <nav class="top-nav">
-        <div class="nav-left">
-            <button class="nav-button icon-only" id="sidebar-toggle">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                    <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" />
-                </svg>
-            </button>
-            <button class="nav-button" id="new-chat-btn">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
-                </svg>
-                <span>New chat</span>
-            </button>
-            <div class="logo-container">
-                <svg class="logo-icon" viewBox="0 0 24 24" width="20" height="20">
-                    <path fill="currentColor" d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z" />
-                </svg>
-                <button class="model-selector-btn" id="model-selector-btn">
-                    <span id="selected-model-name">GPT-3.5 Turbo</span>
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                        <path d="M7 10l5 5 5-5z" />
-                    </svg>
-                </button>
-            </div>
-        </div>
-        <div class="nav-right">
-            {% if not user.is_premium %}
-            <button class="nav-button upgrade-btn" onclick="location.href='/checkout'">
-                <span>⭐ Upgrade to Premium</span>
-            </button>
-            {% else %}
-            <div class="premium-badge-nav">⭐ Premium</div>
-            {% endif %}
-            <button class="nav-button icon-only" id="user-menu-btn">
-                <div class="user-avatar">{{ user.name[0].upper() }}</div>
-            </button>
-        </div>
-    </nav>
+    <!-- TOP NAV, MODEL SELECTOR, USER MENU, SIDEBAR, MAIN AREA: your HTML stays the same -->
+    <!-- ========= COPY EVERYTHING FROM YOUR LAST WORKING VERSION UP TO JUST BEFORE <script> ========= -->
+    <!-- (To save space here, only the <script> block is rewritten.) -->
 
-    <!-- Model Selector Dropdown -->
-    <div id="model-selector" class="model-selector-dropdown" style="display:none;">
-        <div class="model-selector-header">
-            <h3>Select AI Model</h3>
-            <button class="close-selector" id="close-selector-btn">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-                </svg>
-            </button>
-        </div>
-
-        <div class="model-selector-content">
-            <!-- Free models -->
-            <div class="model-group">
-                <div class="model-group-header">
-                    <span class="group-badge free">Free</span>
-                    <span class="group-title">Available for Everyone</span>
-                </div>
-                {% for model_key, model_data in models.items() if model_key in ['gpt-3.5-turbo','claude-3-haiku','gemini-flash','deepseek-chat'] %}
-                <div class="model-card {% if loop.first %}active{% endif %}" data-model="{{ model_key }}" data-name="{{ model_data.name }}">
-                    <div class="model-card-header">
-                        <div class="model-icon">
-                            {% if 'gpt' in model_key %}<span class="icon-text">🤖</span>
-                            {% elif 'claude' in model_key %}<span class="icon-text">🎭</span>
-                            {% elif 'gemini' in model_key %}<span class="icon-text">✨</span>
-                            {% elif 'deepseek' in model_key %}<span class="icon-text">🔍</span>
-                            {% else %}<span class="icon-text">💬</span>{% endif %}
-                        </div>
-                        <div class="model-info">
-                            <h4 class="model-name">{{ model_data.name }}</h4>
-                            <div class="model-features">
-                                {% if model_data.vision %}<span class="feature-badge vision">📷 Vision</span>{% endif %}
-                                {% if model_data.limit %}<span class="feature-badge limit">{{ model_data.limit }}/day</span>{% endif %}
-                                <span class="feature-badge speed">⚡ Fast</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="model-description">
-                        {% if 'gpt-3.5' in model_key %}Fast and efficient for everyday tasks
-                        {% elif 'claude-3-haiku' in model_key %}Fast Claude model, great for quick responses
-                        {% elif 'gemini-flash' in model_key %}Google's fast and efficient model
-                        {% elif 'deepseek' in model_key %}Advanced reasoning with daily limit
-                        {% else %}Versatile AI model{% endif %}
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-
-            <!-- Premium models -->
-            {% if user.is_premium %}
-            <div class="model-group">
-                <div class="model-group-header">
-                    <span class="group-badge premium">⭐ Premium</span>
-                    <span class="group-title">Unlimited Access</span>
-                </div>
-                {% for model_key, model_data in models.items() if model_key in ['gpt-4o','gpt-4o-mini','claude-3.5-sonnet','claude-3-opus','gemini-pro','deepseek-r1'] %}
-                <div class="model-card premium" data-model="{{ model_key }}" data-name="{{ model_data.name }}">
-                    <div class="model-card-header">
-                        <div class="model-icon premium">
-                            {% if 'gpt-4' in model_key %}<span class="icon-text">🧠</span>
-                            {% elif 'claude' in model_key %}<span class="icon-text">🎭</span>
-                            {% elif 'gemini' in model_key %}<span class="icon-text">💎</span>
-                            {% elif 'deepseek-r1' in model_key %}<span class="icon-text">🚀</span>
-                            {% else %}<span class="icon-text">⚡</span>{% endif %}
-                        </div>
-                        <div class="model-info">
-                            <h4 class="model-name">{{ model_data.name }}</h4>
-                            <div class="model-features">
-                                {% if model_data.vision %}<span class="feature-badge vision">📷 Vision</span>{% endif %}
-                                <span class="feature-badge unlimited">∞ Unlimited</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="model-description">
-                        {% if 'gpt-4o-mini' in model_key %}Fast and cost-effective GPT-4 variant
-                        {% elif 'gpt-4o' in model_key %}Most advanced GPT with vision & reasoning
-                        {% elif 'claude-3.5' in model_key %}Best for coding, writing & analysis
-                        {% elif 'claude-3-opus' in model_key %}Most capable Claude model
-                        {% elif 'gemini-pro' in model_key %}Google's most capable AI
-                        {% elif 'deepseek-r1' in model_key %}Advanced reasoning & problem solving
-                        {% else %}High-performance AI model{% endif %}
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <div class="model-group locked">
-                <div class="model-group-header">
-                    <span class="group-badge premium">⭐ Premium</span>
-                    <span class="group-title">Unlock Advanced Models</span>
-                </div>
-                <div class="upgrade-card" onclick="location.href='/checkout'">
-                    <div class="upgrade-content">
-                        <div class="upgrade-icon">🔓</div>
-                        <h3>Upgrade to Premium</h3>
-                        <p>Get unlimited access to GPT-4, Claude 3.5, Gemini Pro & more</p>
-                        <ul class="upgrade-features">
-                            <li>✓ GPT-4o & GPT-4o Mini</li>
-                            <li>✓ Claude 3.5 Sonnet (Best for coding)</li>
-                            <li>✓ Unlimited messages</li>
-                            <li>✓ Priority support</li>
-                        </ul>
-                        <button class="upgrade-button">Upgrade Now - $19.99/mo</button>
-                    </div>
-                </div>
-            </div>
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- User Menu -->
-    <div id="user-menu" class="dropdown-menu" style="display:none;">
-        <div class="menu-header">
-            <div class="user-avatar-large">{{ user.name[0].upper() }}</div>
-            <div class="user-info">
-                <div class="user-name">{{ user.name }}</div>
-                <div class="user-email">{{ user.email }}</div>
-                {% if user.is_premium %}
-                <div class="premium-badge-small">⭐ Premium Member</div>
-                {% else %}
-                <div class="free-badge-small">Free Account</div>
-                {% endif %}
-            </div>
-        </div>
-        <div class="menu-divider"></div>
-        {% if not user.is_premium %}
-        <a href="/checkout" class="menu-item">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                <path d="M12 2L2 12h3v8h14v-8h3L12 2zm0 2.84L18 10v8h-3v-6H9v6H6v-8l6-5.16z" />
-            </svg>
-            Upgrade to Premium
-        </a>
-        <div class="menu-divider"></div>
-        {% endif %}
-        <a href="/logout" class="menu-item">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z" />
-            </svg>
-            Log out
-        </a>
-    </div>
-
-    <!-- Sidebar -->
-    <aside class="sidebar" id="sidebar">
-        <div class="sidebar-content">
-            <div class="sidebar-section">
-                <div class="section-title">Chat History</div>
-                <div class="chat-history">
-                    {% if chats %}
-                    {% for chat in chats %}
-                    <div class="chat-item" data-chat-id="{{ chat.id }}">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                            <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z" />
-                        </svg>
-                        <span class="chat-title">{{ chat.title }}</span>
-                        <div class="chat-actions">
-                            <button class="icon-btn rename-chat-btn" data-chat-id="{{ chat.id }}">✏️</button>
-                            <button class="icon-btn delete-chat-btn" data-chat-id="{{ chat.id }}">🗑️</button>
-                        </div>
-                    </div>
-                    {% endfor %}
-                    {% else %}
-                    <div class="empty-state">No chats yet. Start a new conversation!</div>
-                    {% endif %}
-                </div>
-            </div>
-            <div class="sidebar-footer">
-                <div class="usage-info">
-                    {% if not user.is_premium %}
-                    <div class="usage-item">
-                        <span class="usage-label">DeepSeek Today:</span>
-                        <span class="usage-value">{{ user.deepseek_count }}/50</span>
-                    </div>
-                    <div class="upgrade-cta-small">
-                        <a href="/checkout">Upgrade for unlimited access →</a>
-                    </div>
-                    {% else %}
-                    <div class="premium-info">✨ You have unlimited access to all models</div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </aside>
-
-    <!-- Main Chat Area -->
-    <div class="main-container with-sidebar" id="main-content">
-        <div class="center-content">
-            <div class="welcome-section" id="welcome-section">
-                <h1 class="main-heading">What can I help with?</h1>
-                <div class="suggestion-cards">
-                    <div class="suggestion-card" data-suggestion="Create a weekly schedule for studying programming">
-                        <div class="suggestion-icon">📅</div><div class="suggestion-text">Create a schedule</div>
-                    </div>
-                    <div class="suggestion-card" data-suggestion="Write Python code to sort a list">
-                        <div class="suggestion-icon">💻</div><div class="suggestion-text">Write code</div>
-                    </div>
-                    <div class="suggestion-card" data-suggestion="Explain machine learning concepts">
-                        <div class="suggestion-icon">🧠</div><div class="suggestion-text">Learn AI concepts</div>
-                    </div>
-                    <div class="suggestion-card" data-suggestion="Help me write a creative story">
-                        <div class="suggestion-icon">✍️</div><div class="suggestion-text">Write a story</div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="messages-container"></div>
-        </div>
-
-        <div class="input-wrapper">
-            <div class="input-box">
-                <div class="input-inner">
-                    <textarea id="chat-input" placeholder="Ask anything..." rows="1"></textarea>
-                    <button class="send-button" id="send-btn">
-                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-                        </svg>
-                    </button>
-                </div>
-                <div class="input-footer">
-                    <span class="footer-text">
-                        <span id="model-info">GPT-3.5 Turbo</span> · NexaAI can make mistakes. Check important info.
-                    </span>
-                </div>
-            </div>
-        </div>
-    </div>
+    <!-- … your existing HTML above … -->
 
     <script>
+/* ============ GLOBAL ============ */
 let currentModel = 'gpt-3.5-turbo';
 let currentChatId = null;
 let isLoading = false;
 
-function escapeHtml(text){const d=document.createElement('div');d.textContent=text;return d.innerHTML;}
+function escapeHtml(text) {
+    const d = document.createElement('div');
+    d.textContent = text;
+    return d.innerHTML;
+}
 
+/* ============ MARKDOWN + HIGHLIGHT + COPY (SAME AS INDEX) ============ */
 function formatMessage(text) {
     if (typeof marked === 'undefined') {
         return escapeHtml(text).replace(/\n/g, '<br>');
@@ -311,11 +69,13 @@ function addCopyButtons(container) {
         const btn = document.createElement('button');
         btn.className = 'copy-code-btn';
         btn.textContent = 'Copy';
+
         btn.addEventListener('click', () => {
             navigator.clipboard.writeText(codeBlock.textContent);
             btn.textContent = 'Copied!';
             setTimeout(() => (btn.textContent = 'Copy'), 1500);
         });
+
         pre.style.position = 'relative';
         btn.style.position = 'absolute';
         btn.style.top = '8px';
@@ -324,91 +84,647 @@ function addCopyButtons(container) {
     });
 }
 
-/* sidebar, menu, model selector, newChat, loadChat, renameChat, deleteChat
-   stay as you already have above – unchanged for brevity */
-
-async function sendMessage(){
-  const input=document.getElementById('chat-input');
-  const message=input.value.trim();
-  if(!message||isLoading)return;
-  isLoading=true;
-  document.getElementById('welcome-section').style.display='none';
-  addMessage(message,'user','',false);
-  input.value='';input.style.height='auto';
-  showTypingIndicator();
-  try{
-    const res=await fetch('/chat',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({message,model:currentModel,chat_id:currentChatId})
-    });
-    const d=await res.json();
-    removeTypingIndicator();
-    if(d.error)addMessage(d.error,'error','',false);
-    else{
-      addMessage(d.response,'assistant',d.model,true);
-      currentChatId=d.chat_id;
-      if(d.chat_title){
-        const ex=document.querySelector(`[data-chat-id="${d.chat_id}"]`);
-        if(ex)ex.querySelector('.chat-title').textContent=d.chat_title;
-        else addChatToSidebar(d.chat_id,d.chat_title,true);
-      }
+/* ============ SIDEBAR / MENUS ============ */
+function toggleSidebar() {
+    const s = document.getElementById('sidebar');
+    const m = document.getElementById('main-content');
+    if (window.innerWidth <= 1024) {
+        s.classList.toggle('show');
+    } else {
+        s.classList.toggle('collapsed');
+        m.classList.toggle('sidebar-collapsed');
     }
-  }catch{
-    removeTypingIndicator();
-    addMessage('Error connecting to AI. Please try again.','error','',false);
-  }finally{isLoading=false;}
 }
 
-function addMessage(text,role,model='',useTyping=false){
-  const c=document.getElementById('messages-container');
-  const row=document.createElement('div');
-  row.className=`message-row ${role}-row`;
-
-  if(role==='user'){
-    row.innerHTML=`
-      <div class="message user-message">
-        <div class="message-content"><div class="message-text">${escapeHtml(text)}</div></div>
-      </div>`;
-    c.appendChild(row);
-    c.scrollTop=c.scrollHeight;
-    return;
-  }
-
-  if(role==='assistant'){
-    row.innerHTML=`
-      <div class="message assistant-message">
-        <div class="avatar">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-            <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
-          </svg>
-        </div>
-        <div class="message-content">
-          ${model?`<div class="model-badge">${escapeHtml(model)}</div>`:''}
-          <div class="message-text markdown-content"></div>
-        </div>
-      </div>`;
-    c.appendChild(row);
-    const el=row.querySelector('.message-text');
-    el.innerHTML=formatMessage(text);
-    el.querySelectorAll('pre code').forEach(block=>hljs.highlightElement(block));
-    addCopyButtons(el);
-    c.scrollTop=c.scrollHeight;
-    return;
-  }
-
-  // error
-  row.innerHTML=`
-    <div class="message error-message">
-      <div class="message-content">⚠️ ${escapeHtml(text)}</div>
-    </div>`;
-  c.appendChild(row);
-  c.scrollTop=c.scrollHeight;
+function toggleUserMenu() {
+    const m = document.getElementById('user-menu');
+    m.style.display = m.style.display === 'block' ? 'none' : 'block';
 }
 
-/* keep typing indicator + event listeners same as before */
+function toggleModelSelector() {
+    const s = document.getElementById('model-selector');
+    s.style.display = s.style.display === 'block' ? 'none' : 'block';
+}
 
+function selectModel(key, name) {
+    currentModel = key;
+    document.getElementById('selected-model-name').textContent = name;
+    document.getElementById('model-info').textContent = name;
+    document.querySelectorAll('.model-card').forEach(c => c.classList.remove('active'));
+    document.querySelector(`[data-model="${key}"]`)?.classList.add('active');
+    toggleModelSelector();
+}
+
+/* ============ CHAT MANAGEMENT ============ */
+async function newChat() {
+    try {
+        const res = await fetch('/chat/new', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+        const d = await res.json();
+        if (d.success) {
+            currentChatId = d.chat_id;
+            document.getElementById('messages-container').innerHTML = '';
+            document.getElementById('welcome-section').style.display = 'block';
+            document.getElementById('chat-input').value = '';
+            addChatToSidebar(d.chat_id, d.title, true);
+        }
+    } catch {
+        alert('Failed to create new chat');
+    }
+}
+
+async function loadChat(id) {
+    if (isLoading) return;
+    isLoading = true;
+    try {
+        const res = await fetch(`/chat/${id}/messages`);
+        const d = await res.json();
+        currentChatId = id;
+        const mc = document.getElementById('messages-container');
+        mc.innerHTML = '';
+        document.getElementById('welcome-section').style.display = 'none';
+        d.messages.forEach(m => addMessage(m.content, m.role, m.model, false));
+        document.querySelectorAll('.chat-item').forEach(el => el.classList.remove('active'));
+        document.querySelector(`[data-chat-id="${id}"]`)?.classList.add('active');
+        if (window.innerWidth <= 1024) document.getElementById('sidebar').classList.remove('show');
+    } catch {
+        alert('Failed to load chat');
+    } finally {
+        isLoading = false;
+    }
+}
+
+async function renameChat(id) {
+    const title = prompt('Enter new chat title:');
+    if (!title || !title.trim()) return;
+    try {
+        const res = await fetch(`/chat/${id}/rename`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: title.trim() })
+        });
+        const d = await res.json();
+        if (d.success) {
+            document.querySelector(`[data-chat-id="${id}"] .chat-title`).textContent = title.trim();
+        }
+    } catch {
+        alert('Failed to rename chat');
+    }
+}
+
+async function deleteChat(id) {
+    if (!confirm('Delete this chat?')) return;
+    try {
+        const res = await fetch(`/chat/${id}/delete`, { method: 'DELETE' });
+        const d = await res.json();
+        if (d.success) {
+            document.querySelector(`[data-chat-id="${id}"]`)?.remove();
+            if (currentChatId === id) {
+                currentChatId = null;
+                document.getElementById('messages-container').innerHTML = '';
+                document.getElementById('welcome-section').style.display = 'block';
+            }
+        }
+    } catch {
+        alert('Failed to delete chat');
+    }
+}
+
+function addChatToSidebar(id, title, prepend = false) {
+    const h = document.querySelector('.chat-history');
+    const e = h.querySelector('.empty-state'); if (e) e.remove();
+    const item = document.createElement('div');
+    item.className = 'chat-item active';
+    item.dataset.chatId = id;
+    item.innerHTML = `
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+        </svg>
+        <span class="chat-title">${escapeHtml(title)}</span>
+        <div class="chat-actions">
+            <button class="icon-btn rename-chat-btn" data-chat-id="${id}">✏️</button>
+            <button class="icon-btn delete-chat-btn" data-chat-id="${id}">🗑️</button>
+        </div>`;
+    document.querySelectorAll('.chat-item').forEach(el => el.classList.remove('active'));
+    if (prepend) h.insertBefore(item, h.firstChild); else h.appendChild(item);
+}
+
+/* ============ SENDING & RENDERING MESSAGES ============ */
+async function sendMessage() {
+    const input = document.getElementById('chat-input');
+    const message = input.value.trim();
+    if (!message || isLoading) return;
+
+    isLoading = true;
+    document.getElementById('welcome-section').style.display = 'none';
+    addMessage(message, 'user', '', false);
+    input.value = '';
+    input.style.height = 'auto';
+    showTypingIndicator();
+
+    try {
+        const res = await fetch('/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message, model: currentModel, chat_id: currentChatId })
+        });
+        const d = await res.json();
+        removeTypingIndicator();
+        if (d.error) {
+            addMessage(d.error, 'error', '', false);
+        } else {
+            addMessage(d.response, 'assistant', d.model, true);
+            currentChatId = d.chat_id;
+            if (d.chat_title) {
+                const ex = document.querySelector(`[data-chat-id="${d.chat_id}"]`);
+                if (ex) ex.querySelector('.chat-title').textContent = d.chat_title;
+                else addChatToSidebar(d.chat_id, d.chat_title, true);
+            }
+        }
+    } catch {
+        removeTypingIndicator();
+        addMessage('Error connecting to AI. Please try again.', 'error', '', false);
+    } finally {
+        isLoading = false;
+    }
+}
+
+function addMessage(text, role, model = '', useTyping = false) {
+    const c = document.getElementById('messages-container');
+    const row = document.createElement('div');
+    row.className = `message-row ${role}-row`;
+
+    if (role === 'user') {
+        row.innerHTML = `
+            <div class="message user-message">
+                <div class="message-content"><div class="message-text">${escapeHtml(text)}</div></div>
+            </div>`;
+        c.appendChild(row);
+        c.scrollTop = c.scrollHeight;
+        return;
+    }
+
+    if (role === 'assistant') {
+        row.innerHTML = `
+            <div class="message assistant-message">
+                <div class="avatar">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                        <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
+                    </svg>
+                </div>
+                <div class="message-content">
+                    ${model ? `<div class="model-badge">${escapeHtml(model)}</div>` : ''}
+                    <div class="message-text markdown-content"></div>
+                </div>
+            </div>`;
+        c.appendChild(row);
+        const el = row.querySelector('.message-text');
+        el.innerHTML = formatMessage(text);
+        el.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
+        addCopyButtons(el);
+        c.scrollTop = c.scrollHeight;
+        return;
+    }
+
+    // error
+    row.innerHTML = `
+        <div class="message error-message">
+            <div class="message-content">⚠️ ${escapeHtml(text)}</div>
+        </div>`;
+    c.appendChild(row);
+    c.scrollTop = c.scrollHeight;
+}
+
+/* ============ TYPING INDICATOR ============ */
+function showTypingIndicator() {
+    const c = document.getElementById('messages-container');
+    const d = document.createElement('div');
+    d.className = 'message-row assistant-row typing-indicator';
+    d.id = 'typing-indicator';
+    d.innerHTML = `
+        <div class="message assistant-message">
+            <div class="avatar">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                    <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
+                </svg>
+            </div>
+            <div class="typing-dots"><span></span><span></span><span></span></div>
+        </div>`;
+    c.appendChild(d);
+    c.scrollTop = c.scrollHeight;
+}
+
+function removeTypingIndicator() {
+    document.getElementById('typing-indicator')?.remove();
+}
+
+/* ============ EVENT LISTENERS ============ */
+document.getElementById('sidebar-toggle')?.addEventListener('click', toggleSidebar);
+document.getElementById('new-chat-btn')?.addEventListener('click', newChat);
+document.getElementById('model-selector-btn')?.addEventListener('click', toggleModelSelector);
+document.getElementById('close-selector-btn')?.addEventListener('click', toggleModelSelector);
+document.getElementById('user-menu-btn')?.addEventListener('click', toggleUserMenu);
+document.getElementById('send-btn')?.addEventListener('click', sendMessage);
+
+document.getElementById('chat-input')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+    }
+});
+document.getElementById('chat-input')?.addEventListener('input', function () {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 200) + 'px';
+});
+
+document.querySelectorAll('.model-card').forEach(card => {
+    card.addEventListener('click', function () {
+        selectModel(this.dataset.model, this.dataset.name);
+    });
+});
+
+document.querySelectorAll('.suggestion-card').forEach(card => {
+    card.addEventListener('click', function () {
+        document.getElementById('chat-input').value = this.dataset.suggestion;
+        sendMessage();
+    });
+});
+
+document.addEventListener('click', e => {
+    if (e.target.closest('.chat-item') && !e.target.closest('.chat-actions')) {
+        const id = e.target.closest('.chat-item').dataset.chatId;
+        if (id) loadChat(parseInt(id));
+    }
+    if (e.target.closest('.rename-chat-btn')) {
+        e.stopPropagation();
+        renameChat(parseInt(e.target.closest('.rename-chat-btn').dataset.chatId));
+    }
+    if (e.target.closest('.delete-chat-btn')) {
+        e.stopPropagation();
+        deleteChat(parseInt(e.target.closest('.delete-chat-btn').dataset.chatId));
+    }
+    const menu = document.getElementById('user-menu');
+    if (menu && !e.target.closest('#user-menu-btn') && !menu.contains(e.target)) menu.style.display = 'none';
+    const sel = document.getElementById('model-selector');
+    if (sel.style.display === 'block' &&
+        !e.target.closest('#model-selector-btn') &&
+        !e.target.closest('#close-selector-btn') &&
+        !sel.contains(e.target)) sel.style.display = 'none';
+    if (window.innerWidth <= 1024) {
+        const s = document.getElementById('sidebar');
+        if (s.classList.contains('show') &&
+            !e.target.closest('#sidebar-toggle') &&
+            !s.contains(e.target)) s.classList.remove('show');
+    }
+});
     </script>
 </body>
 </html>
 
+    <script>
+/* ============ GLOBAL ============ */
+let currentModel = 'gpt-3.5-turbo';
+let currentChatId = null;
+let isLoading = false;
+
+function escapeHtml(text) {
+    const d = document.createElement('div');
+    d.textContent = text;
+    return d.innerHTML;
+}
+
+/* ============ MARKDOWN + HIGHLIGHT + COPY (SAME AS INDEX) ============ */
+function formatMessage(text) {
+    if (typeof marked === 'undefined') {
+        return escapeHtml(text).replace(/\n/g, '<br>');
+    }
+    marked.setOptions({
+        gfm: true,
+        breaks: true,
+        highlight: function (code, lang) {
+            if (typeof hljs !== 'undefined' && lang && hljs.getLanguage(lang)) {
+                return hljs.highlight(code, { language: lang }).value;
+            }
+            return typeof hljs !== 'undefined'
+                ? hljs.highlightAuto(code).value
+                : code;
+        }
+    });
+    return marked.parse(text);
+}
+
+function addCopyButtons(container) {
+    container.querySelectorAll('pre code').forEach((codeBlock) => {
+        const pre = codeBlock.parentElement;
+        const btn = document.createElement('button');
+        btn.className = 'copy-code-btn';
+        btn.textContent = 'Copy';
+
+        btn.addEventListener('click', () => {
+            navigator.clipboard.writeText(codeBlock.textContent);
+            btn.textContent = 'Copied!';
+            setTimeout(() => (btn.textContent = 'Copy'), 1500);
+        });
+
+        pre.style.position = 'relative';
+        btn.style.position = 'absolute';
+        btn.style.top = '8px';
+        btn.style.right = '8px';
+        pre.appendChild(btn);
+    });
+}
+
+/* ============ SIDEBAR / MENUS ============ */
+function toggleSidebar() {
+    const s = document.getElementById('sidebar');
+    const m = document.getElementById('main-content');
+    if (window.innerWidth <= 1024) {
+        s.classList.toggle('show');
+    } else {
+        s.classList.toggle('collapsed');
+        m.classList.toggle('sidebar-collapsed');
+    }
+}
+
+function toggleUserMenu() {
+    const m = document.getElementById('user-menu');
+    m.style.display = m.style.display === 'block' ? 'none' : 'block';
+}
+
+function toggleModelSelector() {
+    const s = document.getElementById('model-selector');
+    s.style.display = s.style.display === 'block' ? 'none' : 'block';
+}
+
+function selectModel(key, name) {
+    currentModel = key;
+    document.getElementById('selected-model-name').textContent = name;
+    document.getElementById('model-info').textContent = name;
+    document.querySelectorAll('.model-card').forEach(c => c.classList.remove('active'));
+    document.querySelector(`[data-model="${key}"]`)?.classList.add('active');
+    toggleModelSelector();
+}
+
+/* ============ CHAT MANAGEMENT ============ */
+async function newChat() {
+    try {
+        const res = await fetch('/chat/new', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+        const d = await res.json();
+        if (d.success) {
+            currentChatId = d.chat_id;
+            document.getElementById('messages-container').innerHTML = '';
+            document.getElementById('welcome-section').style.display = 'block';
+            document.getElementById('chat-input').value = '';
+            addChatToSidebar(d.chat_id, d.title, true);
+        }
+    } catch {
+        alert('Failed to create new chat');
+    }
+}
+
+async function loadChat(id) {
+    if (isLoading) return;
+    isLoading = true;
+    try {
+        const res = await fetch(`/chat/${id}/messages`);
+        const d = await res.json();
+        currentChatId = id;
+        const mc = document.getElementById('messages-container');
+        mc.innerHTML = '';
+        document.getElementById('welcome-section').style.display = 'none';
+        d.messages.forEach(m => addMessage(m.content, m.role, m.model, false));
+        document.querySelectorAll('.chat-item').forEach(el => el.classList.remove('active'));
+        document.querySelector(`[data-chat-id="${id}"]`)?.classList.add('active');
+        if (window.innerWidth <= 1024) document.getElementById('sidebar').classList.remove('show');
+    } catch {
+        alert('Failed to load chat');
+    } finally {
+        isLoading = false;
+    }
+}
+
+async function renameChat(id) {
+    const title = prompt('Enter new chat title:');
+    if (!title || !title.trim()) return;
+    try {
+        const res = await fetch(`/chat/${id}/rename`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: title.trim() })
+        });
+        const d = await res.json();
+        if (d.success) {
+            document.querySelector(`[data-chat-id="${id}"] .chat-title`).textContent = title.trim();
+        }
+    } catch {
+        alert('Failed to rename chat');
+    }
+}
+
+async function deleteChat(id) {
+    if (!confirm('Delete this chat?')) return;
+    try {
+        const res = await fetch(`/chat/${id}/delete`, { method: 'DELETE' });
+        const d = await res.json();
+        if (d.success) {
+            document.querySelector(`[data-chat-id="${id}"]`)?.remove();
+            if (currentChatId === id) {
+                currentChatId = null;
+                document.getElementById('messages-container').innerHTML = '';
+                document.getElementById('welcome-section').style.display = 'block';
+            }
+        }
+    } catch {
+        alert('Failed to delete chat');
+    }
+}
+
+function addChatToSidebar(id, title, prepend = false) {
+    const h = document.querySelector('.chat-history');
+    const e = h.querySelector('.empty-state'); if (e) e.remove();
+    const item = document.createElement('div');
+    item.className = 'chat-item active';
+    item.dataset.chatId = id;
+    item.innerHTML = `
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+        </svg>
+        <span class="chat-title">${escapeHtml(title)}</span>
+        <div class="chat-actions">
+            <button class="icon-btn rename-chat-btn" data-chat-id="${id}">✏️</button>
+            <button class="icon-btn delete-chat-btn" data-chat-id="${id}">🗑️</button>
+        </div>`;
+    document.querySelectorAll('.chat-item').forEach(el => el.classList.remove('active'));
+    if (prepend) h.insertBefore(item, h.firstChild); else h.appendChild(item);
+}
+
+/* ============ SENDING & RENDERING MESSAGES ============ */
+async function sendMessage() {
+    const input = document.getElementById('chat-input');
+    const message = input.value.trim();
+    if (!message || isLoading) return;
+
+    isLoading = true;
+    document.getElementById('welcome-section').style.display = 'none';
+    addMessage(message, 'user', '', false);
+    input.value = '';
+    input.style.height = 'auto';
+    showTypingIndicator();
+
+    try {
+        const res = await fetch('/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message, model: currentModel, chat_id: currentChatId })
+        });
+        const d = await res.json();
+        removeTypingIndicator();
+        if (d.error) {
+            addMessage(d.error, 'error', '', false);
+        } else {
+            addMessage(d.response, 'assistant', d.model, true);
+            currentChatId = d.chat_id;
+            if (d.chat_title) {
+                const ex = document.querySelector(`[data-chat-id="${d.chat_id}"]`);
+                if (ex) ex.querySelector('.chat-title').textContent = d.chat_title;
+                else addChatToSidebar(d.chat_id, d.chat_title, true);
+            }
+        }
+    } catch {
+        removeTypingIndicator();
+        addMessage('Error connecting to AI. Please try again.', 'error', '', false);
+    } finally {
+        isLoading = false;
+    }
+}
+
+function addMessage(text, role, model = '', useTyping = false) {
+    const c = document.getElementById('messages-container');
+    const row = document.createElement('div');
+    row.className = `message-row ${role}-row`;
+
+    if (role === 'user') {
+        row.innerHTML = `
+            <div class="message user-message">
+                <div class="message-content"><div class="message-text">${escapeHtml(text)}</div></div>
+            </div>`;
+        c.appendChild(row);
+        c.scrollTop = c.scrollHeight;
+        return;
+    }
+
+    if (role === 'assistant') {
+        row.innerHTML = `
+            <div class="message assistant-message">
+                <div class="avatar">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                        <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
+                    </svg>
+                </div>
+                <div class="message-content">
+                    ${model ? `<div class="model-badge">${escapeHtml(model)}</div>` : ''}
+                    <div class="message-text markdown-content"></div>
+                </div>
+            </div>`;
+        c.appendChild(row);
+        const el = row.querySelector('.message-text');
+        el.innerHTML = formatMessage(text);
+        el.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
+        addCopyButtons(el);
+        c.scrollTop = c.scrollHeight;
+        return;
+    }
+
+    // error
+    row.innerHTML = `
+        <div class="message error-message">
+            <div class="message-content">⚠️ ${escapeHtml(text)}</div>
+        </div>`;
+    c.appendChild(row);
+    c.scrollTop = c.scrollHeight;
+}
+
+/* ============ TYPING INDICATOR ============ */
+function showTypingIndicator() {
+    const c = document.getElementById('messages-container');
+    const d = document.createElement('div');
+    d.className = 'message-row assistant-row typing-indicator';
+    d.id = 'typing-indicator';
+    d.innerHTML = `
+        <div class="message assistant-message">
+            <div class="avatar">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                    <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
+                </svg>
+            </div>
+            <div class="typing-dots"><span></span><span></span><span></span></div>
+        </div>`;
+    c.appendChild(d);
+    c.scrollTop = c.scrollHeight;
+}
+
+function removeTypingIndicator() {
+    document.getElementById('typing-indicator')?.remove();
+}
+
+/* ============ EVENT LISTENERS ============ */
+document.getElementById('sidebar-toggle')?.addEventListener('click', toggleSidebar);
+document.getElementById('new-chat-btn')?.addEventListener('click', newChat);
+document.getElementById('model-selector-btn')?.addEventListener('click', toggleModelSelector);
+document.getElementById('close-selector-btn')?.addEventListener('click', toggleModelSelector);
+document.getElementById('user-menu-btn')?.addEventListener('click', toggleUserMenu);
+document.getElementById('send-btn')?.addEventListener('click', sendMessage);
+
+document.getElementById('chat-input')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+    }
+});
+document.getElementById('chat-input')?.addEventListener('input', function () {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 200) + 'px';
+});
+
+document.querySelectorAll('.model-card').forEach(card => {
+    card.addEventListener('click', function () {
+        selectModel(this.dataset.model, this.dataset.name);
+    });
+});
+
+document.querySelectorAll('.suggestion-card').forEach(card => {
+    card.addEventListener('click', function () {
+        document.getElementById('chat-input').value = this.dataset.suggestion;
+        sendMessage();
+    });
+});
+
+document.addEventListener('click', e => {
+    if (e.target.closest('.chat-item') && !e.target.closest('.chat-actions')) {
+        const id = e.target.closest('.chat-item').dataset.chatId;
+        if (id) loadChat(parseInt(id));
+    }
+    if (e.target.closest('.rename-chat-btn')) {
+        e.stopPropagation();
+        renameChat(parseInt(e.target.closest('.rename-chat-btn').dataset.chatId));
+    }
+    if (e.target.closest('.delete-chat-btn')) {
+        e.stopPropagation();
+        deleteChat(parseInt(e.target.closest('.delete-chat-btn').dataset.chatId));
+    }
+    const menu = document.getElementById('user-menu');
+    if (menu && !e.target.closest('#user-menu-btn') && !menu.contains(e.target)) menu.style.display = 'none';
+    const sel = document.getElementById('model-selector');
+    if (sel.style.display === 'block' &&
+        !e.target.closest('#model-selector-btn') &&
+        !e.target.closest('#close-selector-btn') &&
+        !sel.contains(e.target)) sel.style.display = 'none';
+    if (window.innerWidth <= 1024) {
+        const s = document.getElementById('sidebar');
+        if (s.classList.contains('show') &&
+            !e.target.closest('#sidebar-toggle') &&
+            !s.contains(e.target)) s.classList.remove('show');
+    }
+});
+    </script>
+</body>
+</html>
