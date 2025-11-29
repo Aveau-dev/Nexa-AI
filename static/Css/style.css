@@ -2383,55 +2383,53 @@ body {
 
 
 
+/* User message row alignment */
+.message-row.user-row {
+    display: flex;
+    justify-content: flex-end;      /* right side */
+    padding: 4px 12px;
+}
 
-/* User prompt header bar (top of each exchange) */
+/* User bubble */
+.message.user-message {
+    max-width: 70%;                 /* bubble never wider than 70% of chat area */
+    display: inline-flex;
+    justify-content: flex-end;
+}
+
+/* Header containing text + icons */
 .message-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  padding: 6px 12px;
-  margin-bottom: 6px;          /* small gap before assistant reply */
-  border-radius: 999px;
-  background: #020617;         /* same as main background card */
-  border: 1px solid #1f2937;   /* subtle border like other elements */
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 16px;
+    background: #1f2937;            /* your dark gray */
+    color: #f9fafb;
+    /* auto width based on content, but wrap when long */
+    max-width: 100%;
 }
 
-/* Text inside the prompt bar */
+/* The text itself – allows wrapping */
 .message-prompt-text {
-  flex: 1;
-  font-size: 0.85rem;
-  color: #e5e7eb;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Right‑side icon group */
-.message-header-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+    white-space: normal;            /* allow wrapping */
+    word-wrap: break-word;
+    word-break: break-word;
 }
 
 /* Copy / edit buttons */
-.msg-copy-btn,
-.msg-edit-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid transparent;
-  background: transparent;
-  color: #9ca3af;              /* softer gray to match UI icons */
-  font-size: 0.8rem;
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 999px;
+.message-header-actions {
+    display: inline-flex;
+    gap: 4px;
+    flex-shrink: 0;                 /* don’t shrink icons */
 }
 
-.msg-copy-btn:hover,
-.msg-edit-btn:hover {
-  border-color: #374151;
-  background: #020617;
-  color: #e5e7eb;
+.msg-copy-btn,
+.msg-edit-btn {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 0 2px;
 }
+
