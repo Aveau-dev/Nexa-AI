@@ -583,7 +583,7 @@ def stripe_webhook():
     except Exception as e:
         return str(e), 400
 
-    if event['type'] == 'checkout.session.completed']:
+    if event['type'] == 'checkout.session.completed':
         sess = event['data']['object']
         user = User.query.filter_by(email=sess['customer_email']).first()
         if user:
@@ -600,3 +600,4 @@ if __name__ == '__main__':
         print("✅ Database ready!")
         print("🚀 Starting NexaAI with advanced features...")
     app.run(debug=True, port=5000)
+
