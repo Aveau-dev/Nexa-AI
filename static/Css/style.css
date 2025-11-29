@@ -2313,4 +2313,27 @@ body {
 }
 
 
+/*new*/
 
+
+
+.markdown-content p {
+  margin: 0 0 8px;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  margin: 4px 0 8px 20px;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3 {
+  margin: 10px 0 6px;
+  font-weight: 600;
+}
+
+pre {
+  margin: 8px 0;      /* no huge gaps above/below code */
+  line-height: 1.4;
+}
