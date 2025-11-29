@@ -863,29 +863,37 @@
         const row = document.createElement('div');
         row.className = `message-row ${role}-row`;
 
+        // USER MESSAGE: with Copy + Edit buttons
         if (role === 'user') {
             row.innerHTML = `
-            <div class="message user-message">
-                <div class="message-content"><div class="message-text">${escapeHtml(text)}</div></div>
-            </div>`;
+        <div class="message user-message">
+            <div class="message-content">
+                <div class="message-text">${escapeHtml(text)}</div>
+                <div class="message-actions">
+                    <button class="msg-copy-btn">Copy</button>
+                    <button class="msg-edit-btn">Edit</button>
+                </div>
+            </div>
+        </div>`;
             c.appendChild(row);
             c.scrollTop = c.scrollHeight;
             return;
         }
 
+        // ASSISTANT MESSAGE: same as you had
         if (role === 'assistant') {
             row.innerHTML = `
-            <div class="message assistant-message">
-                <div class="avatar">
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                        <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
-                    </svg>
-                </div>
-                <div class="message-content">
-                    ${model ? `<div class="model-badge">${escapeHtml(model)}</div>` : ''}
-                    <div class="message-text markdown-content"></div>
-                </div>
-            </div>`;
+        <div class="message assistant-message">
+            <div class="avatar">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                    <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
+                </svg>
+            </div>
+            <div class="message-content">
+                ${model ? `<div class="model-badge">${escapeHtml(model)}</div>` : ''}
+                <div class="message-text markdown-content"></div>
+            </div>
+        </div>`;
             c.appendChild(row);
             const el = row.querySelector('.message-text');
             el.innerHTML = formatMessage(text);
@@ -895,14 +903,38 @@
             return;
         }
 
-        // error
+        // ERROR MESSAGE
         row.innerHTML = `
-        <div class="message error-message">
-            <div class="message-content">⚠️ ${escapeHtml(text)}</div>
-        </div>`;
+    <div class="message error-message">
+        <div class="message-content">⚠️ ${escapeHtml(text)}</div>
+    </div>`;
         c.appendChild(row);
         c.scrollTop = c.scrollHeight;
     }
+
+    document.addEventListener('click', (e) => {
+        if (!e.target.classList.contains('msg-copy-btn') &&
+            !e.target.classList.contains('msg-edit-btn')) return;
+
+        const userMsg = e.target.closest('.user-message');
+        const textEl = userMsg?.querySelector('.message-text');
+        if (!textEl) return;
+        const txt = textEl.innerText;
+
+        if (e.target.classList.contains('msg-copy-btn')) {
+            navigator.clipboard.writeText(txt);
+            e.target.textContent = 'Copied!';
+            setTimeout(() => (e.target.textContent = 'Copy'), 1500);
+        }
+
+        if (e.target.classList.contains('msg-edit-btn')) {
+            const input = document.getElementById('chat-input');
+            input.value = txt;
+            input.focus();
+            input.selectionStart = input.selectionEnd = input.value.length;
+        }
+    });
+
 
     /* ============ TYPING INDICATOR ============ */
     function showTypingIndicator() {
