@@ -241,24 +241,35 @@ def get_chat_history(chat_id, limit=10):
     return history
 
 def call_openrouter_api(model_path, messages):
+    """Call OpenRouter with a Markdown-focused system prompt and higher token cap."""
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
     }
 
+    system_msg = {
+        "role": "system",
+        "content": (
+            "You are NexaAI. Always respond in clean, well‑structured Markdown. "
+            "Use headings, bullet lists, code blocks, and tables when helpful. "
+            "For big coding tasks, send as much working code as possible."
+        ),
+    }
+
     payload = {
         "model": model_path,
-        "messages": messages,
-        "max_tokens": 800,      # cap response length
+        "messages": [system_msg] + messages,
+        "max_tokens": 4096,   # higher cap, within common model limits
         "temperature": 0.7,
     }
 
     response = requests.post(
-        OPENROUTER_BASE_URL, headers=headers, json=payload, timeout=60
+        OPENROUTER_BASE_URL, headers=headers, json=payload, timeout=120
     )
     response.raise_for_status()
     data = response.json()
     return data["choices"][0]["message"]["content"]
+
 
 
 # ============ ROUTES ============
@@ -596,5 +607,6 @@ if __name__ == '__main__':
         print("🚀 Starting NexaAI with advanced features...")
     
     app.run(debug=True, port=5000)
+
 
 
