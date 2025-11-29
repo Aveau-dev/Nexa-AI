@@ -5,11 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NexaAI - Dashboard</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2319c37d' d='M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z'/></svg>">
-    <!-- NOTE: your folder is "Css" with capital C -->
     <link rel="stylesheet" href="{{ url_for('static', filename='Css/style.css') }}">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
     <!-- Top Navigation Bar -->
@@ -263,7 +262,6 @@
         <div class="input-wrapper">
             <div class="input-box">
                 <div class="input-inner">
-                    <input type="file" id="image-input" accept="image/*">
                     <textarea id="chat-input" placeholder="Ask anything..." rows="1"></textarea>
                     <button class="send-button" id="send-btn">
                         <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
@@ -280,7 +278,7 @@
         </div>
     </div>
 
-<script>
+    <script>
 let currentModel = 'gpt-3.5-turbo';
 let currentChatId = null;
 let isLoading = false;
@@ -464,13 +462,7 @@ async function sendMessage(){
         const res=await fetch('/chat',{
             method:'POST',
             headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({
-              message,
-              model: currentModel,
-              chat_id: currentChatId,
-              uploaded_file: currentUploadedFilename || null
-            })
-
+            body:JSON.stringify({message,model:currentModel,chat_id:currentChatId})
         });
         const d=await res.json();
         removeTypingIndicator();
@@ -487,40 +479,30 @@ async function sendMessage(){
         }
     }catch{
         removeTypingIndicator();
-        addMessage('Error connecting to AI. Please try again.','error','',false);
+        addMessage('Network error talking to server.','error','',false);
     }finally{
         isLoading=false;
     }
 }
 
-/* User + assistant messages */
+/* Messages: user bubble like index.html */
 function addMessage(text, role, model = '', useTyping = false) {
     const c = document.getElementById('messages-container');
     const row = document.createElement('div');
     row.className = `message-row ${role}-row`;
 
-    // USER: header bar with copy + edit
     if (role === 'user') {
-    row.innerHTML = `
-      <div class="message user-message">
-        <div class="message-content">
-          <div class="message-text">${escapeHtml(text)}</div>
-        </div>
-      </div>`;
-    c.appendChild(row);
+        row.innerHTML = `
+          <div class="message user-message">
+            <div class="message-content">
+              <div class="message-text">${escapeHtml(text)}</div>
+            </div>
+          </div>`;
+        c.appendChild(row);
+        c.scrollTop = c.scrollHeight;
+        return;
+    }
 
-    // add tools on top of the bubble (copy + edit icons)
-    const tools = document.createElement('div');
-    tools.className = 'user-tools';
-    tools.innerHTML = `
-    `;
-    row.querySelector('.user-message').appendChild(tools);
-
-    c.scrollTop = c.scrollHeight;
-    return;
-}
-
-    // ASSISTANT
     if (role === 'assistant') {
         row.innerHTML = `
           <div class="message assistant-message">
@@ -543,31 +525,12 @@ function addMessage(text, role, model = '', useTyping = false) {
         return;
     }
 
-    // ERROR
     row.innerHTML = `
       <div class="message error-message">
         <div class="message-content">⚠️ ${escapeHtml(text)}</div>
       </div>`;
     c.appendChild(row);
     c.scrollTop = c.scrollHeight;
-}
-    
-function addImageMessage(url) {
-  const c = document.getElementById('messages-container');
-  const row = document.createElement('div');
-  row.className = 'message-row assistant-row';
-  row.innerHTML = `
-    <div class="message assistant-message">
-      <div class="avatar">...</div>
-      <div class="message-content">
-        <div class="message-text markdown-content">
-          <img src="${url}" alt="Generated image" style="max-width:100%;border-radius:12px;">
-          <p><a href="${url}" download>Download image</a></p>
-        </div>
-      </div>
-    </div>`;
-  c.appendChild(row);
-  c.scrollTop = c.scrollHeight;
 }
 
 /* typing indicator */
@@ -592,74 +555,8 @@ function removeTypingIndicator(){
     document.getElementById('typing-indicator')?.remove();
 }
 
-/* CLICK HANDLER: copy + edit + resend, plus other UI */
+/* Global click: chat list + menus */
 document.addEventListener('click', (e) => {
-    const copyBtn = e.target.closest('.msg-copy-btn');
-    const editBtn = e.target.closest('.msg-edit-btn');
-    const doneBtn = e.target.closest('.msg-edit-done-btn');
-    const cancelBtn = e.target.closest('.msg-edit-cancel-btn');
-
-    // 1) COPY
-    if (copyBtn) {
-        const header = copyBtn.closest('.message-header');
-        const textEl = header.querySelector('.message-prompt-text');
-        const txt = textEl.innerText;
-        navigator.clipboard.writeText(txt);
-        copyBtn.textContent = 'Copied';
-        setTimeout(() => (copyBtn.textContent = '📋'), 1200);
-        return;
-    }
-
-    // 2) ENTER EDIT MODE
-    if (editBtn) {
-        const header = editBtn.closest('.message-header');
-        const textEl = header.querySelector('.message-prompt-text');
-        const current = textEl.innerText;
-        header.dataset.original = current;
-        header.innerHTML = `
-          <textarea class="msg-edit-area">${escapeHtml(current)}</textarea>
-          <div class="message-header-actions">
-            <button class="msg-edit-cancel-btn">Cancel</button>
-            <button class="msg-edit-done-btn">Done</button>
-          </div>`;
-        const ta = header.querySelector('.msg-edit-area');
-        ta.focus();
-        ta.selectionStart = ta.selectionEnd = ta.value.length;
-        return;
-    }
-
-    // 3) CANCEL EDIT
-    if (cancelBtn) {
-        const header = cancelBtn.closest('.message-header');
-        const original = header.dataset.original || '';
-        header.innerHTML = `
-          <div class="message-prompt-text">${escapeHtml(original)}</div>
-          <div class="message-header-actions">
-            <button class="msg-copy-btn" title="Copy prompt">📋</button>
-            <button class="msg-edit-btn" title="Edit prompt">✏️</button>
-          </div>`;
-        return;
-    }
-
-    // 4) DONE EDIT -> resend
-    if (doneBtn) {
-        const header = doneBtn.closest('.message-header');
-        const ta = header.querySelector('.msg-edit-area');
-        const updated = ta.value.trim();
-        if (!updated) return;
-        header.innerHTML = `
-          <div class="message-prompt-text">${escapeHtml(updated)}</div>
-          <div class="message-header-actions">
-            <button class="msg-copy-btn" title="Copy prompt">📋</button>
-            <button class="msg-edit-btn" title="Edit prompt">✏️</button>
-          </div>`;
-        const input = document.getElementById('chat-input');
-        input.value = updated;
-        sendMessage();
-        return;
-    }
-
-    /* Chat item click / rename / delete */
     if (e.target.closest('.chat-item') && !e.target.closest('.chat-actions')) {
         const id=e.target.closest('.chat-item').dataset.chatId;
         if(id)loadChat(parseInt(id));
@@ -675,7 +572,6 @@ document.addEventListener('click', (e) => {
         deleteChat(id);
     }
 
-    /* Close menus / sidebar click outside */
     const menu=document.getElementById('user-menu');
     if(menu && !e.target.closest('#user-menu-btn') && !menu.contains(e.target)){
         menu.style.display='none';
@@ -697,7 +593,7 @@ document.addEventListener('click', (e) => {
     }
 });
 
-/* Suggestions */
+/* Suggestions + basic wiring */
 document.querySelectorAll('.model-card').forEach(card=>{
     card.addEventListener('click',function(){selectModel(this.dataset.model,this.dataset.name);});
 });
@@ -708,7 +604,6 @@ document.querySelectorAll('.suggestion-card').forEach(card=>{
     });
 });
 
-/* Basic event wiring */
 document.getElementById('sidebar-toggle')?.addEventListener('click',toggleSidebar);
 document.getElementById('new-chat-btn')?.addEventListener('click',newChat);
 document.getElementById('model-selector-btn')?.addEventListener('click',toggleModelSelector);
@@ -722,11 +617,6 @@ document.getElementById('chat-input')?.addEventListener('input',function(){
     this.style.height='auto';
     this.style.height=Math.min(this.scrollHeight,200)+'px';
 });
-</script>
-
+    </script>
 </body>
 </html>
-
-
-
-
