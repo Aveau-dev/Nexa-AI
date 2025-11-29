@@ -15,6 +15,8 @@ import stripe
 import sqlite3
 import base64
 from PIL import Image
+import json
+import hashlib
 
 # ============ FLASK & DB SETUP ============
 
@@ -28,10 +30,12 @@ if uri and uri.startswith("postgres://"):
 app.config['SQLALCHEMY_DATABASE_URI'] = uri if uri else 'sqlite:///database.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Uploads
+# Uploads & temp sessions
 app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['DEMO_SESSIONS_FOLDER'] = 'demo_sessions'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+os.makedirs(app.config['DEMO_SESSIONS_FOLDER'], exist_ok=True)
 
 db = SQLAlchemy(app)
 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
@@ -139,7 +143,7 @@ FREE_MODELS = {
         'path': 'openai/gpt-3.5-turbo',
         'name': 'GPT-3.5 Turbo',
         'limit': None,
-        'vision': True  # allow vision chat for uploads
+        'vision': True
     },
     'claude-3-haiku': {
         'path': 'anthropic/claude-3-haiku',
@@ -148,7 +152,7 @@ FREE_MODELS = {
         'vision': False
     },
     'gemini-flash': {
-        'path': 'google/gemini-2.0-flash-001',
+        'path': 'google/gemini-2.0-flash-exp',
         'name': 'Gemini Flash 2.0',
         'limit': None,
         'vision': False
@@ -242,7 +246,8 @@ def generate_chat_title_ai(first_message):
     except Exception:
         return generate_chat_title(first_message)
 
-def get_chat_history(chat_id, limit=10):
+def get_chat_history(chat_id, limit=4):
+    """Load last N messages from DB to save memory"""
     messages = (
         Message.query.filter_by(chat_id=chat_id)
         .order_by(Message.created_at.desc())
@@ -267,6 +272,35 @@ def get_chat_history(chat_id, limit=10):
             history.append({"role": msg.role, "content": msg.content})
     return history
 
+def get_demo_session_id():
+    """Generate unique session ID from IP + user agent"""
+    ip = request.remote_addr or 'unknown'
+    ua = request.headers.get('User-Agent', 'unknown')
+    raw = f"{ip}_{ua}_{datetime.utcnow().strftime('%Y%m%d')}"
+    return hashlib.md5(raw.encode()).hexdigest()
+
+def load_demo_history(session_id):
+    """Load demo history from file"""
+    path = os.path.join(app.config['DEMO_SESSIONS_FOLDER'], f"{session_id}.json")
+    if os.path.exists(path):
+        try:
+            with open(path, 'r') as f:
+                data = json.load(f)
+                # Only keep last 6 messages (3 exchanges)
+                return data[-6:]
+        except Exception:
+            return []
+    return []
+
+def save_demo_history(session_id, history):
+    """Save demo history to file"""
+    path = os.path.join(app.config['DEMO_SESSIONS_FOLDER'], f"{session_id}.json")
+    try:
+        with open(path, 'w') as f:
+            json.dump(history[-6:], f)  # only save last 6
+    except Exception:
+        pass
+
 def call_openrouter_api(model_path, messages):
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
@@ -275,17 +309,13 @@ def call_openrouter_api(model_path, messages):
 
     system_msg = {
         "role": "system",
-        "content": (
-            "You are NexaAI. Always respond in well‑structured Markdown "
-            "with headings, lists, and fenced code blocks for code. "
-            "For long tasks, answer in as much detail as possible."
-        ),
+        "content": "You are NexaAI. Respond in Markdown with code blocks where appropriate."
     }
 
     payload = {
         "model": model_path,
         "messages": [system_msg] + messages,
-        "max_tokens": 4096,
+        "max_tokens": 1024,       # reduced to save memory
         "temperature": 0.7,
     }
 
@@ -314,11 +344,26 @@ def index():
 @app.route('/demo-chat', methods=['POST'])
 def demo_chat():
     user_message = request.json.get('message', '')
+    session_id = get_demo_session_id()
+    
+    # Load history from file
+    history = load_demo_history(session_id)
+    
+    # Add current user message
+    history.append({"role": "user", "content": user_message})
+    
     try:
         bot_response = call_openrouter_api(
             FREE_MODELS['gpt-3.5-turbo']['path'],
-            [{"role": "user", "content": user_message}]
+            history
         )
+        
+        # Add assistant response
+        history.append({"role": "assistant", "content": bot_response})
+        
+        # Save to file
+        save_demo_history(session_id, history)
+        
         return jsonify({
             'response': bot_response,
             'demo': True,
@@ -327,6 +372,18 @@ def demo_chat():
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/demo-clear', methods=['POST'])
+def demo_clear():
+    """Clear demo conversation history"""
+    session_id = get_demo_session_id()
+    path = os.path.join(app.config['DEMO_SESSIONS_FOLDER'], f"{session_id}.json")
+    try:
+        if os.path.exists(path):
+            os.remove(path)
+    except Exception:
+        pass
+    return jsonify({'success': True})
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
@@ -480,7 +537,7 @@ def chat():
     user_message = request.json.get('message', '')
     selected_model = request.json.get('model', 'gpt-3.5-turbo')
     chat_id = request.json.get('chat_id')
-    uploaded_file = request.json.get('uploaded_file')  # just filename in uploads/
+    uploaded_file = request.json.get('uploaded_file')
 
     if chat_id:
         chat_obj = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first()
@@ -528,9 +585,6 @@ def chat():
         chat_obj.title = generate_chat_title_ai(user_message)
 
     history = get_chat_history(chat_id)
-
-    # For current message + upload, history already includes previous images;
-    # no need to re-append the same image separately. Just append text.
     history.append({"role": "user", "content": user_message})
 
     try:
@@ -600,4 +654,3 @@ if __name__ == '__main__':
         print("✅ Database ready!")
         print("🚀 Starting NexaAI with advanced features...")
     app.run(debug=True, port=5000)
-
