@@ -2383,30 +2383,49 @@ body {
 
 
 
-/* User prompt header bar */
+/* Base message bubble like index.html */
+.message-row {
+  display: flex;
+  width: 100%;
+  justify-content: center;
+  padding: 0.75rem 1rem;   /* same vertical spacing as index */
+}
+
+.user-row {
+  justify-content: flex-end;
+}
+
+.user-message {
+  max-width: 75%;          /* bubble width */
+  background: #111827;
+  color: #f9fafb;
+  border-radius: 18px;
+  padding: 0;              /* padding will be on header */
+}
+
+/* User prompt header bar (inside user bubble) */
 .message-header {
-  display: inline-flex;          /* shrink to content instead of full width */
+  display: inline-flex;
   align-items: center;
   justify-content: space-between;
   gap: 6px;
   padding: 6px 10px;
-  margin-bottom: 6px;
   border-radius: 999px;
-  background: #020617;
+  background: #111827;
   border: 1px solid #1f2937;
-  max-width: 100%;               /* never overflow container */
+  max-width: 100%;
 }
 
-/* Text inside the prompt bar */
 .message-prompt-text {
   flex: 1 1 auto;
   font-size: 0.9rem;
+  line-height: 1.4;        /* same line‑height as index */
   color: #e5e7eb;
-  white-space: normal;           /* allow wrapping to next line */
-  word-break: break-word;        /* break long words/URLs */
+  white-space: normal;     /* allow wrap */
+  word-break: break-word;
 }
 
-/* Right-side icons */
+/* Actions on the right */
 .message-header-actions {
   flex: 0 0 auto;
   display: inline-flex;
@@ -2414,11 +2433,42 @@ body {
   gap: 4px;
 }
 
-.user-message {
-  display: inline-block;
-  max-width: 75%;    /* like typical chat bubble */
+.msg-copy-btn,
+.msg-edit-btn,
+.msg-edit-done-btn,
+.msg-edit-cancel-btn {
+  border: 1px solid transparent;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 999px;
 }
 
+.msg-copy-btn:hover,
+.msg-edit-btn:hover,
+.msg-edit-done-btn:hover,
+.msg-edit-cancel-btn:hover {
+  border-color: #374151;
+  background: #020617;
+  color: #e5e7eb;
+}
+
+/* Inline edit textarea inside header */
+.msg-edit-area {
+  flex: 1 1 auto;
+  min-height: 28px;
+  max-height: 120px;
+  border-radius: 999px;
+  border: 1px solid #1f2937;
+  background: #020617;
+  color: #e5e7eb;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  padding: 4px 10px;
+  resize: vertical;
+}
 
 
 
