@@ -2381,25 +2381,47 @@ body {
 
 
 
-.message-actions {
-    margin-top: 6px;
-    display: flex;
-    gap: 6px;
-    justify-content: flex-end;
+
+
+
+/* User prompt header bar */
+.message-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #111827;        /* slightly lighter than background */
+  border: 1px solid #1f2937;
+}
+
+.message-prompt-text {
+  flex: 1;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.message-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .msg-copy-btn,
 .msg-edit-btn {
-    border: 1px solid #1f2937;
-    background: #020617;
-    color: #e5e7eb;
-    border-radius: 999px;
-    padding: 2px 8px;
-    font-size: 11px;
-    cursor: pointer;
+  border: none;
+  background: transparent;
+  color: #e5e7eb;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 999px;
 }
 
 .msg-copy-btn:hover,
 .msg-edit-btn:hover {
-    background: #111827;
+  background: #1f2937;
 }
