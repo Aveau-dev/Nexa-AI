@@ -214,6 +214,29 @@ def generate_chat_title(first_message):
     if len(first_message) > 50:
         title += '...'
     return title
+    
+def generate_chat_title_ai(first_message):
+    """Ask OpenRouter for a short, human title. Falls back to simple slice on error."""
+    try:
+        prompt = (
+            "Generate a very short chat title (max 6 words) for this user request.\n"
+            "Return ONLY the title, no quotes or extra text.\n\n"
+            f"User message:\n{first_message}"
+        )
+
+        resp = openrouter_client.chat.completions.create(
+            model=FREE_MODELS['gpt-3.5-turbo']['path'],
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=32,
+            temperature=0.3,
+        )
+        title = resp.choices[0].message.content.strip()
+        # Safety: trim if model adds junk
+        return title[:80]
+    except Exception:
+        # Fall back to your existing simple function
+        return generate_chat_title(first_message)
+
 
 def get_chat_history(chat_id, limit=10):
     messages = Message.query.filter_by(chat_id=chat_id) \
@@ -529,7 +552,8 @@ def chat():
     db.session.add(user_msg)
     
     if chat_obj.title == 'New Chat':
-        chat_obj.title = generate_chat_title(user_message)
+        chat_obj.title = generate_chat_title_ai(user_message)
+
     
     history = get_chat_history(chat_id)
     
@@ -618,6 +642,7 @@ if __name__ == '__main__':
         print("🚀 Starting NexaAI with advanced features...")
     
     app.run(debug=True, port=5000)
+
 
 
 
