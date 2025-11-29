@@ -2376,3 +2376,30 @@ body {
     line-height: 1.35;
 }
 
+
+
+
+
+
+.message-actions {
+    margin-top: 6px;
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+}
+
+.msg-copy-btn,
+.msg-edit-btn {
+    border: 1px solid #1f2937;
+    background: #020617;
+    color: #e5e7eb;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.msg-copy-btn:hover,
+.msg-edit-btn:hover {
+    background: #111827;
+}
