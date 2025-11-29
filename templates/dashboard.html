@@ -984,6 +984,30 @@
             if (s.classList.contains('show') &&
                 !e.target.closest('#sidebar-toggle') &&
                 !s.contains(e.target)) s.classList.remove('show');
+            // User message copy / edit
+            if (e.target.classList.contains('msg-copy-btn') ||
+                e.target.classList.contains('msg-edit-btn')) {
+
+                const userMsg = e.target.closest('.user-message');
+                const textEl = userMsg?.querySelector('.message-text');
+                if (!textEl) return;
+                const txt = textEl.innerText;
+
+                if (e.target.classList.contains('msg-copy-btn')) {
+                    navigator.clipboard.writeText(txt);
+                    e.target.textContent = 'Copied!';
+                    setTimeout(() => (e.target.textContent = 'Copy'), 1500);
+                }
+
+                if (e.target.classList.contains('msg-edit-btn')) {
+                    const input = document.getElementById('chat-input');
+                    input.value = txt;
+                    input.focus();
+                    // Optional: move cursor to end
+                    input.selectionStart = input.selectionEnd = input.value.length;
+                }
+            }
+
         }
     });
 </script>
