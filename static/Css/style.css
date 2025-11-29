@@ -426,10 +426,11 @@ body {
 
 .message-content {
     flex: 1;
-    font-size: 1rem;
-    line-height: 1.75;
+    font-size: 0.95rem;
+    line-height: 1.45;   /* tighter lines */
     word-wrap: break-word;
 }
+
 
 .user-message .message-content {
     background: var(--bg-tertiary);
@@ -2336,4 +2337,40 @@ body {
 pre {
   margin: 8px 0;      /* no huge gaps above/below code */
   line-height: 1.4;
+}
+
+
+
+
+
+
+
+
+
+
+
+body {
+    line-height: 1.4;    /* instead of 1.6 */
+}
+
+/* Dashboard markdown text */
+.markdown-content p {
+    margin: 0 0 8px;     /* reduce big gaps between paragraphs */
+}
+
+.markdown-content ul,
+.markdown-content ol {
+    margin: 4px 0 8px 1.25rem;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3 {
+    margin: 10px 0 6px;
+}
+
+/* Code blocks */
+.markdown-content pre {
+    margin: 6px 0;       /* less vertical space around code */
+    line-height: 1.35;
 }
