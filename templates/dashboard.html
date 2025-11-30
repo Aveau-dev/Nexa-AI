@@ -762,9 +762,18 @@ function addMessage(text, role, model = '', useTyping = false) {
           </div>`;
         c.appendChild(row);
         const el = row.querySelector('.message-text');
-        el.innerHTML = formatMessage(text);
-        el.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
-        addCopyButtons(el);
+        
+        // Check if text contains HTML tags (like generated images)
+        if (text.includes('<div') || text.includes('<img') || text.includes('<a')) {
+            // Insert HTML directly without markdown processing
+            el.innerHTML = text;
+        } else {
+            // Normal text - process as markdown
+            el.innerHTML = formatMessage(text);
+            el.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
+            addCopyButtons(el);
+        }
+        
         c.scrollTop = c.scrollHeight;
         return;
     }
@@ -776,6 +785,7 @@ function addMessage(text, role, model = '', useTyping = false) {
     c.appendChild(row);
     c.scrollTop = c.scrollHeight;
 }
+
 
 function showTypingIndicator(){
     const c=document.getElementById('messages-container');
