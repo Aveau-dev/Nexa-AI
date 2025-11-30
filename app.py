@@ -3,6 +3,7 @@ import sqlite3
 import base64
 from datetime import datetime
 import io
+import urllib.parse
 
 from dotenv import load_dotenv
 from flask import (
@@ -681,6 +682,7 @@ if __name__ == '__main__':
         print("✅ Database ready!")
         print("🚀 Starting NexaAI...")
     app.run(debug=True, port=5000)
+
 
 
 
