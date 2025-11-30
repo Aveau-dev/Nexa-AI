@@ -628,12 +628,13 @@ function removeUploadedImage() {
 }
 
 async function handleImageGeneration(message) {
-    const imageKeywords = ['generate image', 'create image', 'draw', 'make an image', 'make image', 'picture of', 'draw me', 'generate a picture'];
+    const imageKeywords = ['generate image', 'create image', 'draw', 'make an image', 'make image', 'picture of', 'draw me', 'generate a picture', 'generate an image'];
     const isImageRequest = imageKeywords.some(kw => message.toLowerCase().includes(kw));
     
     if (!isImageRequest) return false;
     
-    addMessage('🎨 Generating image with DALL-E 3...', 'assistant', 'DALL-E 3', false);
+    // Show generating message
+    const generatingMsg = addMessage('🎨 Generating image with DALL-E 3...', 'assistant', 'DALL-E 3', false);
     
     try {
         const res = await fetch('/generate-image', {
@@ -643,26 +644,35 @@ async function handleImageGeneration(message) {
         });
         const d = await res.json();
         
+        // Remove "generating" message
         const container = document.getElementById('messages-container');
-        container.lastChild.remove();
+        const lastMsg = container.lastChild;
+        if (lastMsg && lastMsg.textContent.includes('Generating image')) {
+            lastMsg.remove();
+        }
         
         if (d.success) {
             const imageHtml = `
                 <div class="generated-image-container">
-                    <img src="${d.url}" alt="Generated image">
+                    <img src="${d.url}" alt="Generated image" onload="this.parentElement.parentElement.parentElement.parentElement.scrollIntoView({behavior:'smooth',block:'end'})">
                 </div>
                 <a href="${d.url}" download class="download-image-btn">⬇️ Download Image</a>
             `;
             addMessage(imageHtml, 'assistant', 'DALL-E 3', false);
             return true;
         } else {
-            addMessage(d.error, 'error', '', false);
+            // Show the helpful error message from backend
+            addMessage(d.error, 'assistant', 'NexaAI', false);
             return true;
         }
     } catch (err) {
         const container = document.getElementById('messages-container');
-        container.lastChild.remove();
-        addMessage('Failed to generate image. Please try again.', 'error', '', false);
+        const lastMsg = container.lastChild;
+        if (lastMsg && lastMsg.textContent.includes('Generating image')) {
+            lastMsg.remove();
+        }
+        
+        addMessage('Image generation is currently unavailable. However, I can:\n\n• Analyze and describe any images you upload\n• Help you write code to create visualizations\n• Recommend free AI image generation tools\n\nTry uploading an image and asking me to analyze it!', 'assistant', 'NexaAI', false);
         return true;
     }
 }
@@ -853,3 +863,4 @@ document.getElementById('chat-input')?.addEventListener('input',function(){
     </script>
 </body>
 </html>
+
