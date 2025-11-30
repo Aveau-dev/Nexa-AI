@@ -443,8 +443,8 @@ def generate_image_route():
         return jsonify({'error': 'Empty prompt'}), 400
 
     try:
-        # Use Stable Diffusion via Hugging Face API (FREE)
-        API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
+        # NEW Hugging Face Router endpoint
+        API_URL = "https://router.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
         headers = {"Authorization": f"Bearer {HUGGINGFACE_API_KEY}"}
         
         # Clean the prompt - remove "generate image of" etc
@@ -452,9 +452,15 @@ def generate_image_route():
         for phrase in ['generate image of', 'create image of', 'make image of', 'draw', 'generate a picture of', 'make an image of', 'create an image of']:
             clean_prompt = clean_prompt.replace(phrase, '').strip()
         
+        # Add quality improvements to prompt
+        enhanced_prompt = f"{clean_prompt}, high quality, detailed, 4k"
+        
         payload = {
-            "inputs": clean_prompt,
-            "options": {"wait_for_model": True}
+            "inputs": enhanced_prompt,
+            "parameters": {
+                "num_inference_steps": 25,
+                "guidance_scale": 7.5
+            }
         }
         
         response = requests.post(API_URL, headers=headers, json=payload, timeout=90)
@@ -474,19 +480,24 @@ def generate_image_route():
                 'url': f'/uploads/{filename}',
                 'prompt': clean_prompt
             })
+        elif response.status_code == 503:
+            # Model is loading
+            try:
+                error_data = response.json()
+                estimated_time = error_data.get('estimated_time', 20)
+            except:
+                estimated_time = 20
+            
+            return jsonify({
+                'error': f'🔄 AI model is warming up (estimated {estimated_time} seconds). Please try again in a moment!',
+                'loading': True
+            }), 503
         else:
             try:
                 error_data = response.json()
-                error_msg = error_data.get('error', 'Image generation failed')
+                error_msg = error_data.get('error', f'Status code: {response.status_code}')
             except:
                 error_msg = f'Status code: {response.status_code}'
-            
-            # If model is loading, inform user
-            if 'currently loading' in error_msg.lower() or 'loading' in str(error_data).lower():
-                return jsonify({
-                    'error': '🔄 AI model is warming up (takes ~20 seconds). Please try again in a moment!',
-                    'loading': True
-                }), 503
             
             return jsonify({'error': f'Generation failed: {error_msg}'}), 500
             
@@ -494,6 +505,7 @@ def generate_image_route():
         return jsonify({'error': 'Image generation timed out. The model might be busy. Try again in a moment!'}), 504
     except Exception as e:
         return jsonify({'error': f'Error: {str(e)}'}), 500
+
 
 @app.route('/chat/new', methods=['POST'])
 @login_required
@@ -698,3 +710,4 @@ if __name__ == '__main__':
         print("✅ Database ready!")
         print("🚀 Starting NexaAI...")
     app.run(debug=True, port=5000)
+
