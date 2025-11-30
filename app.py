@@ -196,6 +196,17 @@ PREMIUM_MODELS = {
     }
 }
 
+# After PREMIUM_MODELS definition, add:
+
+IMAGE_GENERATION_MODELS = {
+    'dall-e-3': {
+        'path': 'openai/dall-e-3',
+        'name': 'DALL-E 3',
+        'premium': True  # Make it premium-only or free as needed
+    }
+}
+
+
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf', 'txt', 'doc', 'docx'}
 
 # ================== HELPERS ==================
@@ -251,6 +262,63 @@ def get_chat_history(chat_id, limit=4):
         else:
             history.append({"role": msg.role, "content": msg.content})
     return history
+
+
+@app.route('/generate-image', methods=['POST'])
+@login_required
+def generate_image_route():
+    prompt = request.json.get('prompt', '').strip()
+    if not prompt:
+        return jsonify({'error': 'Empty prompt'}), 400
+
+    # Optional: restrict to premium
+    # if not current_user.is_premium:
+    #     return jsonify({'error': 'Image generation requires Premium'}), 403
+
+    try:
+        # Call OpenRouter for DALL-E
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": "openai/dall-e-3",
+            "prompt": prompt,
+            "n": 1,
+            "size": "1024x1024"
+        }
+        
+        resp = requests.post(
+            "https://openrouter.ai/api/v1/images/generations",
+            headers=headers,
+            json=payload,
+            timeout=120
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        
+        # DALL-E returns URL, not base64 by default
+        image_url = data['data'][0]['url']
+        
+        # Download and save locally for user
+        img_response = requests.get(image_url)
+        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"generated_{current_user.id}_{ts}.png"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        
+        with open(filepath, 'wb') as f:
+            f.write(img_response.content)
+        
+        return jsonify({
+            'success': True,
+            'filename': filename,
+            'url': f'/uploads/{filename}'
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Image generation failed: {str(e)}'}), 500
+
+
 
 def call_openrouter_api(model_path, messages):
     headers = {
@@ -638,3 +706,4 @@ if __name__ == '__main__':
         db.create_all()
         print("✅ Database ready!")
     app.run(debug=True, port=5000)
+
