@@ -134,7 +134,6 @@ def migrate_database():
 
 # ================== MODEL CONFIG ==================
 
-# vision=True only on models that actually support image input
 FREE_MODELS = {
     'gpt-3.5-turbo': {
         'path': 'openai/gpt-3.5-turbo',
@@ -155,8 +154,8 @@ FREE_MODELS = {
         'vision': False
     },
     'gemini-flash': {
-        'path': 'google/gemini-2.0-flash-exp',
-        'name': 'Gemini Flash 2.0',
+        'path': 'google/gemini-flash-1.5',
+        'name': 'Gemini Flash 1.5',
         'limit': None,
         'vision': True
     },
@@ -195,17 +194,6 @@ PREMIUM_MODELS = {
         'vision': False
     }
 }
-
-# After PREMIUM_MODELS definition, add:
-
-IMAGE_GENERATION_MODELS = {
-    'dall-e-3': {
-        'path': 'openai/dall-e-3',
-        'name': 'DALL-E 3',
-        'premium': True  # Make it premium-only or free as needed
-    }
-}
-
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf', 'txt', 'doc', 'docx'}
 
@@ -263,63 +251,6 @@ def get_chat_history(chat_id, limit=4):
             history.append({"role": msg.role, "content": msg.content})
     return history
 
-
-@app.route('/generate-image', methods=['POST'])
-@login_required
-def generate_image_route():
-    prompt = request.json.get('prompt', '').strip()
-    if not prompt:
-        return jsonify({'error': 'Empty prompt'}), 400
-
-    # Optional: restrict to premium
-    # if not current_user.is_premium:
-    #     return jsonify({'error': 'Image generation requires Premium'}), 403
-
-    try:
-        # Call OpenRouter for DALL-E
-        headers = {
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-            "Content-Type": "application/json",
-        }
-        payload = {
-            "model": "openai/dall-e-3",
-            "prompt": prompt,
-            "n": 1,
-            "size": "1024x1024"
-        }
-        
-        resp = requests.post(
-            "https://openrouter.ai/api/v1/images/generations",
-            headers=headers,
-            json=payload,
-            timeout=120
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        
-        # DALL-E returns URL, not base64 by default
-        image_url = data['data'][0]['url']
-        
-        # Download and save locally for user
-        img_response = requests.get(image_url)
-        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"generated_{current_user.id}_{ts}.png"
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        
-        with open(filepath, 'wb') as f:
-            f.write(img_response.content)
-        
-        return jsonify({
-            'success': True,
-            'filename': filename,
-            'url': f'/uploads/{filename}'
-        })
-        
-    except Exception as e:
-        return jsonify({'error': f'Image generation failed: {str(e)}'}), 500
-
-
-
 def call_openrouter_api(model_path, messages):
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
@@ -343,7 +274,7 @@ def call_openrouter_api(model_path, messages):
     data = resp.json()
     return data["choices"][0]["message"]["content"]
 
-# Demo history saved to small JSON files (IP + UA per day)
+# Demo history
 
 def get_demo_session_id():
     ip = request.remote_addr or 'unknown'
@@ -502,6 +433,54 @@ def upload_file():
         return jsonify({'success': True, 'filename': filename})
     return jsonify({'error': 'File type not allowed'}), 400
 
+@app.route('/generate-image', methods=['POST'])
+@login_required
+def generate_image_route():
+    prompt = request.json.get('prompt', '').strip()
+    if not prompt:
+        return jsonify({'error': 'Empty prompt'}), 400
+
+    try:
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": "openai/dall-e-3",
+            "prompt": prompt,
+            "n": 1,
+            "size": "1024x1024"
+        }
+        
+        resp = requests.post(
+            "https://openrouter.ai/api/v1/images/generations",
+            headers=headers,
+            json=payload,
+            timeout=120
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        
+        image_url = data['data'][0]['url']
+        
+        # Download and save
+        img_response = requests.get(image_url)
+        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"generated_{current_user.id}_{ts}.png"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        
+        with open(filepath, 'wb') as f:
+            f.write(img_response.content)
+        
+        return jsonify({
+            'success': True,
+            'filename': filename,
+            'url': f'/uploads/{filename}'
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Image generation failed: {str(e)}'}), 500
+
 @app.route('/chat/new', methods=['POST'])
 @login_required
 def new_chat():
@@ -566,7 +545,7 @@ def chat_route():
     user_message = request.json.get('message', '')
     selected_model = request.json.get('model', 'gpt-3.5-turbo')
     chat_id = request.json.get('chat_id')
-    uploaded_file = request.json.get('uploaded_file')  # filename in uploads/
+    uploaded_file = request.json.get('uploaded_file')
 
     if chat_id:
         chat_obj = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first()
@@ -601,9 +580,8 @@ def chat_route():
     else:
         return jsonify({'error': 'Invalid model'}), 400
 
-    # if model has no vision but user attached image -> return clear error
     if uploaded_file and not has_vision:
-        return jsonify({'error': 'AI Error: Selected model does not support image input. Choose a Vision model like GPT-4o Mini or Gemini Flash.'}), 400
+        return jsonify({'error': 'Selected model does not support image input. Choose a Vision model like GPT-4o Mini or Gemini Flash.'}), 400
 
     user_msg = Message(
         chat_id=chat_id,
@@ -619,7 +597,6 @@ def chat_route():
 
     history = get_chat_history(chat_id)
 
-    # For current turn, include image if allowed
     if uploaded_file and has_vision:
         try:
             image_base64 = encode_image(uploaded_file)
@@ -706,4 +683,3 @@ if __name__ == '__main__':
         db.create_all()
         print("✅ Database ready!")
     app.run(debug=True, port=5000)
-
