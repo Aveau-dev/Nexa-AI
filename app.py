@@ -1,24 +1,29 @@
 import os
-from dotenv import load_dotenv
-
-# Load environment variables from .env file FIRST!
-load_dotenv()
-
-from flask import Flask, render_template, request, redirect, url_for, jsonify, session, send_from_directory
-from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
-from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
-from datetime import datetime
-import requests
-import stripe
 import sqlite3
 import base64
-from PIL import Image
-import json
-import hashlib
+from datetime import datetime
 
-# ============ FLASK & DB SETUP ============
+from dotenv import load_dotenv
+from flask import (
+    Flask, render_template, request, redirect,
+    url_for, jsonify, session, send_from_directory
+)
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import (
+    LoginManager, UserMixin, login_user, logout_user,
+    login_required, current_user
+)
+from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
+from PIL import Image
+import requests
+import stripe
+import hashlib
+import json
+
+# ================== ENV & FLASK SETUP ==================
+
+load_dotenv()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-this')
@@ -30,17 +35,18 @@ if uri and uri.startswith("postgres://"):
 app.config['SQLALCHEMY_DATABASE_URI'] = uri if uri else 'sqlite:///database.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Uploads & temp sessions
+# Uploads & demo history
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['DEMO_SESSIONS_FOLDER'] = 'demo_sessions'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
+
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['DEMO_SESSIONS_FOLDER'], exist_ok=True)
 
 db = SQLAlchemy(app)
-stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 
-# OpenRouter HTTP configuration
+# Stripe / OpenRouter
+stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
 
@@ -54,7 +60,7 @@ login_manager.login_view = 'login'
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
-# ============ DATABASE MODELS ============
+# ================== DATABASE MODELS ==================
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -93,7 +99,7 @@ class Message(db.Model):
 def load_user(user_id):
     return db.session.get(User, int(user_id))
 
-# ============ DATABASE MIGRATION ============
+# ================== MIGRATION ==================
 
 def migrate_database():
     try:
@@ -105,43 +111,40 @@ def migrate_database():
         cursor = conn.cursor()
 
         cursor.execute("PRAGMA table_info(user)")
-        columns = [column[1] for column in cursor.fetchall()]
-
+        columns = [c[1] for c in cursor.fetchall()]
         if 'deepseek_count' not in columns:
             cursor.execute("ALTER TABLE user ADD COLUMN deepseek_count INTEGER DEFAULT 0")
-            print("✅ Added deepseek_count column")
-
         if 'deepseek_date' not in columns:
             today = datetime.utcnow().strftime('%Y-%m-%d')
             cursor.execute(f"ALTER TABLE user ADD COLUMN deepseek_date TEXT DEFAULT '{today}'")
-            print("✅ Added deepseek_date column")
-
         if 'created_at' not in columns:
             cursor.execute("ALTER TABLE user ADD COLUMN created_at TIMESTAMP")
-            print("✅ Added created_at column")
 
         cursor.execute("PRAGMA table_info(message)")
-        msg_columns = [column[1] for column in cursor.fetchall()]
-
+        msg_columns = [c[1] for c in cursor.fetchall()]
         if 'has_image' not in msg_columns:
             cursor.execute("ALTER TABLE message ADD COLUMN has_image BOOLEAN DEFAULT 0")
-            print("✅ Added has_image column")
-
         if 'image_path' not in msg_columns:
             cursor.execute("ALTER TABLE message ADD COLUMN image_path TEXT")
-            print("✅ Added image_path column")
 
         conn.commit()
         conn.close()
     except Exception as e:
         print(f"⚠️ Migration warning: {str(e)}")
 
-# ============ AI MODEL CONFIGURATION ============
+# ================== MODEL CONFIG ==================
 
+# vision=True only on models that actually support image input
 FREE_MODELS = {
+    'gpt-3.5-turbo': {
+        'path': 'openai/gpt-3.5-turbo',
+        'name': 'GPT-3.5 Turbo',
+        'limit': None,
+        'vision': False
+    },
     'gpt-4o-mini': {
-        'path': ''openai/gpt-4o-mini'',
-        'name': 'GPT-4o-mini',
+        'path': 'openai/gpt-4o-mini',
+        'name': 'GPT-4o Mini',
         'limit': None,
         'vision': True
     },
@@ -160,7 +163,7 @@ FREE_MODELS = {
     'deepseek-chat': {
         'path': 'deepseek/deepseek-chat',
         'name': 'DeepSeek Chat',
-        'limit': None,
+        'limit': 50,
         'vision': False
     }
 }
@@ -169,27 +172,22 @@ PREMIUM_MODELS = {
     'gpt-4o': {
         'path': 'openai/gpt-4o',
         'name': 'GPT-4o',
-        'vision': False
-    },
-    'gpt-4o-mini': {
-        'path': 'openai/gpt-4o-mini',
-        'name': 'GPT-4o Mini',
-        'vision': False
+        'vision': True
     },
     'claude-3.5-sonnet': {
         'path': 'anthropic/claude-3.5-sonnet',
         'name': 'Claude 3.5 Sonnet',
-        'vision': False
+        'vision': True
     },
     'claude-3-opus': {
         'path': 'anthropic/claude-3-opus',
         'name': 'Claude 3 Opus',
-        'vision': False
+        'vision': True
     },
     'gemini-pro': {
         'path': 'google/gemini-pro-1.5',
         'name': 'Gemini Pro 1.5',
-        'vision': False
+        'vision': True
     },
     'deepseek-r1': {
         'path': 'deepseek/deepseek-r1',
@@ -200,21 +198,20 @@ PREMIUM_MODELS = {
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf', 'txt', 'doc', 'docx'}
 
-# ============ HELPER FUNCTIONS ============
+# ================== HELPERS ==================
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def encode_image(image_path):
-    """Encode image to base64 for API"""
-    with open(os.path.join(app.config['UPLOAD_FOLDER'], image_path), 'rb') as image_file:
-        return base64.b64encode(image_file.read()).decode('utf-8')
+def encode_image(filename):
+    path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    with open(path, 'rb') as f:
+        return base64.b64encode(f.read()).decode('utf-8')
 
-def compress_image(image_path, max_size=(1024, 1024)):
-    """Compress image to reduce file size"""
-    img = Image.open(image_path)
+def compress_image(path, max_size=(1024, 1024)):
+    img = Image.open(path)
     img.thumbnail(max_size, Image.Resampling.LANCZOS)
-    img.save(image_path, optimize=True, quality=85)
+    img.save(path, optimize=True, quality=85)
 
 def check_deepseek_limit(user):
     today = datetime.utcnow().strftime('%Y-%m-%d')
@@ -230,24 +227,7 @@ def generate_chat_title(first_message):
         title += '...'
     return title
 
-def generate_chat_title_ai(first_message):
-    """Generate a short title via OpenRouter; fall back on slice."""
-    try:
-        prompt = (
-            "Generate a very short chat title (max 6 words) for this user request.\n"
-            "Return ONLY the title, no quotes or extra text.\n\n"
-            f"User message:\n{first_message}"
-        )
-        content = call_openrouter_api(
-            FREE_MODELS['gpt-3.5-turbo']['path'],
-            [{"role": "user", "content": prompt}]
-        )
-        return content.strip()[:80]
-    except Exception:
-        return generate_chat_title(first_message)
-
 def get_chat_history(chat_id, limit=4):
-    """Load last N messages from DB to save memory"""
     messages = (
         Message.query.filter_by(chat_id=chat_id)
         .order_by(Message.created_at.desc())
@@ -272,35 +252,6 @@ def get_chat_history(chat_id, limit=4):
             history.append({"role": msg.role, "content": msg.content})
     return history
 
-def get_demo_session_id():
-    """Generate unique session ID from IP + user agent"""
-    ip = request.remote_addr or 'unknown'
-    ua = request.headers.get('User-Agent', 'unknown')
-    raw = f"{ip}_{ua}_{datetime.utcnow().strftime('%Y%m%d')}"
-    return hashlib.md5(raw.encode()).hexdigest()
-
-def load_demo_history(session_id):
-    """Load demo history from file"""
-    path = os.path.join(app.config['DEMO_SESSIONS_FOLDER'], f"{session_id}.json")
-    if os.path.exists(path):
-        try:
-            with open(path, 'r') as f:
-                data = json.load(f)
-                # Only keep last 6 messages (3 exchanges)
-                return data[-6:]
-        except Exception:
-            return []
-    return []
-
-def save_demo_history(session_id, history):
-    """Save demo history to file"""
-    path = os.path.join(app.config['DEMO_SESSIONS_FOLDER'], f"{session_id}.json")
-    try:
-        with open(path, 'w') as f:
-            json.dump(history[-6:], f)  # only save last 6
-    except Exception:
-        pass
-
 def call_openrouter_api(model_path, messages):
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
@@ -309,33 +260,49 @@ def call_openrouter_api(model_path, messages):
 
     system_msg = {
         "role": "system",
-        "content": "You are NexaAI. Respond in Markdown with code blocks where appropriate."
+        "content": "You are NexaAI. Respond in Markdown with headings and code blocks when useful."
     }
 
     payload = {
         "model": model_path,
         "messages": [system_msg] + messages,
-        "max_tokens": 1024,       # reduced to save memory
+        "max_tokens": 1024,
         "temperature": 0.7,
     }
 
-    try:
-        resp = requests.post(OPENROUTER_BASE_URL, headers=headers, json=payload, timeout=120)
-        resp.raise_for_status()
-    except requests.HTTPError as e:
-        try:
-            err = e.response.json()
-            msg = err.get("error", {}).get("message", str(e))
-        except Exception:
-            msg = str(e)
-        raise RuntimeError(f"AI error: {msg}")
-    except requests.Timeout:
-        raise RuntimeError("AI timeout: your request is very large, please try a smaller step.")
-
+    resp = requests.post(OPENROUTER_BASE_URL, headers=headers, json=payload, timeout=120)
+    resp.raise_for_status()
     data = resp.json()
     return data["choices"][0]["message"]["content"]
 
-# ============ ROUTES ============
+# Demo history saved to small JSON files (IP + UA per day)
+
+def get_demo_session_id():
+    ip = request.remote_addr or 'unknown'
+    ua = request.headers.get('User-Agent', 'unknown')
+    raw = f"{ip}_{ua}_{datetime.utcnow().strftime('%Y%m%d')}"
+    return hashlib.md5(raw.encode()).hexdigest()
+
+def load_demo_history(session_id):
+    path = os.path.join(app.config['DEMO_SESSIONS_FOLDER'], f"{session_id}.json")
+    if os.path.exists(path):
+        try:
+            with open(path, 'r') as f:
+                data = json.load(f)
+                return data[-6:]
+        except Exception:
+            return []
+    return []
+
+def save_demo_history(session_id, history):
+    path = os.path.join(app.config['DEMO_SESSIONS_FOLDER'], f"{session_id}.json")
+    try:
+        with open(path, 'w') as f:
+            json.dump(history[-6:], f)
+    except Exception:
+        pass
+
+# ================== ROUTES: PUBLIC ==================
 
 @app.route('/')
 def index():
@@ -345,25 +312,18 @@ def index():
 def demo_chat():
     user_message = request.json.get('message', '')
     session_id = get_demo_session_id()
-    
-    # Load history from file
+
     history = load_demo_history(session_id)
-    
-    # Add current user message
     history.append({"role": "user", "content": user_message})
-    
+
     try:
         bot_response = call_openrouter_api(
             FREE_MODELS['gpt-3.5-turbo']['path'],
             history
         )
-        
-        # Add assistant response
         history.append({"role": "assistant", "content": bot_response})
-        
-        # Save to file
         save_demo_history(session_id, history)
-        
+
         return jsonify({
             'response': bot_response,
             'demo': True,
@@ -375,14 +335,13 @@ def demo_chat():
 
 @app.route('/demo-clear', methods=['POST'])
 def demo_clear():
-    """Clear demo conversation history"""
     session_id = get_demo_session_id()
     path = os.path.join(app.config['DEMO_SESSIONS_FOLDER'], f"{session_id}.json")
-    try:
-        if os.path.exists(path):
+    if os.path.exists(path):
+        try:
             os.remove(path)
-    except Exception:
-        pass
+        except Exception:
+            pass
     return jsonify({'success': True})
 
 @app.route('/signup', methods=['GET', 'POST'])
@@ -437,6 +396,8 @@ def logout():
     logout_user()
     return redirect(url_for('index'))
 
+# ================== ROUTES: DASHBOARD ==================
+
 @app.route('/dashboard')
 @login_required
 def dashboard():
@@ -461,13 +422,13 @@ def upload_file():
         return jsonify({'error': 'No file selected'}), 400
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
-        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-        filename = f"{current_user.id}_{timestamp}_{filename}"
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
+        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"{current_user.id}_{ts}_{filename}"
+        path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(path)
         if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
             try:
-                compress_image(filepath)
+                compress_image(path)
             except Exception:
                 pass
         return jsonify({'success': True, 'filename': filename})
@@ -498,10 +459,10 @@ def delete_chat(chat_id):
     chat = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first()
     if not chat:
         return jsonify({'error': 'Chat not found'}), 404
-    for message in chat.messages:
-        if message.has_image and message.image_path:
+    for msg in chat.messages:
+        if msg.has_image and msg.image_path:
             try:
-                os.remove(os.path.join(app.config['UPLOAD_FOLDER'], message.image_path))
+                os.remove(os.path.join(app.config['UPLOAD_FOLDER'], msg.image_path))
             except Exception:
                 pass
     db.session.delete(chat)
@@ -533,11 +494,11 @@ def get_chat_messages(chat_id):
 
 @app.route('/chat', methods=['POST'])
 @login_required
-def chat():
+def chat_route():
     user_message = request.json.get('message', '')
     selected_model = request.json.get('model', 'gpt-3.5-turbo')
     chat_id = request.json.get('chat_id')
-    uploaded_file = request.json.get('uploaded_file')
+    uploaded_file = request.json.get('uploaded_file')  # filename in uploads/
 
     if chat_id:
         chat_obj = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first()
@@ -572,6 +533,10 @@ def chat():
     else:
         return jsonify({'error': 'Invalid model'}), 400
 
+    # if model has no vision but user attached image -> return clear error
+    if uploaded_file and not has_vision:
+        return jsonify({'error': 'AI Error: Selected model does not support image input. Choose a Vision model like GPT-4o Mini or Gemini Flash.'}), 400
+
     user_msg = Message(
         chat_id=chat_id,
         role='user',
@@ -582,10 +547,26 @@ def chat():
     db.session.add(user_msg)
 
     if chat_obj.title == 'New Chat':
-        chat_obj.title = generate_chat_title_ai(user_message)
+        chat_obj.title = generate_chat_title(user_message)
 
     history = get_chat_history(chat_id)
-    history.append({"role": "user", "content": user_message})
+
+    # For current turn, include image if allowed
+    if uploaded_file and has_vision:
+        try:
+            image_base64 = encode_image(uploaded_file)
+            history.append({
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": user_message},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}}
+                ]
+            })
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': f'Image processing error: {str(e)}'}), 500
+    else:
+        history.append({"role": "user", "content": user_message})
 
     try:
         bot_response = call_openrouter_api(model_path, history)
@@ -615,6 +596,8 @@ def chat():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'AI Error: {str(e)}'}), 500
+
+# ================== STRIPE ==================
 
 @app.route('/checkout')
 @login_required
@@ -647,11 +630,11 @@ def stripe_webhook():
 
     return '', 200
 
+# ================== MAIN ==================
+
 if __name__ == '__main__':
     with app.app_context():
         migrate_database()
         db.create_all()
         print("✅ Database ready!")
-        print("🚀 Starting NexaAI with advanced features...")
     app.run(debug=True, port=5000)
-
