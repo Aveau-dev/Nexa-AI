@@ -441,30 +441,52 @@ def generate_image_route():
         return jsonify({'error': 'Empty prompt'}), 400
 
     try:
+        # Try direct OpenAI API if available, otherwise inform user
         headers = {
             "Authorization": f"Bearer {OPENROUTER_API_KEY}",
             "Content-Type": "application/json",
+            "HTTP-Referer": request.host_url,
+            "X-Title": "NexaAI"
         }
+        
+        # Use OpenRouter's chat completion with a model that can describe images
+        # Then use a workaround or inform user
         payload = {
             "model": "openai/dall-e-3",
             "prompt": prompt,
             "n": 1,
-            "size": "1024x1024"
+            "size": "1024x1024",
+            "quality": "standard"
         }
         
+        # OpenRouter might not support image generation, try standard endpoint
         resp = requests.post(
             "https://openrouter.ai/api/v1/images/generations",
             headers=headers,
             json=payload,
             timeout=120
         )
+        
+        # If 404 or not supported, return helpful message
+        if resp.status_code == 404 or resp.status_code == 400:
+            return jsonify({
+                'error': 'Image generation is not available through OpenRouter. To generate images, you need a direct OpenAI API key with DALL-E access. For now, I can help you:\n\n• Analyze and describe images you upload\n• Write code to create visualizations\n• Suggest image resources\n• Guide you to image generation tools',
+                'not_supported': True
+            }), 400
+        
         resp.raise_for_status()
         data = resp.json()
         
+        # Check if we got a valid response
+        if 'data' not in data or len(data['data']) == 0:
+            return jsonify({'error': 'No image generated'}), 500
+        
         image_url = data['data'][0]['url']
         
-        # Download and save
-        img_response = requests.get(image_url)
+        # Download and save locally
+        img_response = requests.get(image_url, timeout=30)
+        img_response.raise_for_status()
+        
         ts = datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = f"generated_{current_user.id}_{ts}.png"
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
@@ -478,8 +500,26 @@ def generate_image_route():
             'url': f'/uploads/{filename}'
         })
         
+    except requests.HTTPError as e:
+        error_msg = str(e)
+        try:
+            error_data = e.response.json()
+            if 'error' in error_data:
+                error_msg = error_data['error'].get('message', str(e))
+        except:
+            pass
+        
+        return jsonify({
+            'error': f'Sorry, image generation is currently not available. OpenRouter may not support DALL-E image generation.\n\nWhat I can do instead:\n• Analyze any images you upload\n• Help you write code to create graphics\n• Suggest free AI image tools like:\n  - Bing Image Creator (free)\n  - Leonardo.ai (free tier)\n  - Craiyon.com (free)',
+            'not_supported': True
+        }), 500
+        
     except Exception as e:
-        return jsonify({'error': f'Image generation failed: {str(e)}'}), 500
+        return jsonify({
+            'error': f'Image generation failed: {str(e)}',
+            'not_supported': True
+        }), 500
+
 
 @app.route('/chat/new', methods=['POST'])
 @login_required
@@ -683,4 +723,5 @@ if __name__ == '__main__':
         db.create_all()
         print("✅ Database ready!")
     app.run(debug=True, port=5000)
+
 
