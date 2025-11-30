@@ -449,13 +449,18 @@ def generate_image_route():
         for phrase in ['generate image of', 'create image of', 'make image of', 'draw', 'generate a picture of', 'make an image of', 'create an image of', 'picture of']:
             clean_prompt = clean_prompt.replace(phrase, '').strip()
         
-        # Use Pollinations.ai (free, no API key needed, always works!)
+        # Enhance prompt for better quality
+        enhanced_prompt = f"{clean_prompt}, highly detailed, 4k uhd, professional photography, sharp focus, vivid colors, masterpiece"
+        
+        # Use Pollinations.ai with MAXIMUM quality settings
         import urllib.parse
-        encoded_prompt = urllib.parse.quote(clean_prompt)
-        image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&enhance=true"
+        encoded_prompt = urllib.parse.quote(enhanced_prompt)
+        
+        # 4K quality settings: 2048x2048 (close to 4K), with enhancement
+        image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=2048&height=2048&nologo=true&enhance=true&model=flux"
         
         # Download the generated image
-        response = requests.get(image_url, timeout=90)
+        response = requests.get(image_url, timeout=120)
         response.raise_for_status()
         
         # Save locally
@@ -470,13 +475,15 @@ def generate_image_route():
             'success': True,
             'filename': filename,
             'url': f'/uploads/{filename}',
-            'prompt': clean_prompt
+            'prompt': clean_prompt,
+            'resolution': '2048x2048 (4K)'
         })
         
     except requests.Timeout:
-        return jsonify({'error': 'Image generation timed out. Please try again!'}), 504
+        return jsonify({'error': 'Image generation timed out. High quality images take longer. Please try again!'}), 504
     except Exception as e:
         return jsonify({'error': f'Generation failed: {str(e)}'}), 500
+
 
 
 @app.route('/chat/new', methods=['POST'])
@@ -682,6 +689,7 @@ if __name__ == '__main__':
         print("✅ Database ready!")
         print("🚀 Starting NexaAI...")
     app.run(debug=True, port=5000)
+
 
 
 
