@@ -175,7 +175,7 @@
                     <span class="group-badge free">Free</span>
                     <span class="group-title">Available for Everyone</span>
                 </div>
-                {% for model_key, model_data in models.items() if model_key in ['gpt-3.5-turbo','gpt-4o-mini','claude-3-haiku','gemini-flash','deepseek-chat'] %}
+                {% for model_key, model_data in models.items() if model_key in ['gpt-3.5-turbo','claude-3-haiku','gemini-flash','deepseek-chat'] %}
                 <div class="model-card {% if loop.first %}active{% endif %}" data-model="{{ model_key }}" data-name="{{ model_data.name }}" data-vision="{{ model_data.vision|lower }}">
                     <div class="model-card-header">
                         <div class="model-icon">
@@ -196,7 +196,6 @@
                     </div>
                     <div class="model-description">
                         {% if 'gpt-3.5' in model_key %}Fast and efficient for everyday tasks
-                        {% elif 'gpt-4o-mini' in model_key %}Vision support + fast responses
                         {% elif 'claude-3-haiku' in model_key %}Fast Claude model, great for quick responses
                         {% elif 'gemini-flash' in model_key %}Google's fast model with vision
                         {% elif 'deepseek' in model_key %}Advanced reasoning with daily limit
@@ -874,4 +873,5 @@ document.getElementById('chat-input')?.addEventListener('input',function(){
     </script>
 </body>
 </html>
+
 
