@@ -144,12 +144,6 @@ FREE_MODELS = {
         'limit': None,
         'vision': False
     },
-    'gpt-4o-mini': {
-        'path': 'openai/gpt-4o-mini',
-        'name': 'GPT-4o Mini',
-        'limit': None,
-        'vision': True
-    },
     'claude-3-haiku': {
         'path': 'anthropic/claude-3-haiku',
         'name': 'Claude 3 Haiku',
@@ -157,7 +151,7 @@ FREE_MODELS = {
         'vision': False
     },
     'gemini-flash': {
-        'path': 'google/gemini-2.5-flash-image',
+        'path': 'google/gemini-2.5-flash-lite',
         'name': 'Gemini Flash 2.5',
         'limit': None,
         'vision': True
@@ -689,6 +683,7 @@ if __name__ == '__main__':
         print("✅ Database ready!")
         print("🚀 Starting NexaAI...")
     app.run(debug=True, port=5000)
+
 
 
 
