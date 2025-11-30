@@ -156,8 +156,8 @@ FREE_MODELS = {
         'vision': False
     },
     'gemini-flash': {
-        'path': 'google/gemini-flash-1.5',
-        'name': 'Gemini Flash 1.5',
+        'path': 'google/gemini-2.5-flash-image',
+        'name': 'Gemini Flash 2.5',
         'limit': None,
         'vision': True
     },
@@ -442,74 +442,40 @@ def generate_image_route():
     if not prompt:
         return jsonify({'error': 'Empty prompt'}), 400
 
-    # Clean the prompt
-    clean_prompt = prompt.lower()
-    for phrase in ['generate image of', 'create image of', 'make image of', 'draw', 'generate a picture of', 'make an image of', 'create an image of', 'picture of']:
-        clean_prompt = clean_prompt.replace(phrase, '').strip()
-
-    # Try multiple models in order
-    models_to_try = [
-        "black-forest-labs/FLUX.1-schnell",
-        "stabilityai/stable-diffusion-2-1",
-        "runwayml/stable-diffusion-v1-5",
-        "CompVis/stable-diffusion-v1-4"
-    ]
-    
-    headers = {
-        "Authorization": f"Bearer {HUGGINGFACE_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    
-    last_error = None
-    
-    for model in models_to_try:
-        try:
-            API_URL = f"https://api-inference.huggingface.co/models/{model}"
-            payload = {"inputs": clean_prompt}
-            
-            response = requests.post(API_URL, headers=headers, json=payload, timeout=60)
-            
-            if response.status_code == 200:
-                # Success! Save and return
-                ts = datetime.now().strftime('%Y%m%d_%H%M%S')
-                filename = f"generated_{current_user.id}_{ts}.png"
-                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                
-                with open(filepath, 'wb') as f:
-                    f.write(response.content)
-                
-                return jsonify({
-                    'success': True,
-                    'filename': filename,
-                    'url': f'/uploads/{filename}',
-                    'prompt': clean_prompt,
-                    'model': model.split('/')[-1]
-                })
-            
-            elif response.status_code == 503:
-                # Model loading, continue to next
-                continue
-            
-            else:
-                # Try next model
-                try:
-                    error_data = response.json()
-                    last_error = error_data.get('error', f'HTTP {response.status_code}')
-                except:
-                    last_error = f'HTTP {response.status_code}'
-                continue
-                
-        except requests.Timeout:
-            continue
-        except Exception as e:
-            last_error = str(e)
-            continue
-    
-    # All models failed
-    return jsonify({
-        'error': f'Image generation unavailable. All models are busy or loading. Please try again in 30 seconds!\n\nLast error: {last_error}'
-    }), 503
-
+    try:
+        # Clean the prompt
+        clean_prompt = prompt.lower()
+        for phrase in ['generate image of', 'create image of', 'make image of', 'draw', 'generate a picture of', 'make an image of', 'create an image of', 'picture of']:
+            clean_prompt = clean_prompt.replace(phrase, '').strip()
+        
+        # Use Pollinations.ai (free, no API key needed, always works!)
+        import urllib.parse
+        encoded_prompt = urllib.parse.quote(clean_prompt)
+        image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&enhance=true"
+        
+        # Download the generated image
+        response = requests.get(image_url, timeout=90)
+        response.raise_for_status()
+        
+        # Save locally
+        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"generated_{current_user.id}_{ts}.png"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        
+        with open(filepath, 'wb') as f:
+            f.write(response.content)
+        
+        return jsonify({
+            'success': True,
+            'filename': filename,
+            'url': f'/uploads/{filename}',
+            'prompt': clean_prompt
+        })
+        
+    except requests.Timeout:
+        return jsonify({'error': 'Image generation timed out. Please try again!'}), 504
+    except Exception as e:
+        return jsonify({'error': f'Generation failed: {str(e)}'}), 500
 
 
 @app.route('/chat/new', methods=['POST'])
@@ -715,5 +681,6 @@ if __name__ == '__main__':
         print("✅ Database ready!")
         print("🚀 Starting NexaAI...")
     app.run(debug=True, port=5000)
+
 
 
