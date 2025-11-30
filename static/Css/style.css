@@ -2620,3 +2620,57 @@ body {
     width: 20px;
     height: 20px;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+.image-preview-container {
+    display: none;
+    padding: 8px;
+    background: rgba(25, 195, 125, 0.1);
+    border: 1px solid #19c37d;
+    border-radius: 8px;
+    margin: 8px 0;
+    align-items: center;
+    gap: 8px;
+}
+
+.image-preview-container.active {
+    display: flex;
+}
+
+.image-preview-thumbnail {
+    width: 40px;
+    height: 40px;
+    border-radius: 6px;
+    object-fit: cover;
+}
+
+.image-preview-info {
+    flex: 1;
+    font-size: 0.85rem;
+    color: #19c37d;
+}
+
+.image-preview-remove {
+    background: transparent;
+    border: none;
+    color: #ef4444;
+    cursor: pointer;
+    padding: 4px;
+    font-size: 1.2rem;
+}
+
+.attach-button.active {
+    color: #19c37d !important;
+}
