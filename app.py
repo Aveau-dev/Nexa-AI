@@ -154,8 +154,8 @@ FREE_MODELS = {
         'vision': False
     },
     'gemini-flash': {
-        'path': 'google/gemini-flash-1.5',
-        'name': 'Gemini Flash 1.5',
+        'path': 'google/gemini-2.5-flash-image',
+        'name': 'Gemini Flash 2.5',
         'limit': None,
         'vision': True
     },
@@ -683,3 +683,4 @@ if __name__ == '__main__':
         db.create_all()
         print("✅ Database ready!")
     app.run(debug=True, port=5000)
+
