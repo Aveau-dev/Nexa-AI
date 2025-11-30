@@ -763,12 +763,12 @@ function addMessage(text, role, model = '', useTyping = false) {
         c.appendChild(row);
         const el = row.querySelector('.message-text');
         
-        // Check if text contains HTML tags (like generated images)
-        if (text.includes('<div') || text.includes('<img') || text.includes('<a')) {
-            // Insert HTML directly without markdown processing
+        // ONLY render as HTML if it's OUR generated image (has our specific class)
+        if (text.includes('generated-image-container') && text.includes('download-image-btn')) {
+            // This is our generated image HTML - render it directly
             el.innerHTML = text;
         } else {
-            // Normal text - process as markdown
+            // Everything else (including AI code examples) - process as markdown
             el.innerHTML = formatMessage(text);
             el.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
             addCopyButtons(el);
@@ -785,6 +785,7 @@ function addMessage(text, role, model = '', useTyping = false) {
     c.appendChild(row);
     c.scrollTop = c.scrollHeight;
 }
+
 
 
 function showTypingIndicator(){
@@ -873,3 +874,4 @@ document.getElementById('chat-input')?.addEventListener('input',function(){
     </script>
 </body>
 </html>
+
