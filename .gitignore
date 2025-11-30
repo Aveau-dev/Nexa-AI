@@ -1,10 +1,1 @@
 
-
-venv/
-__pycache__/
-*.pyc
-.env
-*.db
-uploads/
-instance/
-.DS_Store
