@@ -9,6 +9,112 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        /* Image preview styles */
+        .image-preview-container {
+            display: none;
+            padding: 8px 12px;
+            background: rgba(25, 195, 125, 0.1);
+            border: 1px solid #19c37d;
+            border-radius: 8px;
+            margin: 8px 0;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .image-preview-container.active {
+            display: flex;
+        }
+
+        .image-preview-thumbnail {
+            width: 48px;
+            height: 48px;
+            border-radius: 6px;
+            object-fit: cover;
+            border: 2px solid #19c37d;
+        }
+
+        .image-preview-info {
+            flex: 1;
+            font-size: 0.9rem;
+            color: #19c37d;
+            font-weight: 500;
+        }
+
+        .image-preview-remove {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid #ef4444;
+            color: #ef4444;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .image-preview-remove:hover {
+            background: #ef4444;
+            color: white;
+        }
+
+        .attach-button {
+            background: transparent;
+            border: none;
+            color: #9ca3af;
+            cursor: pointer;
+            padding: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .attach-button:hover {
+            background: rgba(255,255,255,0.06);
+            color: #e5e7eb;
+        }
+
+        .attach-button.active {
+            color: #19c37d !important;
+            background: rgba(25, 195, 125, 0.1);
+        }
+
+        .attach-button svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .generated-image-container {
+            margin: 16px 0;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid #333;
+        }
+
+        .generated-image-container img {
+            width: 100%;
+            max-width: 512px;
+            display: block;
+        }
+
+        .download-image-btn {
+            display: inline-block;
+            margin-top: 8px;
+            padding: 8px 16px;
+            background: #19c37d;
+            color: #000;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .download-image-btn:hover {
+            background: #16a869;
+        }
+    </style>
 </head>
 <body>
     <!-- Top Navigation Bar -->
@@ -261,11 +367,16 @@
 
         <div class="input-wrapper">
             <div class="input-box">
+                <!-- Image preview -->
+                <div class="image-preview-container" id="image-preview">
+                    <img src="" alt="Preview" class="image-preview-thumbnail" id="preview-thumb">
+                    <span class="image-preview-info" id="preview-name">Image attached</span>
+                    <button class="image-preview-remove" onclick="removeUploadedImage()">Remove</button>
+                </div>
+
                 <div class="input-inner">
-                    <!-- Hidden file input -->
                     <input type="file" id="file-input" accept="image/*" style="display:none;">
                     
-                    <!-- Attach button -->
                     <button class="attach-button" id="attach-btn" title="Attach image">
                         <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                             <path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/>
@@ -302,7 +413,6 @@ function escapeHtml(text){
     return d.innerHTML;
 }
 
-/* Markdown + highlight */
 function formatMessage(text) {
     if (typeof marked === 'undefined') {
         return escapeHtml(text).replace(/\n/g, '<br>');
@@ -320,7 +430,6 @@ function formatMessage(text) {
     return marked.parse(text);
 }
 
-/* Code block copy buttons */
 function addCopyButtons(container) {
     container.querySelectorAll('pre code').forEach((codeBlock) => {
         const pre = codeBlock.parentElement;
@@ -340,7 +449,6 @@ function addCopyButtons(container) {
     });
 }
 
-/* Sidebar / menus */
 function toggleSidebar(){
     const s=document.getElementById('sidebar');
     const m=document.getElementById('main-content');
@@ -364,16 +472,11 @@ function selectModel(key,name,vision){
     document.querySelector(`[data-model="${key}"]`)?.classList.add('active');
     toggleModelSelector();
     
-    // Reset attach button if switching to non-vision model
     if(!currentModelSupportsVision && currentUploadedFile) {
-        currentUploadedFile = null;
-        const attachBtn = document.getElementById('attach-btn');
-        attachBtn.style.color = '#9ca3af';
-        attachBtn.title = 'Attach image';
+        removeUploadedImage();
     }
 }
 
-/* Chat management */
 async function newChat(){
     try{
         const res=await fetch('/chat/new',{method:'POST',headers:{'Content-Type':'application/json'}});
@@ -383,7 +486,7 @@ async function newChat(){
             document.getElementById('messages-container').innerHTML='';
             document.getElementById('welcome-section').style.display='block';
             document.getElementById('chat-input').value='';
-            currentUploadedFile = null;
+            removeUploadedImage();
             addChatToSidebar(d.chat_id,d.title,true);
         }
     }catch{
@@ -467,16 +570,14 @@ function addChatToSidebar(id,title,prepend=false){
     if(prepend)h.insertBefore(item,h.firstChild);else h.appendChild(item);
 }
 
-/* Attach button handler */
 document.getElementById('attach-btn')?.addEventListener('click', () => {
     if (!currentModelSupportsVision) {
-        alert('⚠️ Current model does not support images.\n\nPlease switch to a Vision model:\n• GPT-4o Mini\n• Gemini Flash 2.0\n• GPT-4o (Premium)\n• Claude 3.5 Sonnet (Premium)\n• Gemini Pro (Premium)');
+        alert('⚠️ Current model does not support images.\n\nPlease switch to a Vision model:\n• GPT-4o Mini\n• Gemini Flash 1.5\n• GPT-4o (Premium)\n• Claude 3.5 Sonnet (Premium)\n• Gemini Pro (Premium)');
         return;
     }
     document.getElementById('file-input').click();
 });
 
-/* File input handler */
 document.getElementById('file-input')?.addEventListener('change', async function(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -499,9 +600,16 @@ document.getElementById('file-input')?.addEventListener('change', async function
         
         if (data.success) {
             currentUploadedFile = data.filename;
-            const attachBtn = document.getElementById('attach-btn');
-            attachBtn.style.color = '#19c37d';
-            attachBtn.title = `Attached: ${file.name}`;
+            
+            const preview = document.getElementById('image-preview');
+            const thumb = document.getElementById('preview-thumb');
+            const name = document.getElementById('preview-name');
+            
+            thumb.src = URL.createObjectURL(file);
+            name.textContent = file.name;
+            preview.classList.add('active');
+            
+            document.getElementById('attach-btn').classList.add('active');
         } else {
             alert(data.error || 'Upload failed');
         }
@@ -512,7 +620,53 @@ document.getElementById('file-input')?.addEventListener('change', async function
     e.target.value = '';
 });
 
-/* Sending & rendering */
+function removeUploadedImage() {
+    currentUploadedFile = null;
+    document.getElementById('image-preview').classList.remove('active');
+    document.getElementById('attach-btn').classList.remove('active');
+    document.getElementById('file-input').value = '';
+}
+
+async function handleImageGeneration(message) {
+    const imageKeywords = ['generate image', 'create image', 'draw', 'make an image', 'make image', 'picture of', 'draw me', 'generate a picture'];
+    const isImageRequest = imageKeywords.some(kw => message.toLowerCase().includes(kw));
+    
+    if (!isImageRequest) return false;
+    
+    addMessage('🎨 Generating image with DALL-E 3...', 'assistant', 'DALL-E 3', false);
+    
+    try {
+        const res = await fetch('/generate-image', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({prompt: message})
+        });
+        const d = await res.json();
+        
+        const container = document.getElementById('messages-container');
+        container.lastChild.remove();
+        
+        if (d.success) {
+            const imageHtml = `
+                <div class="generated-image-container">
+                    <img src="${d.url}" alt="Generated image">
+                </div>
+                <a href="${d.url}" download class="download-image-btn">⬇️ Download Image</a>
+            `;
+            addMessage(imageHtml, 'assistant', 'DALL-E 3', false);
+            return true;
+        } else {
+            addMessage(d.error, 'error', '', false);
+            return true;
+        }
+    } catch (err) {
+        const container = document.getElementById('messages-container');
+        container.lastChild.remove();
+        addMessage('Failed to generate image. Please try again.', 'error', '', false);
+        return true;
+    }
+}
+
 async function sendMessage(){
     const input=document.getElementById('chat-input');
     const message=input.value.trim();
@@ -522,6 +676,13 @@ async function sendMessage(){
     document.getElementById('welcome-section').style.display='none';
     addMessage(message,'user','',false);
     input.value='';input.style.height='auto';
+
+    const wasImageGen = await handleImageGeneration(message);
+    if (wasImageGen) {
+        isLoading = false;
+        return;
+    }
+
     showTypingIndicator();
 
     try{
@@ -538,11 +699,7 @@ async function sendMessage(){
         const d=await res.json();
         removeTypingIndicator();
         
-        // Reset attach button after sending
-        currentUploadedFile = null;
-        const attachBtn = document.getElementById('attach-btn');
-        attachBtn.style.color = '#9ca3af';
-        attachBtn.title = 'Attach image';
+        removeUploadedImage();
         
         if(d.error){
             addMessage(d.error,'error','',false);
@@ -563,7 +720,6 @@ async function sendMessage(){
     }
 }
 
-/* Messages */
 function addMessage(text, role, model = '', useTyping = false) {
     const c = document.getElementById('messages-container');
     const row = document.createElement('div');
@@ -611,7 +767,6 @@ function addMessage(text, role, model = '', useTyping = false) {
     c.scrollTop = c.scrollHeight;
 }
 
-/* typing indicator */
 function showTypingIndicator(){
     const c=document.getElementById('messages-container');
     const d=document.createElement('div');
@@ -633,7 +788,6 @@ function removeTypingIndicator(){
     document.getElementById('typing-indicator')?.remove();
 }
 
-/* Global click: chat list + menus */
 document.addEventListener('click', (e) => {
     if (e.target.closest('.chat-item') && !e.target.closest('.chat-actions')) {
         const id=e.target.closest('.chat-item').dataset.chatId;
@@ -671,7 +825,6 @@ document.addEventListener('click', (e) => {
     }
 });
 
-/* Suggestions + wiring */
 document.querySelectorAll('.model-card').forEach(card=>{
     card.addEventListener('click',function(){
         selectModel(this.dataset.model, this.dataset.name, this.dataset.vision);
