@@ -2,6 +2,7 @@ import os
 import sqlite3
 import base64
 from datetime import datetime
+import io
 
 from dotenv import load_dotenv
 from flask import (
@@ -45,9 +46,10 @@ os.makedirs(app.config['DEMO_SESSIONS_FOLDER'], exist_ok=True)
 
 db = SQLAlchemy(app)
 
-# Stripe / OpenRouter
+# API Keys
 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
+HUGGINGFACE_API_KEY = os.getenv('HUGGINGFACE_API_KEY')
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 login_manager = LoginManager()
@@ -154,8 +156,8 @@ FREE_MODELS = {
         'vision': False
     },
     'gemini-flash': {
-        'path': 'google/gemini-2.5-flash-image',
-        'name': 'Gemini Flash 2.5',
+        'path': 'google/gemini-flash-1.5',
+        'name': 'Gemini Flash 1.5',
         'limit': None,
         'vision': True
     },
@@ -441,85 +443,57 @@ def generate_image_route():
         return jsonify({'error': 'Empty prompt'}), 400
 
     try:
-        # Try direct OpenAI API if available, otherwise inform user
-        headers = {
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": request.host_url,
-            "X-Title": "NexaAI"
-        }
+        # Use Stable Diffusion via Hugging Face API (FREE)
+        API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
+        headers = {"Authorization": f"Bearer {HUGGINGFACE_API_KEY}"}
         
-        # Use OpenRouter's chat completion with a model that can describe images
-        # Then use a workaround or inform user
+        # Clean the prompt - remove "generate image of" etc
+        clean_prompt = prompt.lower()
+        for phrase in ['generate image of', 'create image of', 'make image of', 'draw', 'generate a picture of', 'make an image of', 'create an image of']:
+            clean_prompt = clean_prompt.replace(phrase, '').strip()
+        
         payload = {
-            "model": "openai/dall-e-3",
-            "prompt": prompt,
-            "n": 1,
-            "size": "1024x1024",
-            "quality": "standard"
+            "inputs": clean_prompt,
+            "options": {"wait_for_model": True}
         }
         
-        # OpenRouter might not support image generation, try standard endpoint
-        resp = requests.post(
-            "https://openrouter.ai/api/v1/images/generations",
-            headers=headers,
-            json=payload,
-            timeout=120
-        )
+        response = requests.post(API_URL, headers=headers, json=payload, timeout=90)
         
-        # If 404 or not supported, return helpful message
-        if resp.status_code == 404 or resp.status_code == 400:
+        # Hugging Face returns image bytes directly
+        if response.status_code == 200:
+            ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"generated_{current_user.id}_{ts}.png"
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            
+            with open(filepath, 'wb') as f:
+                f.write(response.content)
+            
             return jsonify({
-                'error': 'Image generation is not available through OpenRouter. To generate images, you need a direct OpenAI API key with DALL-E access. For now, I can help you:\n\n• Analyze and describe images you upload\n• Write code to create visualizations\n• Suggest image resources\n• Guide you to image generation tools',
-                'not_supported': True
-            }), 400
-        
-        resp.raise_for_status()
-        data = resp.json()
-        
-        # Check if we got a valid response
-        if 'data' not in data or len(data['data']) == 0:
-            return jsonify({'error': 'No image generated'}), 500
-        
-        image_url = data['data'][0]['url']
-        
-        # Download and save locally
-        img_response = requests.get(image_url, timeout=30)
-        img_response.raise_for_status()
-        
-        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"generated_{current_user.id}_{ts}.png"
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        
-        with open(filepath, 'wb') as f:
-            f.write(img_response.content)
-        
-        return jsonify({
-            'success': True,
-            'filename': filename,
-            'url': f'/uploads/{filename}'
-        })
-        
-    except requests.HTTPError as e:
-        error_msg = str(e)
-        try:
-            error_data = e.response.json()
-            if 'error' in error_data:
-                error_msg = error_data['error'].get('message', str(e))
-        except:
-            pass
-        
-        return jsonify({
-            'error': f'Sorry, image generation is currently not available. OpenRouter may not support DALL-E image generation.\n\nWhat I can do instead:\n• Analyze any images you upload\n• Help you write code to create graphics\n• Suggest free AI image tools like:\n  - Bing Image Creator (free)\n  - Leonardo.ai (free tier)\n  - Craiyon.com (free)',
-            'not_supported': True
-        }), 500
-        
+                'success': True,
+                'filename': filename,
+                'url': f'/uploads/{filename}',
+                'prompt': clean_prompt
+            })
+        else:
+            try:
+                error_data = response.json()
+                error_msg = error_data.get('error', 'Image generation failed')
+            except:
+                error_msg = f'Status code: {response.status_code}'
+            
+            # If model is loading, inform user
+            if 'currently loading' in error_msg.lower() or 'loading' in str(error_data).lower():
+                return jsonify({
+                    'error': '🔄 AI model is warming up (takes ~20 seconds). Please try again in a moment!',
+                    'loading': True
+                }), 503
+            
+            return jsonify({'error': f'Generation failed: {error_msg}'}), 500
+            
+    except requests.Timeout:
+        return jsonify({'error': 'Image generation timed out. The model might be busy. Try again in a moment!'}), 504
     except Exception as e:
-        return jsonify({
-            'error': f'Image generation failed: {str(e)}',
-            'not_supported': True
-        }), 500
-
+        return jsonify({'error': f'Error: {str(e)}'}), 500
 
 @app.route('/chat/new', methods=['POST'])
 @login_required
@@ -722,6 +696,5 @@ if __name__ == '__main__':
         migrate_database()
         db.create_all()
         print("✅ Database ready!")
+        print("🚀 Starting NexaAI...")
     app.run(debug=True, port=5000)
-
-
