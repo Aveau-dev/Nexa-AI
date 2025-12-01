@@ -73,50 +73,126 @@
         <div class="model-selector-content">
             <div class="model-group">
                 <div class="model-group-header">
-                    <span class="group-badge free">✨ 5 Models 100% Free</span>
+                    <span class="group-badge free">✨ All Models 100% Free</span>
                     <span class="group-title">Choose Your AI</span>
                 </div>
-                {% for model_key, model_data in models.items() %}
-                <div class="model-card {% if loop.index == 2 %}active{% endif %}" 
-                     data-model="{{ model_key }}" 
-                     data-name="{{ model_data.name }}" 
-                     data-vision="{{ model_data.vision|lower }}"
-                     data-imagegen="{{ model_data.image_gen|lower }}"
-                     data-free="{{ model_data.free|lower }}">
+                
+                <!-- Gemini 2.5 Flash -->
+                <div class="model-card active" 
+                     data-model="gemini-flash" 
+                     data-name="Gemini 2.5 Flash ⚡" 
+                     data-vision="true"
+                     data-imagegen="true">
                     <div class="model-card-header">
                         <div class="model-icon">
-                            {% if 'gpt' in model_key %}<span class="icon-text">🤖</span>
-                            {% elif 'gemini-flash' in model_key %}<span class="icon-text">⚡</span>
-                            {% elif 'gemini-pro' in model_key %}<span class="icon-text">💎</span>
-                            {% elif 'qwen' in model_key %}<span class="icon-text">🚀</span>
-                            {% elif 'deepseek' in model_key %}<span class="icon-text">🔍</span>
-                            {% elif 'mistral' in model_key %}<span class="icon-text">⚡</span>
-                            {% else %}<span class="icon-text">💬</span>{% endif %}
+                            <span class="icon-text">⚡</span>
                         </div>
                         <div class="model-info">
-                            <h4 class="model-name">{{ model_data.name }}</h4>
+                            <h4 class="model-name">Gemini 2.5 Flash ⚡</h4>
                             <div class="model-features">
-                                {% if model_data.vision %}<span class="feature-badge vision">📷 Vision</span>{% endif %}
-                                {% if model_data.image_gen %}<span class="feature-badge vision">🎨 Images</span>{% endif %}
-                                {% if model_data.free %}
-                                <span class="feature-badge free">✅ {{ model_data.note }}</span>
-                                {% else %}
-                                <span class="feature-badge premium">💳 {{ model_data.note }}</span>
-                                {% endif %}
+                                <span class="feature-badge vision">📷 Vision</span>
+                                <span class="feature-badge vision">🎨 Images</span>
+                                <span class="feature-badge free">✅ 100% Free</span>
                             </div>
                         </div>
                     </div>
                     <div class="model-description">
-                        {% if 'gpt-3.5' in model_key %}Fast GPT model (uses OpenRouter credits)
-                        {% elif 'gemini-flash' in model_key %}Best free model - Fast with vision & images
-                        {% elif 'gemini-pro' in model_key %}Most capable free model with vision
-                        {% elif 'qwen' in model_key %}Powerful 72B model - completely free
-                        {% elif 'deepseek' in model_key %}Advanced reasoning model - free forever
-                        {% elif 'mistral' in model_key %}Lightning fast responses - free
-                        {% else %}Powerful AI assistant{% endif %}
+                        Best all-in-one free model - Fast with vision & image generation
                     </div>
                 </div>
-                {% endfor %}
+
+                <!-- Gemini 2.5 Pro -->
+                <div class="model-card" 
+                     data-model="gemini-pro" 
+                     data-name="Gemini 2.5 Pro 💎" 
+                     data-vision="true"
+                     data-imagegen="true">
+                    <div class="model-card-header">
+                        <div class="model-icon">
+                            <span class="icon-text">💎</span>
+                        </div>
+                        <div class="model-info">
+                            <h4 class="model-name">Gemini 2.5 Pro 💎</h4>
+                            <div class="model-features">
+                                <span class="feature-badge vision">📷 Vision</span>
+                                <span class="feature-badge vision">🎨 Images</span>
+                                <span class="feature-badge free">✅ 100% Free</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="model-description">
+                        Most capable free model with advanced reasoning
+                    </div>
+                </div>
+
+                <!-- Claude 3.5 Haiku -->
+                <div class="model-card" 
+                     data-model="claude-haiku" 
+                     data-name="Claude 3.5 Haiku 🎭" 
+                     data-vision="false"
+                     data-imagegen="false">
+                    <div class="model-card-header">
+                        <div class="model-icon">
+                            <span class="icon-text">🎭</span>
+                        </div>
+                        <div class="model-info">
+                            <h4 class="model-name">Claude 3.5 Haiku 🎭</h4>
+                            <div class="model-features">
+                                <span class="feature-badge speed">⚡ Fast</span>
+                                <span class="feature-badge free">✅ 100% Free</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="model-description">
+                        Fast Claude model - Great for coding & writing
+                    </div>
+                </div>
+
+                <!-- DeepSeek V3 -->
+                <div class="model-card" 
+                     data-model="deepseek-v3" 
+                     data-name="DeepSeek V3 🔍" 
+                     data-vision="false"
+                     data-imagegen="false">
+                    <div class="model-card-header">
+                        <div class="model-icon">
+                            <span class="icon-text">🔍</span>
+                        </div>
+                        <div class="model-info">
+                            <h4 class="model-name">DeepSeek V3 🔍</h4>
+                            <div class="model-features">
+                                <span class="feature-badge speed">⚡ Fast</span>
+                                <span class="feature-badge free">✅ 100% Free</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="model-description">
+                        Advanced reasoning & problem solving - Free forever
+                    </div>
+                </div>
+
+                <!-- Mistral 7B -->
+                <div class="model-card" 
+                     data-model="mistral-7b" 
+                     data-name="Mistral 7B ⚡" 
+                     data-vision="false"
+                     data-imagegen="false">
+                    <div class="model-card-header">
+                        <div class="model-icon">
+                            <span class="icon-text">⚡</span>
+                        </div>
+                        <div class="model-info">
+                            <h4 class="model-name">Mistral 7B ⚡</h4>
+                            <div class="model-features">
+                                <span class="feature-badge speed">⚡ Instant</span>
+                                <span class="feature-badge free">✅ 100% Free</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="model-description">
+                        Lightning fast responses - Perfect for quick tasks
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -128,7 +204,7 @@
             <div class="user-info">
                 <div class="user-name">{{ user.name }}</div>
                 <div class="user-email">{{ user.email }}</div>
-                <div class="free-badge-small">✨ 5 Models Free</div>
+                <div class="free-badge-small">✨ All Models Free Forever</div>
             </div>
         </div>
         <div class="menu-divider"></div>
@@ -173,21 +249,21 @@
             <div class="welcome-section" id="welcome-section">
                 <h1 class="main-heading">What can I help with?</h1>
                 <div class="suggestion-cards">
-                    <div class="suggestion-card" data-suggestion="Generate an image of a futuristic city at sunset">
+                    <div class="suggestion-card" data-suggestion="Generate an image of a cyberpunk city at night">
                         <div class="suggestion-icon">🎨</div>
                         <div class="suggestion-text">Generate image</div>
                     </div>
-                    <div class="suggestion-card" data-suggestion="Write Python code to create a REST API with Flask">
+                    <div class="suggestion-card" data-suggestion="Write Python code to analyze CSV data with pandas">
                         <div class="suggestion-icon">💻</div>
                         <div class="suggestion-text">Write code</div>
                     </div>
-                    <div class="suggestion-card" data-suggestion="Explain quantum computing in simple terms">
+                    <div class="suggestion-card" data-suggestion="Explain machine learning in simple terms">
                         <div class="suggestion-icon">🧠</div>
-                        <div class="suggestion-text">Explain concepts</div>
+                        <div class="suggestion-text">Learn AI</div>
                     </div>
-                    <div class="suggestion-card" data-suggestion="Help me plan a trip to Japan">
+                    <div class="suggestion-card" data-suggestion="Help me plan a 7-day trip to Japan">
                         <div class="suggestion-icon">✈️</div>
-                        <div class="suggestion-text">Plan a trip</div>
+                        <div class="suggestion-text">Plan trip</div>
                     </div>
                 </div>
             </div>
@@ -217,7 +293,7 @@
                     </button>
                 </div>
                 <div class="input-footer">
-                    <span class="footer-text"><span id="model-info">Gemini 2.5 Flash ⚡</span> · 5 models are 100% free</span>
+                    <span class="footer-text"><span id="model-info">Gemini 2.5 Flash ⚡</span> · All 5 models are 100% free forever</span>
                 </div>
             </div>
         </div>
@@ -341,7 +417,7 @@ async function sendMessage(){
     const isImageGenRequest=message.toLowerCase().match(/^(generate|create|make|draw).*(image|picture|photo|art)/);
     
     if(isImageGenRequest&&!currentModelSupportsImageGen){
-        alert('Switch to Gemini 2.5 Flash or Pro to generate images!');return;
+        alert('Switch to Gemini models to generate images!');return;
     }
     
     isLoading=true;document.getElementById('welcome-section').style.display='none';
