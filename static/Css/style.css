@@ -2674,3 +2674,46 @@ body {
 .attach-button.active {
     color: #19c37d !important;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* Fix mobile text overflow */
+.message-text {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+/* Hide [/s] tokens */
+.message-text::after {
+    content: '';
+}
+
+@media (max-width: 768px) {
+    .user-message .message-content {
+        max-width: 90%;
+        font-size: 0.9rem;
+    }
+    
+    .assistant-message .message-content {
+        font-size: 0.9rem;
+    }
+    
+    /* Better code block mobile handling */
+    .markdown-content pre {
+        overflow-x: auto;
+        font-size: 0.75rem;
+    }
+}
+
