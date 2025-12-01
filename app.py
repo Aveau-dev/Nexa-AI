@@ -90,11 +90,9 @@ def load_user(user_id):
 
 # ================== MODEL CONFIG ==================
 
-# ================== MODEL CONFIG ==================
-
 FREE_MODELS = {
     'gemini-flash': {
-        'name': 'Gemini 2.5 Flash ⚡',
+        'name': 'Gemini 2.0 Flash ⚡',
         'provider': 'google',
         'model_id': 'gemini-2.0-flash-exp',
         'vision': True,
@@ -103,9 +101,9 @@ FREE_MODELS = {
         'note': '100% Free'
     },
     'gemini-pro': {
-        'name': 'Gemini 2.5 Pro 💎',
+        'name': 'Gemini 1.5 Pro 💎',
         'provider': 'google',
-        'model_id': 'gemini-exp-1206',
+        'model_id': 'gemini-1.5-pro',
         'vision': True,
         'image_gen': True,
         'free': True,
@@ -140,7 +138,6 @@ FREE_MODELS = {
     }
 }
 
-
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
 # ================== AI API FUNCTIONS ==================
@@ -174,7 +171,7 @@ def call_google_api(model_id, messages, uploaded_file=None):
         raise Exception(f"Google API error: {str(e)}")
 
 def call_openrouter_api(model_path, messages):
-    """Call OpenRouter for GPT and free models"""
+    """Call OpenRouter for free models"""
     try:
         headers = {
             "Authorization": f"Bearer {OPENROUTER_API_KEY}",
@@ -195,7 +192,7 @@ def call_openrouter_api(model_path, messages):
         payload = {
             "model": model_path,
             "messages": formatted_messages,
-            "max_tokens": 1024,
+            "max_tokens": 2048,
             "temperature": 0.7
         }
         
@@ -208,12 +205,12 @@ def call_openrouter_api(model_path, messages):
         response.raise_for_status()
         data = response.json()
         
-        # Check if credits exhausted
         if 'error' in data:
-            if 'credits' in data['error'].lower() or 'quota' in data['error'].lower():
-                raise Exception("OpenRouter credits exhausted for paid models. Switch to free models (Gemini, Qwen, DeepSeek, Mistral)")
+            raise Exception(data['error'].get('message', 'OpenRouter API error'))
         
         return data["choices"][0]["message"]["content"]
+    except requests.exceptions.HTTPError as e:
+        raise Exception(f"OpenRouter error: {e.response.status_code} - {e.response.text}")
     except Exception as e:
         raise Exception(f"OpenRouter error: {str(e)}")
 
@@ -284,6 +281,53 @@ def get_chat_history(chat_id, limit=4):
 def index():
     return render_template('index.html')
 
+@app.route('/demo-chat', methods=['POST'])
+def demo_chat():
+    """Demo chat without login - Uses Mistral 7B (100% free, no limits)"""
+    user_message = request.json.get('message', '')
+    
+    if not user_message:
+        return jsonify({'error': 'Empty message'}), 400
+    
+    try:
+        # Use Mistral 7B for demo (truly unlimited free)
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://nexaai.app",
+            "X-Title": "NexaAI Demo"
+        }
+        
+        payload = {
+            "model": "mistralai/mistral-7b-instruct:free",
+            "messages": [{"role": "user", "content": user_message}],
+            "max_tokens": 1024,
+            "temperature": 0.7
+        }
+        
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=60
+        )
+        response.raise_for_status()
+        data = response.json()
+        
+        if 'error' in data:
+            raise Exception(data['error'].get('message', 'API error'))
+        
+        bot_response = data["choices"][0]["message"]["content"]
+        
+        return jsonify({
+            'response': bot_response,
+            'demo': True,
+            'model': 'Mistral 7B Demo',
+            'message': '✨ Sign up for full access: Vision, Images & 5 AI models!'
+        })
+    except Exception as e:
+        return jsonify({'error': f'Demo unavailable: {str(e)}'}), 500
+
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     if request.method == 'POST':
@@ -334,50 +378,6 @@ def login():
 def logout():
     logout_user()
     return redirect(url_for('index'))
-
-
-@app.route('/demo-chat', methods=['POST'])
-def demo_chat():
-    """Demo chat without login using Gemini Flash"""
-    user_message = request.json.get('message', '')
-    
-    if not user_message:
-        return jsonify({'error': 'Empty message'}), 400
-    
-    try:
-        # Use Gemini Flash for demo (100% free)
-        if GOOGLE_API_KEY:
-            model = genai.GenerativeModel('gemini-2.0-flash-exp')
-            response = model.generate_content(user_message)
-            bot_response = response.text
-        else:
-            # Fallback to OpenRouter free model
-            headers = {
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json"
-            }
-            payload = {
-                "model": "mistralai/mistral-7b-instruct:free",
-                "messages": [{"role": "user", "content": user_message}]
-            }
-            response = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers=headers,
-                json=payload,
-                timeout=60
-            )
-            response.raise_for_status()
-            bot_response = response.json()["choices"][0]["message"]["content"]
-        
-        return jsonify({
-            'response': bot_response,
-            'demo': True,
-            'model': 'Gemini Flash Demo',
-            'message': '✨ Sign up for full access to all 5 models + vision + images!'
-        })
-    except Exception as e:
-        return jsonify({'error': f'Demo error: {str(e)}'}), 500
-
 
 # ================== ROUTES: DASHBOARD ==================
 
@@ -620,14 +620,10 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all()
         print("✅ Database ready!")
-        print("🚀 NexaAI - 6 AI Models:")
-        print("   1. GPT-3.5 Turbo (OpenRouter credits)")
-        print("   2. Gemini 2.0 Flash (100% FREE)")
-        print("   3. Gemini 1.5 Pro (100% FREE)")
-        print("   4. Qwen 2.5 72B (100% FREE)")
-        print("   5. DeepSeek V3 (100% FREE)")
-        print("   6. Mistral 7B (100% FREE)")
+        print("🚀 NexaAI - 5 AI Models (100% Free):")
+        print("   1. Gemini 2.0 Flash ⚡ (Vision + Images)")
+        print("   2. Gemini 1.5 Pro 💎 (Vision + Images)")
+        print("   3. Claude 3.5 Haiku 🎭 (Fast)")
+        print("   4. DeepSeek V3 🔍 (Reasoning)")
+        print("   5. Mistral 7B ⚡ (Instant)")
     app.run(debug=True, port=5000)
-
-
-
