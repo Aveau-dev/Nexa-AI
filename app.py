@@ -2,13 +2,12 @@ import os
 import sqlite3
 import base64
 from datetime import datetime
-import io
 import urllib.parse
 
 from dotenv import load_dotenv
 from flask import (
     Flask, render_template, request, redirect,
-    url_for, jsonify, session, send_from_directory
+    url_for, jsonify, send_from_directory
 )
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
@@ -20,39 +19,33 @@ from werkzeug.utils import secure_filename
 from PIL import Image
 import requests
 import stripe
-import hashlib
-import json
-
-# ================== ENV & FLASK SETUP ==================
+import google.generativeai as genai
+from groq import Groq
 
 load_dotenv()
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-this')
-
-# DB URL
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key')
 uri = os.getenv("DATABASE_URL")
 if uri and uri.startswith("postgres://"):
     uri = uri.replace("postgres://", "postgresql://", 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = uri if uri else 'sqlite:///database.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-# Uploads
 app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['DEMO_SESSIONS_FOLDER'] = 'demo_sessions'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-os.makedirs(app.config['DEMO_SESSIONS_FOLDER'], exist_ok=True)
-
 db = SQLAlchemy(app)
+stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 
 # API Keys
-stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
-OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')  # For Claude only
-GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')  # Free from AI Studio
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')  # Free $5 credit
-DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY')  # Optional
+GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
+GROQ_API_KEY = os.getenv('GROQ_API_KEY')
+OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
+
+# Configure APIs
+genai.configure(api_key=GOOGLE_API_KEY)
+groq_client = Groq(api_key=GROQ_API_KEY)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -72,8 +65,6 @@ class User(UserMixin, db.Model):
     name = db.Column(db.String(100), nullable=False)
     is_premium = db.Column(db.Boolean, default=False)
     subscription_id = db.Column(db.String(100))
-    deepseek_count = db.Column(db.Integer, default=0)
-    deepseek_date = db.Column(db.String(10))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     chats = db.relationship('Chat', backref='user', lazy=True, cascade='all, delete-orphan')
 
@@ -99,245 +90,176 @@ class Message(db.Model):
 def load_user(user_id):
     return db.session.get(User, int(user_id))
 
-# ================== MIGRATION ==================
-
-def migrate_database():
-    try:
-        db_path = 'database.db'
-        if not os.path.exists(db_path):
-            return
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("PRAGMA table_info(user)")
-        columns = [c[1] for c in cursor.fetchall()]
-        if 'deepseek_count' not in columns:
-            cursor.execute("ALTER TABLE user ADD COLUMN deepseek_count INTEGER DEFAULT 0")
-        if 'deepseek_date' not in columns:
-            today = datetime.utcnow().strftime('%Y-%m-%d')
-            cursor.execute(f"ALTER TABLE user ADD COLUMN deepseek_date TEXT DEFAULT '{today}'")
-        if 'created_at' not in columns:
-            cursor.execute("ALTER TABLE user ADD COLUMN created_at TIMESTAMP")
-        cursor.execute("PRAGMA table_info(message)")
-        msg_columns = [c[1] for c in cursor.fetchall()]
-        if 'has_image' not in msg_columns:
-            cursor.execute("ALTER TABLE message ADD COLUMN has_image BOOLEAN DEFAULT 0")
-        if 'image_path' not in msg_columns:
-            cursor.execute("ALTER TABLE message ADD COLUMN image_path TEXT")
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        print(f"⚠️ Migration warning: {str(e)}")
-
 # ================== MODEL CONFIG ==================
 
 FREE_MODELS = {
-    'gpt-4o-mini': {
-        'name': 'GPT-4o Mini',
-        'provider': 'openai',
+    'gpt-5': {
+        'name': 'GPT-5',
+        'provider': 'puter',
+        'model_id': 'gpt-5.1',
         'vision': True,
         'image_gen': True,
-        'free': True
+        'free': True,
+        'note': 'Unlimited & Free'
     },
-    'gemini-flash': {
-        'name': 'Gemini Flash 1.5',
-        'provider': 'google',
-        'vision': True,
-        'image_gen': True,
-        'free': True
-    },
-    'claude-3-haiku': {
-        'name': 'Claude 3 Haiku',
-        'provider': 'openrouter',
-        'path': 'anthropic/claude-3-haiku',
-        'vision': False,
-        'image_gen': False,
-        'free': True
-    },
-    'deepseek-chat': {
-        'name': 'DeepSeek Chat',
-        'provider': 'openrouter',
-        'path': 'deepseek/deepseek-chat',
-        'limit': 50,
-        'vision': False,
-        'image_gen': False,
-        'free': True
-    }
-}
-
-PREMIUM_MODELS = {
-    'gpt-4o': {
-        'name': 'GPT-4o',
-        'provider': 'openai',
-        'vision': True,
-        'image_gen': True
-    },
-    'claude-3.5-sonnet': {
+    'claude-sonnet': {
         'name': 'Claude 3.5 Sonnet',
-        'provider': 'openrouter',
-        'path': 'anthropic/claude-3.5-sonnet',
+        'provider': 'puter',
+        'model_id': 'claude-sonnet-4-5',
         'vision': True,
-        'image_gen': False
+        'image_gen': False,
+        'free': True,
+        'note': 'Unlimited & Free'
     },
     'gemini-pro': {
-        'name': 'Gemini Pro 1.5',
+        'name': 'Gemini 1.5 Pro',
         'provider': 'google',
+        'model_id': 'gemini-1.5-pro',
         'vision': True,
-        'image_gen': True
+        'image_gen': True,
+        'free': True,
+        'note': '1,500/day'
+    },
+    'gemini-flash': {
+        'name': 'Gemini 2.0 Flash',
+        'provider': 'google',
+        'model_id': 'gemini-2.0-flash-exp',
+        'vision': True,
+        'image_gen': True,
+        'free': True,
+        'note': '1,500/day'
+    },
+    'llama-70b': {
+        'name': 'Llama 3.1 70B',
+        'provider': 'groq',
+        'model_id': 'llama-3.1-70b-versatile',
+        'vision': False,
+        'image_gen': False,
+        'free': True,
+        'note': '30/min'
     }
 }
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
-# ================== AI API CALLS ==================
+# ================== AI API FUNCTIONS ==================
 
-def call_openai_api(model_name, messages, uploaded_file=None):
-    """Call OpenAI directly (free $5 credit)"""
-    headers = {
-        "Authorization": f"Bearer {OPENAI_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    
-    # Handle vision
-    formatted_messages = []
-    for msg in messages:
-        if isinstance(msg.get('content'), list):
-            formatted_messages.append(msg)
-        else:
-            formatted_messages.append(msg)
-    
-    payload = {
-        "model": model_name,
-        "messages": formatted_messages,
-        "max_tokens": 1024,
-        "temperature": 0.7
-    }
-    
-    response = requests.post(
-        "https://api.openai.com/v1/chat/completions",
-        headers=headers,
-        json=payload,
-        timeout=120
-    )
-    response.raise_for_status()
-    data = response.json()
-    return data["choices"][0]["message"]["content"]
-
-def call_google_api(model_name, messages, uploaded_file=None):
-    """Call Google AI Studio directly (FREE forever)"""
-    import google.generativeai as genai
-    
-    genai.configure(api_key=GOOGLE_API_KEY)
-    
-    # Choose model
-    if 'pro' in model_name:
-        model = genai.GenerativeModel('gemini-1.5-pro')
-    else:
-        model = genai.GenerativeModel('gemini-1.5-flash')
-    
-    # Convert messages to Gemini format
-    prompt_parts = []
-    for msg in messages:
-        if msg['role'] == 'system':
-            continue
-        if isinstance(msg.get('content'), list):
-            # Handle vision
-            for part in msg['content']:
-                if part['type'] == 'text':
-                    prompt_parts.append(part['text'])
-                elif part['type'] == 'image_url':
-                    # Add image
-                    image_data = part['image_url']['url'].split(',')[1]
-                    import PIL.Image
-                    import io
-                    img = PIL.Image.open(io.BytesIO(base64.b64decode(image_data)))
-                    prompt_parts.append(img)
-        else:
-            prompt_parts.append(msg['content'])
-    
-    response = model.generate_content(prompt_parts)
-    return response.text
-
-def call_openrouter_api(model_path, messages):
-    """OpenRouter for Claude only"""
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    
-    system_msg = {
-        "role": "system",
-        "content": "You are NexaAI. Respond in Markdown with headings and code blocks when useful."
-    }
-    
-    payload = {
-        "model": model_path,
-        "messages": [system_msg] + messages,
-        "max_tokens": 1024,
-        "temperature": 0.7
-    }
-    
-    response = requests.post(
-        "https://openrouter.ai/api/v1/chat/completions",
-        headers=headers,
-        json=payload,
-        timeout=120
-    )
-    response.raise_for_status()
-    data = response.json()
-    return data["choices"][0]["message"]["content"]
-
-def generate_image_with_ai(prompt, model_provider):
-    """Generate images using the selected AI's native capability"""
-    
-    # Clean prompt
-    clean_prompt = prompt.lower()
-    for phrase in ['generate image of', 'create image of', 'make image of', 'draw', 'generate a picture of', 'make an image of', 'create an image of', 'picture of']:
-        clean_prompt = clean_prompt.replace(phrase, '').strip()
-    
-    if model_provider == 'openai':
-        # Use DALL-E 3
-        headers = {"Authorization": f"Bearer {OPENAI_API_KEY}"}
-        response = requests.post(
-            "https://api.openai.com/v1/images/generations",
-            headers=headers,
-            json={
-                "model": "dall-e-3",
-                "prompt": clean_prompt,
-                "n": 1,
-                "size": "1024x1024",
-                "quality": "hd"
-            },
-            timeout=120
-        )
+def call_puter_api(model_id, messages):
+    """Call Puter.js for GPT-5 and Claude 3.5 Sonnet (FREE)"""
+    try:
+        # Convert messages format
+        formatted_messages = []
+        for msg in messages:
+            if isinstance(msg.get('content'), list):
+                # Handle vision (extract text only for now)
+                text = next((p['text'] for p in msg['content'] if p['type'] == 'text'), '')
+                formatted_messages.append({"role": msg['role'], "content": text})
+            else:
+                formatted_messages.append(msg)
+        
+        response = requests.post('https://api.puter.com/drivers/call', json={
+            "interface": "puter-chat-completion",
+            "driver": "openai-completion",
+            "method": "complete",
+            "args": {
+                "messages": formatted_messages,
+                "model": model_id
+            }
+        }, timeout=90)
+        
         response.raise_for_status()
         data = response.json()
-        image_url = data['data'][0]['url']
-        
-        # Download and save
-        img_response = requests.get(image_url, timeout=30)
-        return img_response.content, clean_prompt, 'DALL-E 3 (HD)'
-        
-    elif model_provider == 'google':
-        # Use Google Imagen via Pollinations (Google doesn't have public Imagen API yet)
-        enhanced_prompt = f"{clean_prompt}, highly detailed, 4k uhd, professional, sharp focus"
-        encoded = urllib.parse.quote(enhanced_prompt)
-        image_url = f"https://image.pollinations.ai/prompt/{encoded}?width=2048&height=2048&nologo=true&enhance=true&model=flux"
-        
-        response = requests.get(image_url, timeout=120)
-        response.raise_for_status()
-        return response.content, clean_prompt, 'Flux Pro (4K)'
-        
-    else:
-        # Fallback: Pollinations
-        enhanced_prompt = f"{clean_prompt}, highly detailed, professional"
-        encoded = urllib.parse.quote(enhanced_prompt)
-        image_url = f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=1024&nologo=true&enhance=true"
-        
-        response = requests.get(image_url, timeout=90)
-        response.raise_for_status()
-        return response.content, clean_prompt, 'Stable Diffusion'
+        return data['result']['message']['content']
+    except Exception as e:
+        raise Exception(f"Puter API error: {str(e)}")
 
-# ================== HELPERS ==================
+def call_google_api(model_id, messages, uploaded_file=None):
+    """Call Google Gemini (FREE forever)"""
+    try:
+        model = genai.GenerativeModel(model_id)
+        
+        # Convert messages
+        prompt_parts = []
+        for msg in messages:
+            if msg['role'] == 'system':
+                continue
+            if isinstance(msg.get('content'), list):
+                # Handle vision
+                for part in msg['content']:
+                    if part['type'] == 'text':
+                        prompt_parts.append(part['text'])
+                    elif part['type'] == 'image_url':
+                        image_data = part['image_url']['url'].split(',')[1]
+                        import io
+                        img = Image.open(io.BytesIO(base64.b64decode(image_data)))
+                        prompt_parts.append(img)
+            else:
+                prompt_parts.append(msg['content'])
+        
+        response = model.generate_content(prompt_parts)
+        return response.text
+    except Exception as e:
+        raise Exception(f"Google API error: {str(e)}")
+
+def call_groq_api(model_id, messages):
+    """Call Groq for Llama (FREE 30/min)"""
+    try:
+        # Convert messages (text only)
+        formatted_messages = []
+        for msg in messages:
+            if isinstance(msg.get('content'), list):
+                text = next((p['text'] for p in msg['content'] if p['type'] == 'text'), '')
+                formatted_messages.append({"role": msg['role'], "content": text})
+            else:
+                formatted_messages.append(msg)
+        
+        response = groq_client.chat.completions.create(
+            model=model_id,
+            messages=formatted_messages,
+            temperature=0.7,
+            max_tokens=1024
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        raise Exception(f"Groq API error: {str(e)}")
+
+def generate_image_with_ai(prompt, model_provider):
+    """Generate images using Pollinations or DALL-E via Puter"""
+    clean_prompt = prompt.lower()
+    for phrase in ['generate image', 'create image', 'make image', 'draw', 'picture of']:
+        clean_prompt = clean_prompt.replace(phrase, '').strip()
+    
+    if model_provider == 'puter':
+        # Use Puter's DALL-E access
+        try:
+            response = requests.post('https://api.puter.com/drivers/call', json={
+                "interface": "puter-image-generation",
+                "driver": "openai-image-generation",
+                "method": "generate",
+                "args": {
+                    "prompt": clean_prompt,
+                    "model": "dall-e-3",
+                    "size": "1024x1024",
+                    "quality": "hd"
+                }
+            }, timeout=120)
+            response.raise_for_status()
+            data = response.json()
+            image_url = data['result']['url']
+            img_response = requests.get(image_url, timeout=30)
+            return img_response.content, clean_prompt, 'DALL-E 3 (HD)'
+        except:
+            pass
+    
+    # Fallback: Pollinations (4K, free)
+    enhanced = f"{clean_prompt}, highly detailed, 4k, professional"
+    encoded = urllib.parse.quote(enhanced)
+    image_url = f"https://image.pollinations.ai/prompt/{encoded}?width=2048&height=2048&nologo=true&enhance=true&model=flux"
+    response = requests.get(image_url, timeout=120)
+    response.raise_for_status()
+    return response.content, clean_prompt, 'Flux Pro (4K)'
+
+# ================== HELPER FUNCTIONS ==================
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -351,14 +273,6 @@ def compress_image(path, max_size=(1024, 1024)):
     img = Image.open(path)
     img.thumbnail(max_size, Image.Resampling.LANCZOS)
     img.save(path, optimize=True, quality=85)
-
-def check_deepseek_limit(user):
-    today = datetime.utcnow().strftime('%Y-%m-%d')
-    if user.deepseek_date != today:
-        user.deepseek_count = 0
-        user.deepseek_date = today
-        db.session.commit()
-    return user.deepseek_count < 50
 
 def generate_chat_title(first_message):
     title = first_message[:50]
@@ -385,7 +299,7 @@ def get_chat_history(chat_id, limit=4):
                         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}}
                     ]
                 })
-            except Exception:
+            except:
                 history.append({"role": msg.role, "content": msg.content})
         else:
             history.append({"role": msg.role, "content": msg.content})
@@ -396,26 +310,6 @@ def get_chat_history(chat_id, limit=4):
 @app.route('/')
 def index():
     return render_template('index.html')
-
-@app.route('/demo-chat', methods=['POST'])
-def demo_chat():
-    user_message = request.json.get('message', '')
-    
-    try:
-        # Use Gemini for demo (completely free)
-        import google.generativeai as genai
-        genai.configure(api_key=GOOGLE_API_KEY)
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(user_message)
-        
-        return jsonify({
-            'response': response.text,
-            'demo': True,
-            'model': 'Gemini Flash (Demo)',
-            'message': 'Sign up for image uploads & more models!'
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
@@ -431,8 +325,7 @@ def signup():
         new_user = User(
             email=email,
             name=name,
-            password=generate_password_hash(password, method='pbkdf2:sha256'),
-            deepseek_date=datetime.utcnow().strftime('%Y-%m-%d')
+            password=generate_password_hash(password, method='pbkdf2:sha256')
         )
         db.session.add(new_user)
         db.session.commit()
@@ -479,11 +372,7 @@ def dashboard():
         .order_by(Chat.updated_at.desc())
         .all()
     )
-    if current_user.is_premium:
-        available_models = {**FREE_MODELS, **PREMIUM_MODELS}
-    else:
-        available_models = FREE_MODELS
-    return render_template('dashboard.html', user=current_user, chats=chats, models=available_models)
+    return render_template('dashboard.html', user=current_user, chats=chats, models=FREE_MODELS)
 
 @app.route('/upload', methods=['POST'])
 @login_required
@@ -499,11 +388,10 @@ def upload_file():
         filename = f"{current_user.id}_{ts}_{filename}"
         path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(path)
-        if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
-            try:
-                compress_image(path)
-            except Exception:
-                pass
+        try:
+            compress_image(path)
+        except:
+            pass
         return jsonify({'success': True, 'filename': filename})
     return jsonify({'error': 'File type not allowed'}), 400
 
@@ -511,28 +399,21 @@ def upload_file():
 @login_required
 def generate_image_route():
     prompt = request.json.get('prompt', '').strip()
-    model_key = request.json.get('model', 'gpt-4o-mini')
+    model_key = request.json.get('model', 'gemini-flash')
     
     if not prompt:
         return jsonify({'error': 'Empty prompt'}), 400
     
-    # Get model info
-    model_info = FREE_MODELS.get(model_key) or PREMIUM_MODELS.get(model_key)
+    model_info = FREE_MODELS.get(model_key)
     if not model_info:
         return jsonify({'error': 'Invalid model'}), 400
     
-    # Check if model supports image generation
     if not model_info.get('image_gen'):
-        return jsonify({'error': f'{model_info["name"]} cannot generate images. Switch to GPT-4o Mini or Gemini Flash!'}), 400
-    
-    # Check premium access
-    if model_key in PREMIUM_MODELS and not current_user.is_premium:
-        return jsonify({'error': 'This model requires Premium subscription'}), 403
+        return jsonify({'error': f'{model_info["name"]} cannot generate images'}), 400
     
     try:
         image_data, clean_prompt, gen_model = generate_image_with_ai(prompt, model_info['provider'])
         
-        # Save image
         ts = datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = f"generated_{current_user.id}_{ts}.png"
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
@@ -547,7 +428,6 @@ def generate_image_route():
             'prompt': clean_prompt,
             'generator': gen_model
         })
-        
     except Exception as e:
         return jsonify({'error': f'Generation failed: {str(e)}'}), 500
 
@@ -576,12 +456,6 @@ def delete_chat(chat_id):
     chat = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first()
     if not chat:
         return jsonify({'error': 'Chat not found'}), 404
-    for msg in chat.messages:
-        if msg.has_image and msg.image_path:
-            try:
-                os.remove(os.path.join(app.config['UPLOAD_FOLDER'], msg.image_path))
-            except Exception:
-                pass
     db.session.delete(chat)
     db.session.commit()
     return jsonify({'success': True})
@@ -603,8 +477,7 @@ def get_chat_messages(chat_id):
             'content': msg.content,
             'model': msg.model,
             'has_image': msg.has_image,
-            'image_path': msg.image_path,
-            'created_at': msg.created_at.isoformat()
+            'image_path': msg.image_path
         } for msg in messages],
         'title': chat.title
     })
@@ -613,7 +486,7 @@ def get_chat_messages(chat_id):
 @login_required
 def chat_route():
     user_message = request.json.get('message', '')
-    selected_model = request.json.get('model', 'gpt-4o-mini')
+    selected_model = request.json.get('model', 'gpt-5')
     chat_id = request.json.get('chat_id')
     uploaded_file = request.json.get('uploaded_file')
 
@@ -627,25 +500,13 @@ def chat_route():
         db.session.commit()
         chat_id = chat_obj.id
 
-    # Get model info
-    model_info = FREE_MODELS.get(selected_model) or PREMIUM_MODELS.get(selected_model)
+    model_info = FREE_MODELS.get(selected_model)
     if not model_info:
         return jsonify({'error': 'Invalid model'}), 400
 
-    # Check premium
-    if selected_model in PREMIUM_MODELS and not current_user.is_premium:
-        return jsonify({'error': 'This model requires Premium subscription'}), 403
-
-    # Check DeepSeek limit
-    if selected_model == 'deepseek-chat' and not current_user.is_premium:
-        if not check_deepseek_limit(current_user):
-            return jsonify({'error': '⚠️ Daily DeepSeek limit reached (50/day)'}), 429
-
-    # Check vision
     if uploaded_file and not model_info.get('vision'):
         return jsonify({'error': 'Selected model does not support image input'}), 400
 
-    # Save user message
     user_msg = Message(
         chat_id=chat_id,
         role='user',
@@ -658,10 +519,8 @@ def chat_route():
     if chat_obj.title == 'New Chat':
         chat_obj.title = generate_chat_title(user_message)
 
-    # Get history
     history = get_chat_history(chat_id)
 
-    # Add current message with image if present
     if uploaded_file and model_info.get('vision'):
         try:
             image_base64 = encode_image(uploaded_file)
@@ -674,28 +533,23 @@ def chat_route():
             })
         except Exception as e:
             db.session.rollback()
-            return jsonify({'error': f'Image processing error: {str(e)}'}), 500
+            return jsonify({'error': f'Image error: {str(e)}'}), 500
     else:
         history.append({"role": "user", "content": user_message})
 
     try:
-        # Route to correct API
         provider = model_info['provider']
+        model_id = model_info['model_id']
         
-        if provider == 'openai':
-            model_name = 'gpt-4o' if selected_model == 'gpt-4o' else 'gpt-4o-mini'
-            bot_response = call_openai_api(model_name, history, uploaded_file)
-            
+        if provider == 'puter':
+            bot_response = call_puter_api(model_id, history)
         elif provider == 'google':
-            bot_response = call_google_api(selected_model, history, uploaded_file)
-            
-        elif provider == 'openrouter':
-            bot_response = call_openrouter_api(model_info['path'], history)
-        
+            bot_response = call_google_api(model_id, history, uploaded_file)
+        elif provider == 'groq':
+            bot_response = call_groq_api(model_id, history)
         else:
             return jsonify({'error': 'Unknown provider'}), 500
 
-        # Save assistant message
         assistant_msg = Message(
             chat_id=chat_id,
             role='assistant',
@@ -703,10 +557,6 @@ def chat_route():
             model=model_info['name']
         )
         db.session.add(assistant_msg)
-
-        if selected_model == 'deepseek-chat' and not current_user.is_premium:
-            current_user.deepseek_count += 1
-
         chat_obj.updated_at = datetime.utcnow()
         db.session.commit()
 
@@ -716,7 +566,6 @@ def chat_route():
             'chat_id': chat_id,
             'chat_title': chat_obj.title
         })
-        
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'AI Error: {str(e)}'}), 500
@@ -728,11 +577,6 @@ def chat_route():
 def checkout():
     return render_template('checkout.html')
 
-@app.route('/payment-success')
-@login_required
-def payment_success():
-    return 'Payment successful! <a href="/dashboard">Go to Dashboard</a>'
-
 @app.route('/webhook', methods=['POST'])
 def stripe_webhook():
     payload = request.data
@@ -741,8 +585,8 @@ def stripe_webhook():
         event = stripe.Webhook.construct_event(
             payload, sig_header, os.getenv('STRIPE_WEBHOOK_SECRET')
         )
-    except Exception as e:
-        return str(e), 400
+    except:
+        return '', 400
 
     if event['type'] == 'checkout.session.completed':
         sess = event['data']['object']
@@ -758,8 +602,12 @@ def stripe_webhook():
 
 if __name__ == '__main__':
     with app.app_context():
-        migrate_database()
         db.create_all()
         print("✅ Database ready!")
-        print("🚀 Starting NexaAI...")
+        print("🚀 NexaAI with 5 FREE models:")
+        print("   1. GPT-5 (Puter - Unlimited)")
+        print("   2. Claude 3.5 Sonnet (Puter - Unlimited)")
+        print("   3. Gemini 1.5 Pro (Google - 1,500/day)")
+        print("   4. Gemini 2.0 Flash (Google - 1,500/day)")
+        print("   5. Llama 3.1 70B (Groq - 30/min)")
     app.run(debug=True, port=5000)
