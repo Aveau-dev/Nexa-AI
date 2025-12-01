@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NexaAI - Dashboard</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2319c37d' d='M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z'/></svg>">
-    <link rel="stylesheet" href="{{ url_for('static', filename='Css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -46,7 +46,7 @@
                     <path fill="currentColor" d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
                 </svg>
                 <button class="model-selector-btn" id="model-selector-btn">
-                    <span id="selected-model-name">Gemini 2.0 Flash ⚡</span>
+                    <span id="selected-model-name">Gemini 2.5 Flash ⚡</span>
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                         <path d="M7 10l5 5 5-5z"/>
                     </svg>
@@ -217,7 +217,7 @@
                     </button>
                 </div>
                 <div class="input-footer">
-                    <span class="footer-text"><span id="model-info">Gemini 2.0 Flash ⚡</span> · 5 models are 100% free</span>
+                    <span class="footer-text"><span id="model-info">Gemini 2.5 Flash ⚡</span> · 5 models are 100% free</span>
                 </div>
             </div>
         </div>
@@ -272,182 +272,210 @@ async function newChat(){
     const d=await res.json();if(d.success){
         currentChatId=d.chat_id;document.getElementById('messages-container').innerHTML='';
         document.getElementById('welcome-section').style.display='block';
-        document.getElementById('chat-input').value='';removeUploadedImage();addChatToSidebar(d.chat_id,d.title,true);
+        document.getElementById('chat-input').value='';addChatToSidebar(d.chat_id,d.title,true);
     }}catch{alert('Failed to create new chat');}
 }
-async function loadChat(id){if(isLoading)return;isLoading=true;
-    try{const res=await fetch(`/chat/${id}/messages`);
-    const d=await res.json();if(d.error){alert(d.error);return;}
-    currentChatId=id;const mc=document.getElementById('messages-container');mc.innerHTML='';
-    document.getElementById('welcome-section').style.display='none';
-    d.messages.forEach(m=>addMessage(m.content,m.role,m.model,false));
-    document.querySelectorAll('.chat-item').forEach(el=>el.classList.remove('active'));
-    document.querySelector(`[data-chat-id="${id}"]`)?.classList.add('active');
-    if(window.innerWidth<=1024)document.getElementById('sidebar').classList.remove('show');
-    }catch{alert('Failed to load chat');}finally{isLoading=false;}}
+
+async function loadChat(id){
+    if(isLoading)return;isLoading=true;
+    try{const res=await fetch(`/chat/${id}/messages`);const d=await res.json();
+        currentChatId=id;document.getElementById('messages-container').innerHTML='';
+        document.getElementById('welcome-section').style.display='none';
+        d.messages.forEach(m=>addMessage(m.content,m.role,m.model,false,m.has_image?m.image_path:null));
+        document.querySelectorAll('.chat-item').forEach(el=>el.classList.remove('active'));
+        document.querySelector(`[data-chat-id="${id}"]`)?.classList.add('active');
+        if(window.innerWidth<=1024)document.getElementById('sidebar').classList.remove('show');
+    }catch{alert('Failed to load chat');}finally{isLoading=false;}
+}
+
 async function renameChat(id){
     const title=prompt('Enter new chat title:');
     if(!title||!title.trim())return;
-    try{const res=await fetch(`/chat/${id}/rename`,{
-        method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:title.trim()})
-    });
-    const d=await res.json();
-    if(d.success)document.querySelector(`[data-chat-id="${id}"] .chat-title`).textContent=title.trim();}catch{alert('Failed to rename');}
+    try{const res=await fetch(`/chat/${id}/rename`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:title.trim()})});
+        const d=await res.json();if(d.success)document.querySelector(`[data-chat-id="${id}"] .chat-title`).textContent=title.trim();
+    }catch{alert('Failed to rename chat');}
 }
-async function deleteChat(id){if(!confirm('Delete this chat?'))return;
+
+async function deleteChat(id){
+    if(!confirm('Delete this chat?'))return;
     try{const res=await fetch(`/chat/${id}/delete`,{method:'DELETE'});
-    const d=await res.json();if(d.success){
-        document.querySelector(`[data-chat-id="${id}"]`)?.remove();
-        if(currentChatId===id){currentChatId=null;document.getElementById('messages-container').innerHTML='';
-        document.getElementById('welcome-section').style.display='block';}}}catch{alert('Failed to delete');}}
+        const d=await res.json();if(d.success){
+            document.querySelector(`[data-chat-id="${id}"]`)?.remove();
+            if(currentChatId===id){currentChatId=null;document.getElementById('messages-container').innerHTML='';document.getElementById('welcome-section').style.display='block';}
+        }
+    }catch{alert('Failed to delete chat');}
+}
+
 function addChatToSidebar(id,title,prepend=false){
-    const h=document.querySelector('.chat-history');const e=h.querySelector('.empty-state');if(e)e.remove();
-    const item=document.createElement('div');item.className='chat-item';item.dataset.chatId=id;
+    const h=document.querySelector('.chat-history');const e=h.querySelector('.empty-state');
+    if(e)e.remove();const item=document.createElement('div');
+    item.className='chat-item active';item.dataset.chatId=id;
     item.innerHTML=`<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg><span class="chat-title">${escapeHtml(title)}</span><div class="chat-actions"><button class="icon-btn rename-chat-btn" data-chat-id="${id}">✏️</button><button class="icon-btn delete-chat-btn" data-chat-id="${id}">🗑️</button></div>`;
+    item.onclick=()=>loadChat(id);
+    document.querySelectorAll('.chat-item').forEach(el=>el.classList.remove('active'));
     if(prepend)h.insertBefore(item,h.firstChild);else h.appendChild(item);
 }
-document.getElementById('attach-btn')?.addEventListener('click',()=>{
-    if(!currentModelSupportsVision){alert('⚠️ This model doesn\'t support images.\n\nSwitch to Gemini models for vision!');return;}
-    document.getElementById('file-input').click();
-});
-document.getElementById('file-input')?.addEventListener('change',async function(e){
-    const file=e.target.files[0];if(!file)return;
-    if(!currentModelSupportsVision){alert('⚠️ Model doesn\'t support images');e.target.value='';return;}
-    const formData=new FormData();formData.append('file',file);
-    try{const res=await fetch('/upload',{method:'POST',body:formData});
-        const data=await res.json();
-        if(data.success){
-            currentUploadedFile=data.filename;
-            document.getElementById('preview-thumb').src=URL.createObjectURL(file);
-            document.getElementById('preview-name').textContent=file.name;
-            document.getElementById('image-preview').classList.add('active');
-            document.getElementById('attach-btn').classList.add('active');
-        }else{alert(data.error||'Upload failed');}
-    }catch{alert('Failed to upload');}
-    e.target.value='';
-});
+
+function handleKeyDown(event){if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}}
+
+async function uploadImage(file){
+    const fd=new FormData();fd.append('file',file);
+    try{const res=await fetch('/upload',{method:'POST',body:fd});
+        const d=await res.json();if(d.success)return d.filename;
+        throw new Error(d.error||'Upload failed');
+    }catch(e){throw e;}
+}
+
 function removeUploadedImage(){
     currentUploadedFile=null;
+    document.getElementById('file-input').value='';
     document.getElementById('image-preview').classList.remove('active');
     document.getElementById('attach-btn').classList.remove('active');
-    document.getElementById('file-input').value='';
 }
-async function handleImageGeneration(message){
-    const keywords=['generate image','create image','draw','make an image','make image','picture of','draw me'];
-    if(!keywords.some(k=>message.toLowerCase().includes(k)))return false;
-    if(!currentModelSupportsImageGen){
-        addMessage(`❌ ${document.getElementById('selected-model-name').textContent} can't generate images.\n\nSwitch to Gemini models for image generation!`,'error','',false);
-        return true;
-    }
-    addMessage('🎨 Generating image...','assistant','Image Generator',false);
-    try{
-        const res=await fetch('/generate-image',{
-            method:'POST',headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({prompt:message,model:currentModel})
-        });
-        const d=await res.json();
-        const container=document.getElementById('messages-container');
-        const lastMsg=container.lastChild;
-        if(lastMsg&&lastMsg.textContent.includes('Generating'))lastMsg.remove();
-        if(d.success){
-            const html=`<div class="generated-image-container"><img src="${d.url}" alt="${escapeHtml(d.prompt)}" loading="lazy"></div><p style="color:#9ca3af;font-size:0.9rem;margin-top:8px;"><strong>Prompt:</strong> ${escapeHtml(d.prompt)}<br><strong>Generator:</strong> ${d.generator}</p><a href="${d.url}" download class="download-image-btn">⬇️ Download Image</a>`;
-            addMessage(html,'assistant',d.generator,false);return true;
-        }else{addMessage('❌ '+d.error,'error','',false);return true;}
-    }catch{
-        const container=document.getElementById('messages-container');
-        const lastMsg=container.lastChild;
-        if(lastMsg&&lastMsg.textContent.includes('Generating'))lastMsg.remove();
-        addMessage('Network error','error','',false);return true;
-    }
-}
+
 async function sendMessage(){
     const input=document.getElementById('chat-input');
-    const message=input.value.trim();
+    let message=input.value.trim();
     if(!message||isLoading)return;
-    isLoading=true;
-    document.getElementById('welcome-section').style.display='none';
-    addMessage(message,'user','',false);
-    input.value='';input.style.height='auto';
-    const wasImg=await handleImageGeneration(message);
-    if(wasImg){isLoading=false;return;}
+    
+    const isImageGenRequest=message.toLowerCase().match(/^(generate|create|make|draw).*(image|picture|photo|art)/);
+    
+    if(isImageGenRequest&&!currentModelSupportsImageGen){
+        alert('Switch to Gemini 2.5 Flash or Pro to generate images!');return;
+    }
+    
+    isLoading=true;document.getElementById('welcome-section').style.display='none';
+    
+    let uploadedFilename=null;
+    if(currentUploadedFile&&!isImageGenRequest){
+        try{uploadedFilename=await uploadImage(currentUploadedFile);
+        }catch(e){alert('Failed to upload image: '+e.message);isLoading=false;return;}
+    }
+    
+    addMessage(message,'user','',false,uploadedFilename);
+    input.value='';input.style.height='auto';removeUploadedImage();
     showTypingIndicator();
+    
     try{
-        const res=await fetch('/chat',{
-            method:'POST',headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({message,model:currentModel,chat_id:currentChatId,uploaded_file:currentUploadedFile})
-        });
-        const d=await res.json();
-        removeTypingIndicator();removeUploadedImage();
-        if(d.error){addMessage(d.error,'error','',false);}
-        else{
-            addMessage(d.response,'assistant',d.model,true);
-            currentChatId=d.chat_id;
-            if(d.chat_title){
-                const ex=document.querySelector(`[data-chat-id="${d.chat_id}"]`);
-                if(ex)ex.querySelector('.chat-title').textContent=d.chat_title;
-                else addChatToSidebar(d.chat_id,d.chat_title,true);
+        if(isImageGenRequest&&currentModelSupportsImageGen){
+            const res=await fetch('/generate-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:message,model:currentModel})});
+            const d=await res.json();removeTypingIndicator();
+            if(d.error){addMessage(d.error,'error','',false);}
+            else{const imgHtml=`<div class="generated-image-container"><img src="${d.url}" alt="${escapeHtml(d.prompt)}"/><br><a href="${d.url}" download="nexaai_${d.filename}" class="download-image-btn">📥 Download Image</a></div><p>✨ Generated: <strong>${escapeHtml(d.prompt)}</strong> using ${escapeHtml(d.generator)}</p>`;
+                addMessage(imgHtml,'assistant','Image Generator',false);}
+        }else{
+            const res=await fetch('/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message,model:currentModel,chat_id:currentChatId,uploaded_file:uploadedFilename})});
+            const d=await res.json();removeTypingIndicator();
+            if(d.error){addMessage(d.error,'error','',false);}
+            else{addMessage(d.response,'assistant',d.model,true);currentChatId=d.chat_id;
+                if(d.chat_title){const ex=document.querySelector(`[data-chat-id="${d.chat_id}"]`);
+                    if(ex)ex.querySelector('.chat-title').textContent=d.chat_title;
+                    else addChatToSidebar(d.chat_id,d.chat_title,true);
+                }
             }
         }
-    }catch{removeTypingIndicator();addMessage('Network error','error','',false);}
+    }catch{removeTypingIndicator();addMessage('Error connecting to AI. Please try again.','error','',false);}
     finally{isLoading=false;}
 }
-function addMessage(text,role,model=''){
+
+function useSuggestion(text){document.getElementById('chat-input').value=text;sendMessage();}
+
+function addMessage(text,role,model='',useTyping=false,imagePath=null){
     const c=document.getElementById('messages-container');
     const row=document.createElement('div');
     row.className=`message-row ${role}-row`;
+    
     if(role==='user'){
-        row.innerHTML=`<div class="message user-message"><div class="message-content"><div class="message-text">${escapeHtml(text)}</div></div></div>`;
+        let content=`<div class="message-text">${escapeHtml(text)}</div>`;
+        if(imagePath){content+=`<br><img src="/uploads/${imagePath}" style="max-width:300px;border-radius:8px;margin-top:8px;"/>`;}
+        row.innerHTML=`<div class="message user-message"><div class="message-content">${content}</div></div>`;
         c.appendChild(row);c.scrollTop=c.scrollHeight;return;
     }
+    
     if(role==='assistant'){
         row.innerHTML=`<div class="message assistant-message"><div class="avatar"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/></svg></div><div class="message-content">${model?`<div class="model-badge">${escapeHtml(model)}</div>`:''}<div class="message-text markdown-content"></div></div></div>`;
-        c.appendChild(row);const el=row.querySelector('.message-text');
-        if(text.includes('generated-image-container'))el.innerHTML=text;
-        else{el.innerHTML=formatMessage(text);el.querySelectorAll('pre code').forEach(b=>hljs.highlightElement(b));addCopyButtons(el);}
-        c.scrollTop=c.scrollHeight;return;
+        c.appendChild(row);
+        const el=row.querySelector('.message-text');
+        el.innerHTML=formatMessage(text);
+        el.querySelectorAll('pre code').forEach(block=>hljs.highlightElement(block));
+        addCopyButtons(el);c.scrollTop=c.scrollHeight;return;
     }
-    row.innerHTML=`<div class="message error-message"><div class="message-content">⚠️ ${escapeHtml(text)}</div></div>`;
+    
+    row.innerHTML=`<div class="message error-message"><div class="message-content">${escapeHtml(text)}</div></div>`;
     c.appendChild(row);c.scrollTop=c.scrollHeight;
 }
+
 function showTypingIndicator(){
-    const c=document.getElementById('messages-container');
-    const d=document.createElement('div');
+    const c=document.getElementById('messages-container');const d=document.createElement('div');
     d.className='message-row assistant-row typing-indicator';d.id='typing-indicator';
-    d.innerHTML=`<div class="message assistant-message"><div class="avatar"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/></svg></div><div class="typing-dots"><span></span><span></span><span></span></div></div>`;
+    d.innerHTML='<div class="message assistant-message"><div class="avatar"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/></svg></div><div class="typing-dots"><span></span><span></span><span></span></div></div>';
     c.appendChild(d);c.scrollTop=c.scrollHeight;
 }
+
 function removeTypingIndicator(){document.getElementById('typing-indicator')?.remove();}
 
-document.addEventListener('click',(e)=>{
-    if(e.target.closest('.chat-item')&&!e.target.closest('.chat-actions')){
-        const id=e.target.closest('.chat-item').dataset.chatId;
-        if(id)loadChat(parseInt(id));
-    }
-    if(e.target.closest('.rename-chat-btn')){e.stopPropagation();renameChat(parseInt(e.target.closest('.rename-chat-btn').dataset.chatId));}
-    if(e.target.closest('.delete-chat-btn')){e.stopPropagation();deleteChat(parseInt(e.target.closest('.delete-chat-btn').dataset.chatId));}
-    const menu=document.getElementById('user-menu');
-    if(menu&&!e.target.closest('#user-menu-btn')&&!menu.contains(e.target))menu.style.display='none';
-    const sel=document.getElementById('model-selector');
-    if(sel.style.display==='block'&&!e.target.closest('#model-selector-btn')&&!e.target.closest('#close-selector-btn')&&!sel.contains(e.target))sel.style.display='none';
-    if(window.innerWidth<=1024){
-        const s=document.getElementById('sidebar');
-        if(s.classList.contains('show')&&!e.target.closest('#sidebar-toggle')&&!s.contains(e.target))s.classList.remove('show');
-    }
-});
-document.querySelectorAll('.model-card').forEach(card=>{
-    card.addEventListener('click',function(){selectModel(this.dataset.model,this.dataset.name,this.dataset.vision,this.dataset.imagegen);});
-});
-document.querySelectorAll('.suggestion-card').forEach(card=>{
-    card.addEventListener('click',function(){document.getElementById('chat-input').value=this.dataset.suggestion;sendMessage();});
-});
 document.getElementById('sidebar-toggle')?.addEventListener('click',toggleSidebar);
 document.getElementById('new-chat-btn')?.addEventListener('click',newChat);
 document.getElementById('model-selector-btn')?.addEventListener('click',toggleModelSelector);
 document.getElementById('close-selector-btn')?.addEventListener('click',toggleModelSelector);
 document.getElementById('user-menu-btn')?.addEventListener('click',toggleUserMenu);
 document.getElementById('send-btn')?.addEventListener('click',sendMessage);
-document.getElementById('chat-input')?.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}});
-document.getElementById('chat-input')?.addEventListener('input',function(){this.style.height='auto';this.style.height=Math.min(this.scrollHeight,200)+'px';});
+document.getElementById('chat-input')?.addEventListener('keydown',handleKeyDown);
+
+document.getElementById('attach-btn')?.addEventListener('click',()=>{
+    if(!currentModelSupportsVision){alert('Switch to Gemini models to use vision!');return;}
+    document.getElementById('file-input').click();
+});
+
+document.getElementById('file-input')?.addEventListener('change',function(){
+    const file=this.files[0];
+    if(!file)return;
+    if(!file.type.startsWith('image/')){alert('Please select an image file');return;}
+    currentUploadedFile=file;
+    const reader=new FileReader();
+    reader.onload=function(e){
+        document.getElementById('preview-thumb').src=e.target.result;
+        document.getElementById('preview-name').textContent=file.name;
+        document.getElementById('image-preview').classList.add('active');
+        document.getElementById('attach-btn').classList.add('active');
+    };
+    reader.readAsDataURL(file);
+});
+
+document.getElementById('chat-input').addEventListener('input',function(){
+    this.style.height='auto';this.style.height=Math.min(this.scrollHeight,200)+'px';
+});
+
+document.addEventListener('click',(e)=>{
+    const menu=document.getElementById('user-menu');
+    const btn=e.target.closest('#user-menu-btn');
+    if(!btn&&!menu.contains(e.target))menu.style.display='none';
+    
+    const selector=document.getElementById('model-selector');
+    const selectorBtn=e.target.closest('#model-selector-btn');
+    if(!selectorBtn&&!selector.contains(e.target))selector.style.display='none';
+});
+
+document.addEventListener('click',function(e){
+    if(e.target.classList.contains('rename-chat-btn')){
+        e.stopPropagation();renameChat(parseInt(e.target.dataset.chatId));
+    }
+    if(e.target.classList.contains('delete-chat-btn')){
+        e.stopPropagation();deleteChat(parseInt(e.target.dataset.chatId));
+    }
+    if(e.target.closest('.chat-item')){
+        const chatId=parseInt(e.target.closest('.chat-item').dataset.chatId);
+        if(!e.target.closest('.chat-actions'))loadChat(chatId);
+    }
+    if(e.target.closest('.suggestion-card')){
+        const suggestion=e.target.closest('.suggestion-card').dataset.suggestion;
+        useSuggestion(suggestion);
+    }
+    if(e.target.closest('.model-card')){
+        const card=e.target.closest('.model-card');
+        selectModel(card.dataset.model,card.dataset.name,card.dataset.vision,card.dataset.imagegen);
+    }
+});
     </script>
 </body>
 </html>
