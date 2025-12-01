@@ -90,20 +90,13 @@ def load_user(user_id):
 
 # ================== MODEL CONFIG ==================
 
+# ================== MODEL CONFIG ==================
+
 FREE_MODELS = {
-    'gpt-3.5-turbo': {
-        'name': 'GPT-3.5 Turbo 🤖',
-        'provider': 'openrouter',
-        'path': 'openai/gpt-3.5-turbo',
-        'vision': False,
-        'image_gen': False,
-        'free': False,
-        'note': 'OpenRouter credits'
-    },
     'gemini-flash': {
         'name': 'Gemini 2.5 Flash ⚡',
         'provider': 'google',
-        'model_id': 'gemini-2.5-flash-lite',
+        'model_id': 'gemini-2.0-flash-exp',
         'vision': True,
         'image_gen': True,
         'free': True,
@@ -112,16 +105,16 @@ FREE_MODELS = {
     'gemini-pro': {
         'name': 'Gemini 2.5 Pro 💎',
         'provider': 'google',
-        'model_id': 'gemini-2.5-pro',
+        'model_id': 'gemini-exp-1206',
         'vision': True,
         'image_gen': True,
         'free': True,
         'note': '100% Free'
     },
-    'qwen-72b': {
-        'name': 'Qwen 2.5 72B 🚀',
+    'claude-haiku': {
+        'name': 'Claude 3.5 Haiku 🎭',
         'provider': 'openrouter',
-        'path': 'qwen/qwen-2.5-72b-instruct:free',
+        'path': 'anthropic/claude-3.5-haiku:free',
         'vision': False,
         'image_gen': False,
         'free': True,
@@ -130,7 +123,7 @@ FREE_MODELS = {
     'deepseek-v3': {
         'name': 'DeepSeek V3 🔍',
         'provider': 'openrouter',
-        'path': 'deepseek/deepseek-chat',
+        'path': 'deepseek/deepseek-chat:free',
         'vision': False,
         'image_gen': False,
         'free': True,
@@ -146,6 +139,7 @@ FREE_MODELS = {
         'note': '100% Free'
     }
 }
+
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
@@ -590,4 +584,5 @@ if __name__ == '__main__':
         print("   5. DeepSeek V3 (100% FREE)")
         print("   6. Mistral 7B (100% FREE)")
     app.run(debug=True, port=5000)
+
 
