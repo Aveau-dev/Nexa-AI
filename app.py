@@ -3,6 +3,7 @@ import sqlite3
 import base64
 from datetime import datetime
 import urllib.parse
+import re
 
 from dotenv import load_dotenv
 from flask import (
@@ -50,8 +51,8 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'
 
 @app.route('/uploads/<path:filename>')
-@login_required
 def uploaded_file(filename):
+    """Public access to uploaded files"""
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 # ================== DATABASE MODELS ==================
@@ -94,7 +95,7 @@ FREE_MODELS = {
     'gemini-flash': {
         'name': 'Gemini 2.0 Flash ⚡',
         'provider': 'google',
-        'model_id': 'gemini-2.0-flash-exp',
+        'model_id': 'gemini-2.5-flash-lite',
         'vision': True,
         'image_gen': True,
         'free': True,
@@ -103,7 +104,7 @@ FREE_MODELS = {
     'gemini-pro': {
         'name': 'Gemini 1.5 Pro 💎',
         'provider': 'google',
-        'model_id': 'gemini-1.5-pro',
+        'model_id': 'gemini-1.5-pro-002',
         'vision': True,
         'image_gen': True,
         'free': True,
@@ -142,6 +143,15 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
 # ================== AI API FUNCTIONS ==================
 
+def clean_response(text):
+    """Clean AI response from special tokens"""
+    # Remove [/s], </s>, [INST], etc.
+    text = re.sub(r'\[/?s\]', '', text)
+    text = re.sub(r'</s>', '', text)
+    text = re.sub(r'\[/?INST\]', '', text)
+    text = re.sub(r'<<SYS>>.*?<</SYS>>', '', text, flags=re.DOTALL)
+    return text.strip()
+
 def call_google_api(model_id, messages, uploaded_file=None):
     """Call Google Gemini API"""
     try:
@@ -166,12 +176,15 @@ def call_google_api(model_id, messages, uploaded_file=None):
                 prompt_parts.append(msg['content'])
         
         response = model.generate_content(prompt_parts)
-        return response.text
+        return clean_response(response.text)
     except Exception as e:
         raise Exception(f"Google API error: {str(e)}")
 
 def call_openrouter_api(model_path, messages):
-    """Call OpenRouter for free models"""
+    """Call OpenRouter for free models with proper error handling"""
+    if not OPENROUTER_API_KEY:
+        raise Exception("OpenRouter API key not configured")
+    
     try:
         headers = {
             "Authorization": f"Bearer {OPENROUTER_API_KEY}",
@@ -187,14 +200,15 @@ def call_openrouter_api(model_path, messages):
                 text = next((p['text'] for p in msg['content'] if p['type'] == 'text'), '')
                 formatted_messages.append({"role": msg['role'], "content": text})
             else:
-                formatted_messages.append(msg)
+                formatted_messages.append({"role": msg['role'], "content": msg['content']})
         
         payload = {
             "model": model_path,
             "messages": formatted_messages,
-            "max_tokens": 2048,
             "temperature": 0.7
         }
+        
+        print(f"🔄 Calling OpenRouter with model: {model_path}")
         
         response = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
@@ -202,15 +216,31 @@ def call_openrouter_api(model_path, messages):
             json=payload,
             timeout=120
         )
+        
+        print(f"📊 Status: {response.status_code}")
+        
         response.raise_for_status()
         data = response.json()
         
         if 'error' in data:
-            raise Exception(data['error'].get('message', 'OpenRouter API error'))
+            error_msg = data['error'].get('message', 'Unknown error')
+            raise Exception(f"OpenRouter API error: {error_msg}")
         
-        return data["choices"][0]["message"]["content"]
+        if 'choices' not in data or len(data['choices']) == 0:
+            raise Exception("No response from OpenRouter")
+        
+        bot_response = data["choices"][0]["message"]["content"]
+        return clean_response(bot_response)
+        
     except requests.exceptions.HTTPError as e:
-        raise Exception(f"OpenRouter error: {e.response.status_code} - {e.response.text}")
+        try:
+            error_data = e.response.json()
+            error_msg = error_data.get('error', {}).get('message', str(e))
+        except:
+            error_msg = f"HTTP {e.response.status_code}"
+        raise Exception(f"OpenRouter error: {error_msg}")
+    except requests.exceptions.Timeout:
+        raise Exception("Request timeout - try again")
     except Exception as e:
         raise Exception(f"OpenRouter error: {str(e)}")
 
@@ -283,50 +313,51 @@ def index():
 
 @app.route('/demo-chat', methods=['POST'])
 def demo_chat():
-    """Demo chat without login - Uses Mistral 7B (100% free, no limits)"""
+    """Demo chat using Gemini 2.0 Flash (Best free model)"""
     user_message = request.json.get('message', '')
     
     if not user_message:
         return jsonify({'error': 'Empty message'}), 400
     
     try:
-        # Use Mistral 7B for demo (truly unlimited free)
-        headers = {
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://nexaai.app",
-            "X-Title": "NexaAI Demo"
-        }
-        
-        payload = {
-            "model": "mistralai/mistral-7b-instruct:free",
-            "messages": [{"role": "user", "content": user_message}],
-            "max_tokens": 1024,
-            "temperature": 0.7
-        }
-        
-        response = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=60
-        )
-        response.raise_for_status()
-        data = response.json()
-        
-        if 'error' in data:
-            raise Exception(data['error'].get('message', 'API error'))
-        
-        bot_response = data["choices"][0]["message"]["content"]
+        # Use Gemini 2.0 Flash for demo (handles long prompts better)
+        if GOOGLE_API_KEY:
+            model = genai.GenerativeModel('gemini-2.0-flash-exp')
+            response = model.generate_content(user_message)
+            bot_response = clean_response(response.text)
+            model_name = 'Gemini 2.0 Flash Demo'
+        else:
+            # Fallback to OpenRouter
+            headers = {
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json"
+            }
+            
+            payload = {
+                "model": "mistralai/mistral-7b-instruct:free",
+                "messages": [{"role": "user", "content": user_message}],
+                "temperature": 0.7
+            }
+            
+            response = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=60
+            )
+            response.raise_for_status()
+            data = response.json()
+            bot_response = clean_response(data["choices"][0]["message"]["content"])
+            model_name = 'Mistral 7B Demo'
         
         return jsonify({
             'response': bot_response,
             'demo': True,
-            'model': 'Mistral 7B Demo',
-            'message': '✨ Sign up for full access: Vision, Images & 5 AI models!'
+            'model': model_name,
+            'message': '✨ Sign up for: Vision, Images & Chat History!'
         })
     except Exception as e:
-        return jsonify({'error': f'Demo unavailable: {str(e)}'}), 500
+        return jsonify({'error': f'Demo error: {str(e)}'}), 500
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
@@ -626,4 +657,6 @@ if __name__ == '__main__':
         print("   3. Claude 3.5 Haiku 🎭 (Fast)")
         print("   4. DeepSeek V3 🔍 (Reasoning)")
         print("   5. Mistral 7B ⚡ (Instant)")
+        print("\n📝 OpenRouter Key:", "✅ Configured" if OPENROUTER_API_KEY else "❌ Missing")
+        print("📝 Google Key:", "✅ Configured" if GOOGLE_API_KEY else "❌ Missing")
     app.run(debug=True, port=5000)
