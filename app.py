@@ -101,18 +101,18 @@ FREE_MODELS = {
         'note': 'OpenRouter credits'
     },
     'gemini-flash': {
-        'name': 'Gemini 2.0 Flash ⚡',
+        'name': 'Gemini 2.5 Flash ⚡',
         'provider': 'google',
-        'model_id': 'gemini-2.0-flash-thinking-exp-1219',
+        'model_id': 'gemini-2.5-flash-lite',
         'vision': True,
         'image_gen': True,
         'free': True,
         'note': '100% Free'
     },
     'gemini-pro': {
-        'name': 'Gemini 1.5 Pro 💎',
+        'name': 'Gemini 2.5 Pro 💎',
         'provider': 'google',
-        'model_id': 'gemini-1.5-pro-latest',
+        'model_id': 'gemini-2.5-pro',
         'vision': True,
         'image_gen': True,
         'free': True,
@@ -590,3 +590,4 @@ if __name__ == '__main__':
         print("   5. DeepSeek V3 (100% FREE)")
         print("   6. Mistral 7B (100% FREE)")
     app.run(debug=True, port=5000)
+
