@@ -46,7 +46,7 @@
                     <path fill="currentColor" d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
                 </svg>
                 <button class="model-selector-btn" id="model-selector-btn">
-                    <span id="selected-model-name">GPT-5</span>
+                    <span id="selected-model-name">Gemini 2.0 Flash ⚡</span>
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                         <path d="M7 10l5 5 5-5z"/>
                     </svg>
@@ -63,7 +63,7 @@
     <!-- Model Selector -->
     <div id="model-selector" class="model-selector-dropdown" style="display:none;">
         <div class="model-selector-header">
-            <h3>Select AI Model (All FREE)</h3>
+            <h3>Select AI Model</h3>
             <button class="close-selector" id="close-selector-btn">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                     <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
@@ -73,21 +73,24 @@
         <div class="model-selector-content">
             <div class="model-group">
                 <div class="model-group-header">
-                    <span class="group-badge free">✨ 100% Free Forever</span>
+                    <span class="group-badge free">✨ 5 Models 100% Free</span>
                     <span class="group-title">Choose Your AI</span>
                 </div>
                 {% for model_key, model_data in models.items() %}
-                <div class="model-card {% if loop.first %}active{% endif %}" 
+                <div class="model-card {% if loop.index == 2 %}active{% endif %}" 
                      data-model="{{ model_key }}" 
                      data-name="{{ model_data.name }}" 
                      data-vision="{{ model_data.vision|lower }}"
-                     data-imagegen="{{ model_data.image_gen|lower }}">
+                     data-imagegen="{{ model_data.image_gen|lower }}"
+                     data-free="{{ model_data.free|lower }}">
                     <div class="model-card-header">
                         <div class="model-icon">
                             {% if 'gpt' in model_key %}<span class="icon-text">🤖</span>
-                            {% elif 'claude' in model_key %}<span class="icon-text">🎭</span>
-                            {% elif 'gemini-pro' in model_key %}<span class="icon-text">💎</span>
                             {% elif 'gemini-flash' in model_key %}<span class="icon-text">⚡</span>
+                            {% elif 'gemini-pro' in model_key %}<span class="icon-text">💎</span>
+                            {% elif 'qwen' in model_key %}<span class="icon-text">🚀</span>
+                            {% elif 'deepseek' in model_key %}<span class="icon-text">🔍</span>
+                            {% elif 'mistral' in model_key %}<span class="icon-text">⚡</span>
                             {% else %}<span class="icon-text">💬</span>{% endif %}
                         </div>
                         <div class="model-info">
@@ -95,15 +98,21 @@
                             <div class="model-features">
                                 {% if model_data.vision %}<span class="feature-badge vision">📷 Vision</span>{% endif %}
                                 {% if model_data.image_gen %}<span class="feature-badge vision">🎨 Images</span>{% endif %}
+                                {% if model_data.free %}
                                 <span class="feature-badge free">✅ {{ model_data.note }}</span>
+                                {% else %}
+                                <span class="feature-badge premium">💳 {{ model_data.note }}</span>
+                                {% endif %}
                             </div>
                         </div>
                     </div>
                     <div class="model-description">
-                        {% if 'gpt-5' in model_key %}Latest GPT with vision & image generation
-                        {% elif 'claude' in model_key %}Best for coding, writing & deep analysis
-                        {% elif 'gemini-pro' in model_key %}Google's most capable AI
-                        {% elif 'gemini-flash' in model_key %}Fastest Gemini model
+                        {% if 'gpt-3.5' in model_key %}Fast GPT model (uses OpenRouter credits)
+                        {% elif 'gemini-flash' in model_key %}Best free model - Fast with vision & images
+                        {% elif 'gemini-pro' in model_key %}Most capable free model with vision
+                        {% elif 'qwen' in model_key %}Powerful 72B model - completely free
+                        {% elif 'deepseek' in model_key %}Advanced reasoning model - free forever
+                        {% elif 'mistral' in model_key %}Lightning fast responses - free
                         {% else %}Powerful AI assistant{% endif %}
                     </div>
                 </div>
@@ -119,7 +128,7 @@
             <div class="user-info">
                 <div class="user-name">{{ user.name }}</div>
                 <div class="user-email">{{ user.email }}</div>
-                <div class="free-badge-small">✨ All Models Free</div>
+                <div class="free-badge-small">✨ 5 Models Free</div>
             </div>
         </div>
         <div class="menu-divider"></div>
@@ -168,7 +177,7 @@
                         <div class="suggestion-icon">🎨</div>
                         <div class="suggestion-text">Generate image</div>
                     </div>
-                    <div class="suggestion-card" data-suggestion="Write Python code to create a REST API">
+                    <div class="suggestion-card" data-suggestion="Write Python code to create a REST API with Flask">
                         <div class="suggestion-icon">💻</div>
                         <div class="suggestion-text">Write code</div>
                     </div>
@@ -176,9 +185,9 @@
                         <div class="suggestion-icon">🧠</div>
                         <div class="suggestion-text">Explain concepts</div>
                     </div>
-                    <div class="suggestion-card" data-suggestion="Help me write a creative short story">
-                        <div class="suggestion-icon">✍️</div>
-                        <div class="suggestion-text">Write a story</div>
+                    <div class="suggestion-card" data-suggestion="Help me plan a trip to Japan">
+                        <div class="suggestion-icon">✈️</div>
+                        <div class="suggestion-text">Plan a trip</div>
                     </div>
                 </div>
             </div>
@@ -195,7 +204,7 @@
                 </div>
                 <div class="input-inner">
                     <input type="file" id="file-input" accept="image/*" style="display:none;">
-                    <button class="attach-button" id="attach-btn" title="Attach image">
+                    <button class="attach-button" id="attach-btn" title="Attach image (Gemini only)">
                         <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                             <path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/>
                         </svg>
@@ -208,14 +217,14 @@
                     </button>
                 </div>
                 <div class="input-footer">
-                    <span class="footer-text"><span id="model-info">GPT-5</span> · All models are 100% free</span>
+                    <span class="footer-text"><span id="model-info">Gemini 2.0 Flash ⚡</span> · 5 models are 100% free</span>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-let currentModel='gpt-5';
+let currentModel='gemini-flash';
 let currentModelSupportsVision=true;
 let currentModelSupportsImageGen=true;
 let currentChatId=null;
@@ -298,7 +307,7 @@ function addChatToSidebar(id,title,prepend=false){
     if(prepend)h.insertBefore(item,h.firstChild);else h.appendChild(item);
 }
 document.getElementById('attach-btn')?.addEventListener('click',()=>{
-    if(!currentModelSupportsVision){alert('⚠️ This model doesn\'t support images.\n\nSwitch to: GPT-5, Claude, Gemini Pro, or Gemini Flash');return;}
+    if(!currentModelSupportsVision){alert('⚠️ This model doesn\'t support images.\n\nSwitch to Gemini models for vision!');return;}
     document.getElementById('file-input').click();
 });
 document.getElementById('file-input')?.addEventListener('change',async function(e){
@@ -327,7 +336,7 @@ async function handleImageGeneration(message){
     const keywords=['generate image','create image','draw','make an image','make image','picture of','draw me'];
     if(!keywords.some(k=>message.toLowerCase().includes(k)))return false;
     if(!currentModelSupportsImageGen){
-        addMessage(`❌ ${document.getElementById('selected-model-name').textContent} can't generate images.\n\nSwitch to: GPT-5, Gemini Pro, or Gemini Flash`,'error','',false);
+        addMessage(`❌ ${document.getElementById('selected-model-name').textContent} can't generate images.\n\nSwitch to Gemini models for image generation!`,'error','',false);
         return true;
     }
     addMessage('🎨 Generating image...','assistant','Image Generator',false);
