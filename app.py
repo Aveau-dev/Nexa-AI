@@ -20,7 +20,6 @@ from PIL import Image
 import requests
 import stripe
 import google.generativeai as genai
-from groq import Groq
 
 load_dotenv()
 
@@ -39,23 +38,12 @@ db = SQLAlchemy(app)
 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 
 # API Keys
-# API Keys
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
-GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
 
-# Configure APIs
-genai.configure(api_key=GOOGLE_API_KEY)
-
-# Initialize Groq client safely
-groq_client = None
-if GROQ_API_KEY:
-    try:
-        groq_client = Groq(api_key=GROQ_API_KEY)
-        print("✅ Groq client initialized")
-    except Exception as e:
-        print(f"⚠️ Groq initialization failed: {e}")
-        print("   Llama 3.1 70B will be unavailable")
+# Configure Google Gemini
+if GOOGLE_API_KEY:
+    genai.configure(api_key=GOOGLE_API_KEY)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -103,50 +91,59 @@ def load_user(user_id):
 # ================== MODEL CONFIG ==================
 
 FREE_MODELS = {
-    'gpt-5': {
-        'name': 'GPT-5',
-        'provider': 'puter',
-        'model_id': 'gpt-5.1',
-        'vision': True,
-        'image_gen': True,
-        'free': True,
-        'note': 'Unlimited & Free'
-    },
-    'claude-sonnet': {
-        'name': 'Claude 3.5 Sonnet',
-        'provider': 'puter',
-        'model_id': 'claude-sonnet-4-5',
-        'vision': True,
+    'gpt-3.5-turbo': {
+        'name': 'GPT-3.5 Turbo 🤖',
+        'provider': 'openrouter',
+        'path': 'openai/gpt-3.5-turbo',
+        'vision': False,
         'image_gen': False,
-        'free': True,
-        'note': 'Unlimited & Free'
-    },
-    'gemini-pro': {
-        'name': 'Gemini 1.5 Pro',
-        'provider': 'google',
-        'model_id': 'gemini-1.5-pro',
-        'vision': True,
-        'image_gen': True,
-        'free': True,
-        'note': '1,500/day'
+        'free': False,
+        'note': 'OpenRouter credits'
     },
     'gemini-flash': {
-        'name': 'Gemini 2.0 Flash',
+        'name': 'Gemini 2.0 Flash ⚡',
         'provider': 'google',
-        'model_id': 'gemini-2.0-flash-exp',
+        'model_id': 'gemini-2.0-flash-thinking-exp-1219',
         'vision': True,
         'image_gen': True,
         'free': True,
-        'note': '1,500/day'
+        'note': '100% Free'
     },
-    'llama-70b': {
-        'name': 'Llama 3.1 70B',
-        'provider': 'groq',
-        'model_id': 'llama-3.1-70b-versatile',
+    'gemini-pro': {
+        'name': 'Gemini 1.5 Pro 💎',
+        'provider': 'google',
+        'model_id': 'gemini-1.5-pro-latest',
+        'vision': True,
+        'image_gen': True,
+        'free': True,
+        'note': '100% Free'
+    },
+    'qwen-72b': {
+        'name': 'Qwen 2.5 72B 🚀',
+        'provider': 'openrouter',
+        'path': 'qwen/qwen-2.5-72b-instruct:free',
         'vision': False,
         'image_gen': False,
         'free': True,
-        'note': '30/min'
+        'note': '100% Free'
+    },
+    'deepseek-v3': {
+        'name': 'DeepSeek V3 🔍',
+        'provider': 'openrouter',
+        'path': 'deepseek/deepseek-chat',
+        'vision': False,
+        'image_gen': False,
+        'free': True,
+        'note': '100% Free'
+    },
+    'mistral-7b': {
+        'name': 'Mistral 7B ⚡',
+        'provider': 'openrouter',
+        'path': 'mistralai/mistral-7b-instruct:free',
+        'vision': False,
+        'image_gen': False,
+        'free': True,
+        'note': '100% Free'
     }
 }
 
@@ -154,37 +151,8 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
 # ================== AI API FUNCTIONS ==================
 
-def call_puter_api(model_id, messages):
-    """Call Puter.js for GPT-5 and Claude 3.5 Sonnet (FREE)"""
-    try:
-        # Convert messages format
-        formatted_messages = []
-        for msg in messages:
-            if isinstance(msg.get('content'), list):
-                # Handle vision (extract text only for now)
-                text = next((p['text'] for p in msg['content'] if p['type'] == 'text'), '')
-                formatted_messages.append({"role": msg['role'], "content": text})
-            else:
-                formatted_messages.append(msg)
-        
-        response = requests.post('https://api.puter.com/drivers/call', json={
-            "interface": "puter-chat-completion",
-            "driver": "openai-completion",
-            "method": "complete",
-            "args": {
-                "messages": formatted_messages,
-                "model": model_id
-            }
-        }, timeout=90)
-        
-        response.raise_for_status()
-        data = response.json()
-        return data['result']['message']['content']
-    except Exception as e:
-        raise Exception(f"Puter API error: {str(e)}")
-
 def call_google_api(model_id, messages, uploaded_file=None):
-    """Call Google Gemini (FREE forever)"""
+    """Call Google Gemini API"""
     try:
         model = genai.GenerativeModel(model_id)
         
@@ -211,10 +179,17 @@ def call_google_api(model_id, messages, uploaded_file=None):
     except Exception as e:
         raise Exception(f"Google API error: {str(e)}")
 
-def call_groq_api(model_id, messages):
-    """Call Groq for Llama (FREE 30/min)"""
+def call_openrouter_api(model_path, messages):
+    """Call OpenRouter for GPT and free models"""
     try:
-        # Convert messages (text only)
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://nexaai.app",
+            "X-Title": "NexaAI"
+        }
+        
+        # Convert messages (text only for free models)
         formatted_messages = []
         for msg in messages:
             if isinstance(msg.get('content'), list):
@@ -223,48 +198,42 @@ def call_groq_api(model_id, messages):
             else:
                 formatted_messages.append(msg)
         
-        response = groq_client.chat.completions.create(
-            model=model_id,
-            messages=formatted_messages,
-            temperature=0.7,
-            max_tokens=1024
+        payload = {
+            "model": model_path,
+            "messages": formatted_messages,
+            "max_tokens": 1024,
+            "temperature": 0.7
+        }
+        
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=120
         )
-        return response.choices[0].message.content
+        response.raise_for_status()
+        data = response.json()
+        
+        # Check if credits exhausted
+        if 'error' in data:
+            if 'credits' in data['error'].lower() or 'quota' in data['error'].lower():
+                raise Exception("OpenRouter credits exhausted for paid models. Switch to free models (Gemini, Qwen, DeepSeek, Mistral)")
+        
+        return data["choices"][0]["message"]["content"]
     except Exception as e:
-        raise Exception(f"Groq API error: {str(e)}")
+        raise Exception(f"OpenRouter error: {str(e)}")
 
 def generate_image_with_ai(prompt, model_provider):
-    """Generate images using Pollinations or DALL-E via Puter"""
+    """Generate images using Pollinations (Free)"""
     clean_prompt = prompt.lower()
     for phrase in ['generate image', 'create image', 'make image', 'draw', 'picture of']:
         clean_prompt = clean_prompt.replace(phrase, '').strip()
     
-    if model_provider == 'puter':
-        # Use Puter's DALL-E access
-        try:
-            response = requests.post('https://api.puter.com/drivers/call', json={
-                "interface": "puter-image-generation",
-                "driver": "openai-image-generation",
-                "method": "generate",
-                "args": {
-                    "prompt": clean_prompt,
-                    "model": "dall-e-3",
-                    "size": "1024x1024",
-                    "quality": "hd"
-                }
-            }, timeout=120)
-            response.raise_for_status()
-            data = response.json()
-            image_url = data['result']['url']
-            img_response = requests.get(image_url, timeout=30)
-            return img_response.content, clean_prompt, 'DALL-E 3 (HD)'
-        except:
-            pass
-    
-    # Fallback: Pollinations (4K, free)
-    enhanced = f"{clean_prompt}, highly detailed, 4k, professional"
+    # Use Pollinations (4K, completely free)
+    enhanced = f"{clean_prompt}, highly detailed, 4k uhd, professional, sharp focus, vivid colors"
     encoded = urllib.parse.quote(enhanced)
     image_url = f"https://image.pollinations.ai/prompt/{encoded}?width=2048&height=2048&nologo=true&enhance=true&model=flux"
+    
     response = requests.get(image_url, timeout=120)
     response.raise_for_status()
     return response.content, clean_prompt, 'Flux Pro (4K)'
@@ -419,7 +388,7 @@ def generate_image_route():
         return jsonify({'error': 'Invalid model'}), 400
     
     if not model_info.get('image_gen'):
-        return jsonify({'error': f'{model_info["name"]} cannot generate images'}), 400
+        return jsonify({'error': f'{model_info["name"]} cannot generate images. Switch to Gemini models!'}), 400
     
     try:
         image_data, clean_prompt, gen_model = generate_image_with_ai(prompt, model_info['provider'])
@@ -496,7 +465,7 @@ def get_chat_messages(chat_id):
 @login_required
 def chat_route():
     user_message = request.json.get('message', '')
-    selected_model = request.json.get('model', 'gpt-5')
+    selected_model = request.json.get('model', 'gemini-flash')
     chat_id = request.json.get('chat_id')
     uploaded_file = request.json.get('uploaded_file')
 
@@ -549,14 +518,13 @@ def chat_route():
 
     try:
         provider = model_info['provider']
-        model_id = model_info['model_id']
         
-        if provider == 'puter':
-            bot_response = call_puter_api(model_id, history)
-        elif provider == 'google':
+        if provider == 'google':
+            model_id = model_info['model_id']
             bot_response = call_google_api(model_id, history, uploaded_file)
-        elif provider == 'groq':
-            bot_response = call_groq_api(model_id, history)
+        elif provider == 'openrouter':
+            model_path = model_info['path']
+            bot_response = call_openrouter_api(model_path, history)
         else:
             return jsonify({'error': 'Unknown provider'}), 500
 
@@ -614,11 +582,11 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all()
         print("✅ Database ready!")
-        print("🚀 NexaAI with 5 FREE models:")
-        print("   1. GPT-5 (Puter - Unlimited)")
-        print("   2. Claude 3.5 Sonnet (Puter - Unlimited)")
-        print("   3. Gemini 1.5 Pro (Google - 1,500/day)")
-        print("   4. Gemini 2.0 Flash (Google - 1,500/day)")
-        print("   5. Llama 3.1 70B (Groq - 30/min)")
+        print("🚀 NexaAI - 6 AI Models:")
+        print("   1. GPT-3.5 Turbo (OpenRouter credits)")
+        print("   2. Gemini 2.0 Flash (100% FREE)")
+        print("   3. Gemini 1.5 Pro (100% FREE)")
+        print("   4. Qwen 2.5 72B (100% FREE)")
+        print("   5. DeepSeek V3 (100% FREE)")
+        print("   6. Mistral 7B (100% FREE)")
     app.run(debug=True, port=5000)
-
