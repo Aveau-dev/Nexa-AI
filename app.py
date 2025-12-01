@@ -322,7 +322,7 @@ def demo_chat():
     try:
         # Use Gemini 2.0 Flash for demo (handles long prompts better)
         if GOOGLE_API_KEY:
-            model = genai.GenerativeModel('gemini-2.0-flash-exp')
+            model = genai.GenerativeModel('gemini-1.5-pro-002')
             response = model.generate_content(user_message)
             bot_response = clean_response(response.text)
             model_name = 'Gemini 2.0 Flash Demo'
@@ -660,3 +660,4 @@ if __name__ == '__main__':
         print("\n📝 OpenRouter Key:", "✅ Configured" if OPENROUTER_API_KEY else "❌ Missing")
         print("📝 Google Key:", "✅ Configured" if GOOGLE_API_KEY else "❌ Missing")
     app.run(debug=True, port=5000)
+
