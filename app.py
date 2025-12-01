@@ -335,6 +335,50 @@ def logout():
     logout_user()
     return redirect(url_for('index'))
 
+
+@app.route('/demo-chat', methods=['POST'])
+def demo_chat():
+    """Demo chat without login using Gemini Flash"""
+    user_message = request.json.get('message', '')
+    
+    if not user_message:
+        return jsonify({'error': 'Empty message'}), 400
+    
+    try:
+        # Use Gemini Flash for demo (100% free)
+        if GOOGLE_API_KEY:
+            model = genai.GenerativeModel('gemini-2.0-flash-exp')
+            response = model.generate_content(user_message)
+            bot_response = response.text
+        else:
+            # Fallback to OpenRouter free model
+            headers = {
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "model": "mistralai/mistral-7b-instruct:free",
+                "messages": [{"role": "user", "content": user_message}]
+            }
+            response = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=60
+            )
+            response.raise_for_status()
+            bot_response = response.json()["choices"][0]["message"]["content"]
+        
+        return jsonify({
+            'response': bot_response,
+            'demo': True,
+            'model': 'Gemini Flash Demo',
+            'message': '✨ Sign up for full access to all 5 models + vision + images!'
+        })
+    except Exception as e:
+        return jsonify({'error': f'Demo error: {str(e)}'}), 500
+
+
 # ================== ROUTES: DASHBOARD ==================
 
 @app.route('/dashboard')
@@ -584,5 +628,6 @@ if __name__ == '__main__':
         print("   5. DeepSeek V3 (100% FREE)")
         print("   6. Mistral 7B (100% FREE)")
     app.run(debug=True, port=5000)
+
 
 
