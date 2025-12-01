@@ -39,13 +39,23 @@ db = SQLAlchemy(app)
 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 
 # API Keys
+# API Keys
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
 
 # Configure APIs
 genai.configure(api_key=GOOGLE_API_KEY)
-groq_client = Groq(api_key=GROQ_API_KEY)
+
+# Initialize Groq client safely
+groq_client = None
+if GROQ_API_KEY:
+    try:
+        groq_client = Groq(api_key=GROQ_API_KEY)
+        print("✅ Groq client initialized")
+    except Exception as e:
+        print(f"⚠️ Groq initialization failed: {e}")
+        print("   Llama 3.1 70B will be unavailable")
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -611,3 +621,4 @@ if __name__ == '__main__':
         print("   4. Gemini 2.0 Flash (Google - 1,500/day)")
         print("   5. Llama 3.1 70B (Groq - 30/min)")
     app.run(debug=True, port=5000)
+
