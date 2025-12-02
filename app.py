@@ -104,7 +104,7 @@ FREE_MODELS = {
     'gemini-pro': {
         'name': 'Gemini 1.5 Pro 💎',
         'provider': 'google',
-        'model_id': 'gemini-1.5-pro-002',
+        'model_id': 'gemini-1.5-pro-latest',
         'vision': True,
         'image_gen': True,
         'free': True,
@@ -660,4 +660,5 @@ if __name__ == '__main__':
         print("\n📝 OpenRouter Key:", "✅ Configured" if OPENROUTER_API_KEY else "❌ Missing")
         print("📝 Google Key:", "✅ Configured" if GOOGLE_API_KEY else "❌ Missing")
     app.run(debug=True, port=5000)
+
 
