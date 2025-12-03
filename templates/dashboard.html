@@ -1,595 +1,698 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-color-scheme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NexaAI - Dashboard</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2319c37d' d='M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z'/></svg>">
-    <link rel="stylesheet" href="{{ url_for('static', filename='Css/style.css') }}">
+    <title>NexaAI - Your AI Assistant</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2320C997' d='M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z'/></svg>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script>
-    // Promise polyfill for old Android
-    if(!window.Promise){
-        document.write('<script src="https://cdn.jsdelivr.net/npm/promise-polyfill@8/dist/polyfill.min.js"><\/script>');
-    }
-    // Fetch polyfill for old Android
-    if(!window.fetch){
-        document.write('<script src="https://cdn.jsdelivr.net/npm/whatwg-fetch@3.6.2/dist/fetch.umd.js"><\/script>');
-    }
-    </script>
     <style>
-        .image-preview-container{display:none;padding:8px 12px;background:rgba(25,195,125,0.1);border:1px solid #19c37d;border-radius:8px;margin:8px 0;align-items:center;gap:10px;}
-        .image-preview-container.active{display:flex;}
-        .image-preview-thumbnail{width:48px;height:48px;border-radius:6px;object-fit:cover;border:2px solid #19c37d;}
-        .image-preview-info{flex:1;font-size:0.9rem;color:#19c37d;font-weight:500;}
-        .image-preview-remove{background:rgba(239,68,68,0.1);border:1px solid #ef4444;color:#ef4444;cursor:pointer;padding:4px 8px;border-radius:6px;font-size:0.85rem;font-weight:500;transition:.2s;}
-        .image-preview-remove:hover{background:#ef4444;color:white;}
-        .attach-button{background:transparent;border:none;color:#9ca3af;cursor:pointer;padding:8px;display:flex;align-items:center;justify-content:center;border-radius:8px;transition:.2s;}
-        .attach-button:hover{background:rgba(255,255,255,0.06);color:#e5e7eb;}
-        .attach-button.active{color:#19c37d!important;background:rgba(25,195,125,0.1);}
-        .attach-button svg{width:20px;height:20px;}
-        .generated-media-container{margin:16px 0;border-radius:12px;overflow:hidden;border:1px solid #333;}
-        .generated-media-container img,.generated-media-container video{width:100%;max-width:512px;display:block;}
-        .download-media-btn{display:inline-block;margin-top:8px;padding:8px 16px;background:#19c37d;color:#000;text-decoration:none;border-radius:6px;font-weight:500;transition:.2s;}
-        .download-media-btn:hover{background:#16a869;}
-        .footer-warning{display:flex;align-items:center;gap:8px;font-size:0.8rem;color:#9ca3af;margin-top:4px;}
-        .footer-warning svg{width:14px;height:14px;flex-shrink:0;}
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root[data-color-scheme="dark"] {
+            --bg-primary: #100E12;
+            --bg-secondary: #1C1A20;
+            --bg-tertiary: #2A2730;
+            --bg-hover: #35323A;
+            --text-primary: #FCFCF9;
+            --text-secondary: #A8A29E;
+            --text-tertiary: #78746D;
+            --accent: #20C997;
+            --accent-hover: #1AAB7E;
+            --border: #3A3840;
+            --gradient-1: linear-gradient(135deg, #20C997 0%, #60EFFF 100%);
+            --gradient-2: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --error: #EF4444;
+            --warning: #F59E0B;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Navigation */
+        .top-nav {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 10px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .nav-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logo {
+            font-size: 22px;
+            font-weight: 700;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.8px;
+            margin: 0 12px;
+        }
+
+        .model-selector {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 8px 16px;
+            color: var(--text-primary);
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .model-selector:hover {
+            background: var(--bg-hover);
+            border-color: var(--accent);
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--gradient-1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 14px;
+            color: #000;
+        }
+
+        .nav-button {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 8px 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .nav-button:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border-color: var(--accent);
+        }
+
+        /* Main Container */
+        .main-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            max-width: 800px;
+            margin: 0 auto;
+            width: 100%;
+            padding: 20px;
+            overflow-y: auto;
+            padding-bottom: 200px;
+        }
+
+        .welcome {
+            text-align: center;
+            margin: 80px 0 40px;
+        }
+
+        .welcome h1 {
+            font-size: 52px;
+            font-weight: 700;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 16px;
+            letter-spacing: -1.5px;
+        }
+
+        .welcome p {
+            color: var(--text-secondary);
+            font-size: 17px;
+        }
+
+        /* Suggestions */
+        .suggestions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+            margin-bottom: 40px;
+        }
+
+        .suggestion-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 18px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .suggestion-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--gradient-1);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .suggestion-card:hover {
+            background: var(--bg-tertiary);
+            transform: translateY(-4px);
+            border-color: var(--accent);
+            box-shadow: 0 8px 24px rgba(32, 201, 151, 0.15);
+        }
+
+        .suggestion-card:hover::before {
+            opacity: 1;
+        }
+
+        .suggestion-icon {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .suggestion-text {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        /* Messages */
+        #messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 0;
+        }
+
+        .message {
+            margin-bottom: 28px;
+            display: flex;
+            gap: 12px;
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message-content {
+            max-width: 75%;
+            padding: 16px 20px;
+            border-radius: 20px;
+            line-height: 1.7;
+            font-size: 15px;
+        }
+
+        .message.user .message-content {
+            background: var(--accent);
+            color: #000;
+            font-weight: 500;
+            border-bottom-right-radius: 6px;
+        }
+
+        .message.assistant .message-content {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-bottom-left-radius: 6px;
+        }
+
+        .generated-image {
+            border-radius: 12px;
+            max-width: 100%;
+            margin-top: 12px;
+            border: 1px solid var(--border);
+        }
+
+        /* Typing Indicator */
+        .typing {
+            display: flex;
+            gap: 6px;
+            padding: 16px;
+        }
+
+        .typing span {
+            width: 10px;
+            height: 10px;
+            background: var(--accent);
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out;
+        }
+
+        .typing span:nth-child(2) { animation-delay: 0.2s; }
+        .typing span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Input Area */
+        .input-wrapper {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            max-width: 800px;
+            background: linear-gradient(to top, var(--bg-primary) 90%, transparent);
+            padding: 20px;
+            z-index: 50;
+        }
+
+        .input-box {
+            background: var(--bg-secondary);
+            border: 2px solid var(--border);
+            border-radius: 24px;
+            padding: 12px 20px;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .input-box:focus-within {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(32, 201, 151, 0.1);
+        }
+
+        #chat-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-size: 16px;
+            outline: none;
+            resize: none;
+            max-height: 200px;
+            font-family: inherit;
+        }
+
+        #chat-input::placeholder {
+            color: var(--text-tertiary);
+        }
+
+        #send-btn {
+            background: var(--accent);
+            border: none;
+            border-radius: 50%;
+            width: 42px;
+            height: 42px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+
+        #send-btn:hover {
+            background: var(--accent-hover);
+            transform: scale(1.05);
+        }
+
+        #send-btn:active {
+            transform: scale(0.95);
+        }
+
+        .footer-note {
+            text-align: center;
+            color: var(--text-tertiary);
+            font-size: 13px;
+            margin-top: 12px;
+        }
+
+        .footer-note strong {
+            color: var(--text-secondary);
+        }
+
+        /* Code Blocks */
+        pre {
+            background: #0d0d0d !important;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            overflow-x: auto;
+            margin: 12px 0;
+        }
+
+        code {
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 14px;
+        }
+
+        .copy-code-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: 0.2s;
+        }
+
+        .copy-code-btn:hover {
+            background: var(--accent);
+            color: #000;
+        }
+
+        /* Model Selector Dropdown */
+        .model-selector-dropdown {
+            position: fixed;
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 20px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            z-index: 200;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .model-card {
+            background: var(--bg-tertiary);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .model-card:hover {
+            border-color: var(--accent);
+            background: var(--bg-hover);
+        }
+
+        .model-card.active {
+            border-color: var(--accent);
+            background: rgba(32, 201, 151, 0.1);
+        }
+
+        .model-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .model-description {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-top: 8px;
+        }
+
+        .feature-badge {
+            display: inline-block;
+            background: rgba(32, 201, 151, 0.15);
+            color: var(--accent);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-right: 6px;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--border);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .welcome h1 {
+                font-size: 36px;
+            }
+            
+            .suggestions {
+                grid-template-columns: 1fr;
+            }
+            
+            .input-wrapper {
+                max-width: 100%;
+            }
+        }
     </style>
 </head>
 <body>
-    <!-- Top Navigation -->
     <nav class="top-nav">
         <div class="nav-left">
-            <button class="nav-button icon-only" id="sidebar-toggle">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                    <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
-                </svg>
-            </button>
-            <button class="nav-button" id="new-chat-btn">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-                </svg>
-                <span>New chat</span>
-            </button>
-            <div class="logo-container">
-                <svg class="logo-icon" viewBox="0 0 24 24" width="20" height="20">
-                    <path fill="currentColor" d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
-                </svg>
-                <button class="model-selector-btn" id="model-selector-btn">
-                    <span id="selected-model-name">Gemini 2.5 Flash-Lite ⚡</span>
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                        <path d="M7 10l5 5 5-5z"/>
-                    </svg>
-                </button>
-            </div>
+            <div class="logo">⚡ NexaAI</div>
+            <select class="model-selector" id="model-select">
+                <option value="gemini-flash">Gemini 2.5 Flash ⚡</option>
+                <option value="gemini-pro">Gemini 2.5 Pro 🧠</option>
+                <option value="claude-haiku">Claude 3.5 Haiku 🎭</option>
+                <option value="deepseek-v3">DeepSeek V3 🔍</option>
+                <option value="mistral-7b">Mistral 7B ⚡</option>
+            </select>
         </div>
         <div class="nav-right">
-            <button class="nav-button icon-only" id="user-menu-btn">
-                <div class="user-avatar">{{ user.name[0].upper() }}</div>
+            <button class="nav-button" onclick="location.href='/logout'">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                    <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/>
+                </svg>
+                Logout
             </button>
         </div>
     </nav>
 
-    <!-- Model Selector -->
-    <div id="model-selector" class="model-selector-dropdown" style="display:none;">
-        <div class="model-selector-header">
-            <h3>Select AI Model</h3>
-            <button class="close-selector" id="close-selector-btn">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+    <div class="main-container">
+        <div class="welcome" id="welcome">
+            <h1>What can I help with?</h1>
+            <p>Powered by Gemini 2.5 Pro • Free Forever</p>
+        </div>
+
+        <div class="suggestions" id="suggestions">
+            <div class="suggestion-card" onclick="useSuggestion('Generate an image of a sunset over mountains with vibrant colors')">
+                <div class="suggestion-icon">🎨</div>
+                <div class="suggestion-text">Generate beautiful images</div>
+            </div>
+            <div class="suggestion-card" onclick="useSuggestion('Explain quantum computing in simple terms')">
+                <div class="suggestion-icon">🔬</div>
+                <div class="suggestion-text">Learn complex topics</div>
+            </div>
+            <div class="suggestion-card" onclick="useSuggestion('Write a Python function to sort a list')">
+                <div class="suggestion-icon">💻</div>
+                <div class="suggestion-text">Get coding help</div>
+            </div>
+            <div class="suggestion-card" onclick="useSuggestion('Plan a 5-day trip to Paris')">
+                <div class="suggestion-icon">✈️</div>
+                <div class="suggestion-text">Plan adventures</div>
+            </div>
+        </div>
+
+        <div id="messages"></div>
+    </div>
+
+    <div class="input-wrapper">
+        <div class="input-box">
+            <textarea id="chat-input" placeholder="Ask anything or generate images..." rows="1"></textarea>
+            <button id="send-btn" onclick="sendMessage()">
+                <svg width="20" height="20" fill="#000" viewBox="0 0 24 24">
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
                 </svg>
             </button>
         </div>
-        <div class="model-selector-content">
-            <div class="model-group">
-                <div class="model-group-header">
-                    <span class="group-title">Available Models</span>
-                </div>
-                
-                <!-- Gemini 2.5 Flash-Lite -->
-                <div class="model-card active" 
-                     data-model="gemini-flash" 
-                     data-name="Gemini 2.5 Flash-Lite ⚡" 
-                     data-vision="true"
-                     data-imagegen="true"
-                     data-videogen="true">
-                    <div class="model-card-header">
-                        <div class="model-icon">
-                            <span class="icon-text">⚡</span>
-                        </div>
-                        <div class="model-info">
-                            <h4 class="model-name">Gemini 2.5 Flash-Lite ⚡</h4>
-                            <div class="model-features">
-                                <span class="feature-badge vision">📷 Vision</span>
-                                <span class="feature-badge vision">🎨 Nano Banana</span>
-                                <span class="feature-badge vision">🎬 Veo Video</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="model-description">
-                        All-in-one: Chat + Vision + Image Generation + Video Generation
-                    </div>
-                </div>
-
-                <!-- Veo 3.1 Video -->
-                <div class="model-card" 
-                     data-model="veo-video" 
-                     data-name="Veo 3.1 🎬" 
-                     data-vision="false"
-                     data-imagegen="false"
-                     data-videogen="true">
-                    <div class="model-card-header">
-                        <div class="model-icon">
-                            <span class="icon-text">🎬</span>
-                        </div>
-                        <div class="model-info">
-                            <h4 class="model-name">Veo 3.1 🎬</h4>
-                            <div class="model-features">
-                                <span class="feature-badge vision">🎬 8s Videos</span>
-                                <span class="feature-badge vision">🔊 Native Audio</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="model-description">
-                        Generate 8-second videos with realistic motion and native audio
-                    </div>
-                </div>
-
-                <!-- Claude 3.5 Haiku -->
-                <div class="model-card" 
-                     data-model="claude-haiku" 
-                     data-name="Claude 3.5 Haiku 🎭" 
-                     data-vision="false"
-                     data-imagegen="false"
-                     data-videogen="false">
-                    <div class="model-card-header">
-                        <div class="model-icon">
-                            <span class="icon-text">🎭</span>
-                        </div>
-                        <div class="model-info">
-                            <h4 class="model-name">Claude 3.5 Haiku 🎭</h4>
-                            <div class="model-features">
-                                <span class="feature-badge speed">⚡ Fast</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="model-description">
-                        Fast Claude model - Great for coding & writing
-                    </div>
-                </div>
-
-                <!-- DeepSeek V3 -->
-                <div class="model-card" 
-                     data-model="deepseek-v3" 
-                     data-name="DeepSeek V3 🔍" 
-                     data-vision="false"
-                     data-imagegen="false"
-                     data-videogen="false">
-                    <div class="model-card-header">
-                        <div class="model-icon">
-                            <span class="icon-text">🔍</span>
-                        </div>
-                        <div class="model-info">
-                            <h4 class="model-name">DeepSeek V3 🔍</h4>
-                            <div class="model-features">
-                                <span class="feature-badge speed">⚡ Fast</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="model-description">
-                        Advanced reasoning & problem solving
-                    </div>
-                </div>
-
-                <!-- Mistral 7B -->
-                <div class="model-card" 
-                     data-model="mistral-7b" 
-                     data-name="Mistral 7B ⚡" 
-                     data-vision="false"
-                     data-imagegen="false"
-                     data-videogen="false">
-                    <div class="model-card-header">
-                        <div class="model-icon">
-                            <span class="icon-text">⚡</span>
-                        </div>
-                        <div class="model-info">
-                            <h4 class="model-name">Mistral 7B ⚡</h4>
-                            <div class="model-features">
-                                <span class="feature-badge speed">⚡ Instant</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="model-description">
-                        Lightning fast responses - Perfect for quick tasks
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- User Menu -->
-    <div id="user-menu" class="dropdown-menu" style="display:none;">
-        <div class="menu-header">
-            <div class="user-avatar-large">{{ user.name[0].upper() }}</div>
-            <div class="user-info">
-                <div class="user-name">{{ user.name }}</div>
-                <div class="user-email">{{ user.email }}</div>
-            </div>
-        </div>
-        <div class="menu-divider"></div>
-        <a href="/logout" class="menu-item">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/>
-            </svg>
-            Log out
-        </a>
-    </div>
-
-    <!-- Sidebar -->
-    <aside class="sidebar" id="sidebar">
-        <div class="sidebar-content">
-            <div class="sidebar-section">
-                <div class="section-title">Chat History</div>
-                <div class="chat-history">
-                    {% if chats %}
-                    {% for chat in chats %}
-                    <div class="chat-item" data-chat-id="{{ chat.id }}">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                            <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
-                        </svg>
-                        <span class="chat-title">{{ chat.title }}</span>
-                        <div class="chat-actions">
-                            <button class="icon-btn rename-chat-btn" data-chat-id="{{ chat.id }}">✏️</button>
-                            <button class="icon-btn delete-chat-btn" data-chat-id="{{ chat.id }}">🗑️</button>
-                        </div>
-                    </div>
-                    {% endfor %}
-                    {% else %}
-                    <div class="empty-state">No chats yet. Start a conversation!</div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </aside>
-
-    <!-- Main Chat -->
-    <div class="main-container with-sidebar" id="main-content">
-        <div class="center-content">
-            <div class="welcome-section" id="welcome-section">
-                <h1 class="main-heading">What can I help with?</h1>
-                <div class="suggestion-cards">
-                    <div class="suggestion-card" data-suggestion="Generate an image of a futuristic city at sunset">
-                        <div class="suggestion-icon">🎨</div>
-                        <div class="suggestion-text">Generate image with Nano Banana</div>
-                    </div>
-                    <div class="suggestion-card" data-suggestion="Generate a video of a cat playing with yarn">
-                        <div class="suggestion-icon">🎬</div>
-                        <div class="suggestion-text">Create video with Veo 3.1</div>
-                    </div>
-                    <div class="suggestion-card" data-suggestion="Write Python code to analyze CSV data">
-                        <div class="suggestion-icon">💻</div>
-                        <div class="suggestion-text">Write code</div>
-                    </div>
-                    <div class="suggestion-card" data-suggestion="Help me plan a 7-day trip to Japan">
-                        <div class="suggestion-icon">✈️</div>
-                        <div class="suggestion-text">Plan trip</div>
-                    </div>
-                </div>
-            </div>
-            <div id="messages-container"></div>
-        </div>
-
-        <!-- Input Area -->
-        <div class="input-wrapper">
-            <div class="input-box">
-                <div class="image-preview-container" id="image-preview">
-                    <img src="" alt="Preview" class="image-preview-thumbnail" id="preview-thumb">
-                    <span class="image-preview-info" id="preview-name">Image attached</span>
-                    <button class="image-preview-remove" onclick="removeUploadedImage()">Remove</button>
-                </div>
-                <div class="input-inner">
-                    <input type="file" id="file-input" accept="image/*" style="display:none;">
-                    <button class="attach-button" id="attach-btn" title="Attach image (Gemini only)">
-                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                            <path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/>
-                        </svg>
-                    </button>
-                    <textarea id="chat-input" placeholder="Ask anything, generate images/videos..." rows="1"></textarea>
-                    <button class="send-button" id="send-btn">
-                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-                        </svg>
-                    </button>
-                </div>
-                <div class="input-footer">
-                    <div class="footer-text">
-                        <strong id="model-info">Gemini 2.5 Flash-Lite ⚡</strong>
-                    </div>
-                    <div class="footer-warning">
-                        <svg viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
-                        </svg>
-                        <span>NexaAI can make mistakes. Verify important information before use.</span>
-                    </div>
-                </div>
-            </div>
+        <div class="footer-note">
+            <strong id="model-name">Gemini 2.5 Flash</strong> · NexaAI may make mistakes
         </div>
     </div>
 
     <script>
-let currentModel='gemini-flash';
-let currentModelSupportsVision=true;
-let currentModelSupportsImageGen=true;
-let currentModelSupportsVideoGen=true;
-let currentChatId=null;
-let isLoading=false;
-let currentUploadedFile=null;
+        let currentModel = 'gemini-flash';
+        let currentChatId = null;
+        let isLoading = false;
 
-function escapeHtml(text){const d=document.createElement('div');d.textContent=text;return d.innerHTML;}
-function formatMessage(text){
-    if(typeof marked==='undefined')return escapeHtml(text).replace(/\n/g,'<br>');
-    marked.setOptions({gfm:true,breaks:true,highlight:function(code,lang){
-        if(typeof hljs!=='undefined'&&lang&&hljs.getLanguage(lang))return hljs.highlight(code,{language:lang}).value;
-        return typeof hljs!=='undefined'?hljs.highlightAuto(code).value:code;
-    }});
-    return marked.parse(text);
-}
-function addCopyButtons(container){
-    container.querySelectorAll('pre code').forEach((codeBlock)=>{
-        const pre=codeBlock.parentElement;
-        const btn=document.createElement('button');
-        btn.className='copy-code-btn';btn.textContent='Copy';
-        btn.addEventListener('click',()=>{
-            navigator.clipboard.writeText(codeBlock.textContent);
-            btn.textContent='Copied!';
-            setTimeout(()=>(btn.textContent='Copy'),1500);
+        document.getElementById('model-select').addEventListener('change', (e) => {
+            currentModel = e.target.value;
+            document.getElementById('model-name').textContent = e.target.options[e.target.selectedIndex].text;
         });
-        pre.style.position='relative';btn.style.position='absolute';
-        btn.style.top='8px';btn.style.right='8px';pre.appendChild(btn);
-    });
-}
-function toggleSidebar(){const s=document.getElementById('sidebar');const m=document.getElementById('main-content');if(window.innerWidth<=1024){s.classList.toggle('show');}else{s.classList.toggle('collapsed');m.classList.toggle('sidebar-collapsed');}}
-function toggleUserMenu(){const m=document.getElementById('user-menu');m.style.display=m.style.display==='block'?'none':'block';}
-function toggleModelSelector(){const s=document.getElementById('model-selector');s.style.display=s.style.display==='block'?'none':'block';}
-function selectModel(key,name,vision,imagegen,videogen){
-    currentModel=key;
-    currentModelSupportsVision=(vision==='true');
-    currentModelSupportsImageGen=(imagegen==='true');
-    currentModelSupportsVideoGen=(videogen==='true');
-    document.getElementById('selected-model-name').textContent=name;
-    document.getElementById('model-info').textContent=name;
-    document.querySelectorAll('.model-card').forEach(c=>c.classList.remove('active'));
-    document.querySelector(`[data-model="${key}"]`)?.classList.add('active');
-    toggleModelSelector();
-    if(!currentModelSupportsVision&&currentUploadedFile)removeUploadedImage();
-}
 
-async function newChat(){
-    try{const res=await fetch('/chat/new',{method:'POST',headers:{'Content-Type':'application/json'}});
-    const d=await res.json();if(d.success){
-        currentChatId=d.chat_id;document.getElementById('messages-container').innerHTML='';
-        document.getElementById('welcome-section').style.display='block';
-        document.getElementById('chat-input').value='';addChatToSidebar(d.chat_id,d.title,true);
-    }}catch{alert('Failed to create new chat');}
-}
-
-async function loadChat(id){
-    if(isLoading)return;isLoading=true;
-    try{
-        const res=await fetch(`/chat/${id}/messages`);
-        const d=await res.json();
-        currentChatId=id;
-        document.getElementById('messages-container').innerHTML='';
-        document.getElementById('welcome-section').style.display='none';
-        
-        d.messages.forEach(m=>{
-            if(m.image_url){
-                const imgHtml=`<div class="generated-media-container"><img src="${m.image_url}" alt="Generated"/></div><p>${escapeHtml(m.content)}</p>`;
-                addMessage(imgHtml,m.role,m.model,false);
-            }else{
-                addMessage(m.content,m.role,m.model,false,m.has_image?m.image_path:null);
+        document.getElementById('chat-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
             }
         });
-        
-        document.querySelectorAll('.chat-item').forEach(el=>el.classList.remove('active'));
-        document.querySelector(`[data-chat-id="${id}"]`)?.classList.add('active');
-        if(window.innerWidth<=1024)document.getElementById('sidebar').classList.remove('show');
-    }catch{alert('Failed to load chat');}finally{isLoading=false;}
-}
 
+        document.getElementById('chat-input').addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 200) + 'px';
+        });
 
-async function renameChat(id){
-    const title=prompt('Enter new chat title:');
-    if(!title||!title.trim())return;
-    try{const res=await fetch(`/chat/${id}/rename`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:title.trim()})});
-        const d=await res.json();if(d.success)document.querySelector(`[data-chat-id="${id}"] .chat-title`).textContent=title.trim();
-    }catch{alert('Failed to rename chat');}
-}
-
-async function deleteChat(id){
-    if(!confirm('Delete this chat?'))return;
-    try{const res=await fetch(`/chat/${id}/delete`,{method:'DELETE'});
-        const d=await res.json();if(d.success){
-            document.querySelector(`[data-chat-id="${id}"]`)?.remove();
-            if(currentChatId===id){currentChatId=null;document.getElementById('messages-container').innerHTML='';document.getElementById('welcome-section').style.display='block';}
+        function useSuggestion(text) {
+            document.getElementById('chat-input').value = text;
+            sendMessage();
         }
-    }catch{alert('Failed to delete chat');}
-}
 
-function addChatToSidebar(id,title,prepend=false){
-    const h=document.querySelector('.chat-history');const e=h.querySelector('.empty-state');
-    if(e)e.remove();const item=document.createElement('div');
-    item.className='chat-item active';item.dataset.chatId=id;
-    item.innerHTML=`<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg><span class="chat-title">${escapeHtml(title)}</span><div class="chat-actions"><button class="icon-btn rename-chat-btn" data-chat-id="${id}">✏️</button><button class="icon-btn delete-chat-btn" data-chat-id="${id}">🗑️</button></div>`;
-    item.onclick=()=>loadChat(id);
-    document.querySelectorAll('.chat-item').forEach(el=>el.classList.remove('active'));
-    if(prepend)h.insertBefore(item,h.firstChild);else h.appendChild(item);
-}
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
 
-function handleKeyDown(event){if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}}
+        function formatMessage(text) {
+            if (typeof marked === 'undefined') return escapeHtml(text).replace(/\n/g, '<br>');
+            marked.setOptions({
+                gfm: true,
+                breaks: true,
+                highlight: function(code, lang) {
+                    if (typeof hljs !== 'undefined' && lang && hljs.getLanguage(lang)) {
+                        return hljs.highlight(code, { language: lang }).value;
+                    }
+                    return typeof hljs !== 'undefined' ? hljs.highlightAuto(code).value : code;
+                }
+            });
+            return marked.parse(text);
+        }
 
-async function uploadImage(file){
-    const fd=new FormData();fd.append('file',file);
-    try{const res=await fetch('/upload',{method:'POST',body:fd});
-        const d=await res.json();if(d.success)return d.filename;
-        throw new Error(d.error||'Upload failed');
-    }catch(e){throw e;}
-}
+        function addMessage(content, role, imageUrl = null) {
+            document.getElementById('welcome').style.display = 'none';
+            document.getElementById('suggestions').style.display = 'none';
 
-function removeUploadedImage(){
-    currentUploadedFile=null;
-    document.getElementById('file-input').value='';
-    document.getElementById('image-preview').classList.remove('active');
-    document.getElementById('attach-btn').classList.remove('active');
-}
+            const msg = document.createElement('div');
+            msg.className = `message ${role}`;
 
-async function sendMessage(){
-    const input=document.getElementById('chat-input');
-    let message=input.value.trim();
-    if(!message||isLoading)return;
-    
-    isLoading=true;document.getElementById('welcome-section').style.display='none';
-    
-    let uploadedFilename=null;
-    const isImageGenRequest=message.toLowerCase().match(/^(generate|create|make|draw).*(image|picture|photo|art)/);
-    
-    if(currentUploadedFile&&!isImageGenRequest){
-        try{uploadedFilename=await uploadImage(currentUploadedFile);
-        }catch(e){alert('Failed to upload image: '+e.message);isLoading=false;return;}
-    }
-    
-    addMessage(message,'user','',false,uploadedFilename);
-    input.value='';input.style.height='auto';removeUploadedImage();
-    showTypingIndicator();
-    
-    try{
-        const res=await fetch('/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message,model:currentModel,chat_id:currentChatId,uploaded_file:uploadedFilename})});
-        const d=await res.json();removeTypingIndicator();
-        
-        if(d.error){addMessage(d.error,'error','',false);}
-        else{
-            if(d.is_image){
-                // Display generated image
-                const imgHtml=`<div class="generated-media-container"><img src="${d.image_url}" alt="Generated image"/></div><p>✨ ${escapeHtml(d.response)} using ${escapeHtml(d.generator)}</p>`;
-                addMessage(imgHtml,'assistant',d.model,false);
-            }else{
-                addMessage(d.response,'assistant',d.model,true);
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+
+            if (role === 'user') {
+                contentDiv.innerHTML = escapeHtml(content);
+            } else {
+                contentDiv.innerHTML = formatMessage(content);
+                contentDiv.querySelectorAll('pre code').forEach(block => {
+                    if (typeof hljs !== 'undefined') hljs.highlightElement(block);
+                });
+                addCopyButtons(contentDiv);
             }
-            currentChatId=d.chat_id;
-            if(d.chat_title){
-                const ex=document.querySelector(`[data-chat-id="${d.chat_id}"]`);
-                if(ex)ex.querySelector('.chat-title').textContent=d.chat_title;
-                else addChatToSidebar(d.chat_id,d.chat_title,true);
+
+            if (imageUrl) {
+                const img = document.createElement('img');
+                img.src = imageUrl;
+                img.className = 'generated-image';
+                contentDiv.appendChild(img);
+            }
+
+            msg.appendChild(contentDiv);
+            document.getElementById('messages').appendChild(msg);
+            msg.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+
+        function addCopyButtons(container) {
+            container.querySelectorAll('pre code').forEach((codeBlock) => {
+                const pre = codeBlock.parentElement;
+                if (pre.querySelector('.copy-code-btn')) return;
+                
+                const btn = document.createElement('button');
+                btn.className = 'copy-code-btn';
+                btn.textContent = 'Copy';
+                btn.addEventListener('click', () => {
+                    navigator.clipboard.writeText(codeBlock.textContent);
+                    btn.textContent = 'Copied!';
+                    setTimeout(() => (btn.textContent = 'Copy'), 1500);
+                });
+                pre.style.position = 'relative';
+                pre.appendChild(btn);
+            });
+        }
+
+        function showTyping() {
+            const typing = document.createElement('div');
+            typing.id = 'typing';
+            typing.className = 'message assistant';
+            typing.innerHTML = '<div class="message-content typing"><span></span><span></span><span></span></div>';
+            document.getElementById('messages').appendChild(typing);
+            typing.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function removeTyping() {
+            document.getElementById('typing')?.remove();
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            if (!message || isLoading) return;
+
+            isLoading = true;
+            addMessage(message, 'user');
+            input.value = '';
+            input.style.height = 'auto';
+            showTyping();
+
+            try {
+                const res = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message, model: currentModel, chat_id: currentChatId })
+                });
+
+                const data = await res.json();
+                removeTyping();
+
+                if (data.error) {
+                    addMessage('⚠️ ' + data.error, 'assistant');
+                } else {
+                    addMessage(data.response, 'assistant', data.image_url);
+                    currentChatId = data.chat_id;
+                }
+            } catch (e) {
+                removeTyping();
+                addMessage('⚠️ Connection error. Please try again.', 'assistant');
+            } finally {
+                isLoading = false;
             }
         }
-    }catch{removeTypingIndicator();addMessage('Error connecting. Try again.','error','',false);}
-    finally{isLoading=false;}
-}
-
-
-function useSuggestion(text){document.getElementById('chat-input').value=text;sendMessage();}
-
-function addMessage(text,role,model='',useTyping=false,imagePath=null){
-    const c=document.getElementById('messages-container');
-    const row=document.createElement('div');
-    row.className=`message-row ${role}-row`;
-    
-    if(role==='user'){
-        let content=`<div class="message-text">${escapeHtml(text)}</div>`;
-        if(imagePath){content+=`<br><img src="/uploads/${imagePath}" style="max-width:300px;border-radius:8px;margin-top:8px;"/>`;}
-        row.innerHTML=`<div class="message user-message"><div class="message-content">${content}</div></div>`;
-        c.appendChild(row);c.scrollTop=c.scrollHeight;return;
-    }
-    
-    if(role==='assistant'){
-        row.innerHTML=`<div class="message assistant-message"><div class="avatar"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/></svg></div><div class="message-content">${model?`<div class="model-badge">${escapeHtml(model)}</div>`:''}<div class="message-text markdown-content"></div></div></div>`;
-        c.appendChild(row);
-        const el=row.querySelector('.message-text');
-        el.innerHTML=formatMessage(text);
-        el.querySelectorAll('pre code').forEach(block=>hljs.highlightElement(block));
-        addCopyButtons(el);c.scrollTop=c.scrollHeight;return;
-    }
-    
-    row.innerHTML=`<div class="message error-message"><div class="message-content">${escapeHtml(text)}</div></div>`;
-    c.appendChild(row);c.scrollTop=c.scrollHeight;
-}
-
-
-function showTypingIndicator(){
-    const c=document.getElementById('messages-container');const d=document.createElement('div');
-    d.className='message-row assistant-row typing-indicator';d.id='typing-indicator';
-    d.innerHTML='<div class="message assistant-message"><div class="avatar"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/></svg></div><div class="typing-dots"><span></span><span></span><span></span></div></div>';
-    c.appendChild(d);c.scrollTop=c.scrollHeight;
-}
-
-function removeTypingIndicator(){document.getElementById('typing-indicator')?.remove();}
-
-document.getElementById('sidebar-toggle')?.addEventListener('click',toggleSidebar);
-document.getElementById('new-chat-btn')?.addEventListener('click',newChat);
-document.getElementById('model-selector-btn')?.addEventListener('click',toggleModelSelector);
-document.getElementById('close-selector-btn')?.addEventListener('click',toggleModelSelector);
-document.getElementById('user-menu-btn')?.addEventListener('click',toggleUserMenu);
-document.getElementById('send-btn')?.addEventListener('click',sendMessage);
-document.getElementById('chat-input')?.addEventListener('keydown',handleKeyDown);
-
-document.getElementById('attach-btn')?.addEventListener('click',()=>{
-    if(!currentModelSupportsVision){alert('Switch to Gemini models to use vision!');return;}
-    document.getElementById('file-input').click();
-});
-
-document.getElementById('file-input')?.addEventListener('change',function(){
-    const file=this.files[0];
-    if(!file)return;
-    if(!file.type.startsWith('image/')){alert('Please select an image file');return;}
-    currentUploadedFile=file;
-    const reader=new FileReader();
-    reader.onload=function(e){
-        document.getElementById('preview-thumb').src=e.target.result;
-        document.getElementById('preview-name').textContent=file.name;
-        document.getElementById('image-preview').classList.add('active');
-        document.getElementById('attach-btn').classList.add('active');
-    };
-    reader.readAsDataURL(file);
-});
-
-document.getElementById('chat-input').addEventListener('input',function(){
-    this.style.height='auto';this.style.height=Math.min(this.scrollHeight,200)+'px';
-});
-
-document.addEventListener('click',(e)=>{
-    const menu=document.getElementById('user-menu');
-    const btn=e.target.closest('#user-menu-btn');
-    if(!btn&&!menu.contains(e.target))menu.style.display='none';
-    
-    const selector=document.getElementById('model-selector');
-    const selectorBtn=e.target.closest('#model-selector-btn');
-    if(!selectorBtn&&!selector.contains(e.target))selector.style.display='none';
-});
-
-document.addEventListener('click',function(e){
-    if(e.target.classList.contains('rename-chat-btn')){
-        e.stopPropagation();renameChat(parseInt(e.target.dataset.chatId));
-    }
-    if(e.target.classList.contains('delete-chat-btn')){
-        e.stopPropagation();deleteChat(parseInt(e.target.dataset.chatId));
-    }
-    if(e.target.closest('.chat-item')){
-        const chatId=parseInt(e.target.closest('.chat-item').dataset.chatId);
-        if(!e.target.closest('.chat-actions'))loadChat(chatId);
-    }
-    if(e.target.closest('.suggestion-card')){
-        const suggestion=e.target.closest('.suggestion-card').dataset.suggestion;
-        useSuggestion(suggestion);
-    }
-    if(e.target.closest('.model-card')){
-        const card=e.target.closest('.model-card');
-        selectModel(card.dataset.model,card.dataset.name,card.dataset.vision,card.dataset.imagegen,card.dataset.videogen);
-    }
-});
     </script>
 </body>
 </html>
-
-
