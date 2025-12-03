@@ -377,15 +377,28 @@ async function newChat(){
 
 async function loadChat(id){
     if(isLoading)return;isLoading=true;
-    try{const res=await fetch(`/chat/${id}/messages`);const d=await res.json();
-        currentChatId=id;document.getElementById('messages-container').innerHTML='';
+    try{
+        const res=await fetch(`/chat/${id}/messages`);
+        const d=await res.json();
+        currentChatId=id;
+        document.getElementById('messages-container').innerHTML='';
         document.getElementById('welcome-section').style.display='none';
-        d.messages.forEach(m=>addMessage(m.content,m.role,m.model,false,m.has_image?m.image_path:null));
+        
+        d.messages.forEach(m=>{
+            if(m.image_url){
+                const imgHtml=`<div class="generated-media-container"><img src="${m.image_url}" alt="Generated"/></div><p>${escapeHtml(m.content)}</p>`;
+                addMessage(imgHtml,m.role,m.model,false);
+            }else{
+                addMessage(m.content,m.role,m.model,false,m.has_image?m.image_path:null);
+            }
+        });
+        
         document.querySelectorAll('.chat-item').forEach(el=>el.classList.remove('active'));
         document.querySelector(`[data-chat-id="${id}"]`)?.classList.add('active');
         if(window.innerWidth<=1024)document.getElementById('sidebar').classList.remove('show');
     }catch{alert('Failed to load chat');}finally{isLoading=false;}
 }
+
 
 async function renameChat(id){
     const title=prompt('Enter new chat title:');
@@ -437,21 +450,12 @@ async function sendMessage(){
     let message=input.value.trim();
     if(!message||isLoading)return;
     
-    const isImageGenRequest=message.toLowerCase().match(/^(generate|create|make|draw).*(image|picture|photo|art)/);
-    const isVideoGenRequest=message.toLowerCase().match(/^(generate|create|make).*(video|animation|motion|clip)/);
-    
-    if(isImageGenRequest&&!currentModelSupportsImageGen){
-        alert('Switch to Gemini models to generate images with Nano Banana!');return;
-    }
-    
-    if(isVideoGenRequest&&!currentModelSupportsVideoGen){
-        alert('Switch to Gemini or Veo models to generate videos!');return;
-    }
-    
     isLoading=true;document.getElementById('welcome-section').style.display='none';
     
     let uploadedFilename=null;
-    if(currentUploadedFile&&!isImageGenRequest&&!isVideoGenRequest){
+    const isImageGenRequest=message.toLowerCase().match(/^(generate|create|make|draw).*(image|picture|photo|art)/);
+    
+    if(currentUploadedFile&&!isImageGenRequest){
         try{uploadedFilename=await uploadImage(currentUploadedFile);
         }catch(e){alert('Failed to upload image: '+e.message);isLoading=false;return;}
     }
@@ -461,32 +465,29 @@ async function sendMessage(){
     showTypingIndicator();
     
     try{
-        if(isImageGenRequest&&currentModelSupportsImageGen){
-            const res=await fetch('/generate-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:message,model:currentModel})});
-            const d=await res.json();removeTypingIndicator();
-            if(d.error){addMessage(d.error,'error','',false);}
-            else{const imgHtml=`<div class="generated-media-container"><img src="${d.url}" alt="${escapeHtml(d.prompt)}"/><br><a href="${d.url}" download="nexaai_${d.filename}" class="download-media-btn">📥 Download Image</a></div><p>✨ Generated: <strong>${escapeHtml(d.prompt)}</strong> using ${escapeHtml(d.generator)}</p>`;
-                addMessage(imgHtml,'assistant','Nano Banana Generator',false);}
-        }else if(isVideoGenRequest&&currentModelSupportsVideoGen){
-            const res=await fetch('/generate-video',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:message,model:currentModel})});
-            const d=await res.json();removeTypingIndicator();
-            if(d.error){addMessage(d.error,'error','',false);}
-            else{const videoHtml=`<div class="generated-media-container"><video controls style="max-width:100%;border-radius:12px;"><source src="${d.url}" type="video/mp4">Your browser does not support video.</video><br><a href="${d.url}" download="nexaai_${d.filename}" class="download-media-btn">📥 Download Video</a></div><p>✨ Generated: <strong>${escapeHtml(d.prompt)}</strong> using ${escapeHtml(d.generator)}</p>`;
-                addMessage(videoHtml,'assistant','Veo 3.1 Video Generator',false);}
-        }else{
-            const res=await fetch('/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message,model:currentModel,chat_id:currentChatId,uploaded_file:uploadedFilename})});
-            const d=await res.json();removeTypingIndicator();
-            if(d.error){addMessage(d.error,'error','',false);}
-            else{addMessage(d.response,'assistant',d.model,true);currentChatId=d.chat_id;
-                if(d.chat_title){const ex=document.querySelector(`[data-chat-id="${d.chat_id}"]`);
-                    if(ex)ex.querySelector('.chat-title').textContent=d.chat_title;
-                    else addChatToSidebar(d.chat_id,d.chat_title,true);
-                }
+        const res=await fetch('/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message,model:currentModel,chat_id:currentChatId,uploaded_file:uploadedFilename})});
+        const d=await res.json();removeTypingIndicator();
+        
+        if(d.error){addMessage(d.error,'error','',false);}
+        else{
+            if(d.is_image){
+                // Display generated image
+                const imgHtml=`<div class="generated-media-container"><img src="${d.image_url}" alt="Generated image"/></div><p>✨ ${escapeHtml(d.response)} using ${escapeHtml(d.generator)}</p>`;
+                addMessage(imgHtml,'assistant',d.model,false);
+            }else{
+                addMessage(d.response,'assistant',d.model,true);
+            }
+            currentChatId=d.chat_id;
+            if(d.chat_title){
+                const ex=document.querySelector(`[data-chat-id="${d.chat_id}"]`);
+                if(ex)ex.querySelector('.chat-title').textContent=d.chat_title;
+                else addChatToSidebar(d.chat_id,d.chat_title,true);
             }
         }
-    }catch{removeTypingIndicator();addMessage('Error connecting to AI. Please try again.','error','',false);}
+    }catch{removeTypingIndicator();addMessage('Error connecting. Try again.','error','',false);}
     finally{isLoading=false;}
 }
+
 
 function useSuggestion(text){document.getElementById('chat-input').value=text;sendMessage();}
 
@@ -514,6 +515,7 @@ function addMessage(text,role,model='',useTyping=false,imagePath=null){
     row.innerHTML=`<div class="message error-message"><div class="message-content">${escapeHtml(text)}</div></div>`;
     c.appendChild(row);c.scrollTop=c.scrollHeight;
 }
+
 
 function showTypingIndicator(){
     const c=document.getElementById('messages-container');const d=document.createElement('div');
@@ -589,4 +591,5 @@ document.addEventListener('click',function(e){
     </script>
 </body>
 </html>
+
 
