@@ -1,5 +1,4 @@
 import os
-import sqlite3
 import base64
 from datetime import datetime
 import urllib.parse
@@ -9,7 +8,7 @@ import time
 from dotenv import load_dotenv
 from flask import (
     Flask, render_template, request, redirect,
-    url_for, jsonify, send_from_directory
+    url_for, jsonify, send_from_directory, session
 )
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
@@ -20,7 +19,6 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from PIL import Image
 import requests
-import stripe
 import google.generativeai as genai
 from flask_cors import CORS
 from sqlalchemy import text
@@ -28,7 +26,7 @@ from sqlalchemy import text
 load_dotenv()
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key')
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
 uri = os.getenv("DATABASE_URL")
 if uri and uri.startswith("postgres://"):
     uri = uri.replace("postgres://", "postgresql://", 1)
@@ -41,7 +39,6 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 db = SQLAlchemy(app)
-stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
@@ -99,9 +96,7 @@ def auto_migrate_database():
     try:
         with app.app_context():
             with db.engine.connect() as conn:
-                # Check if column exists
                 if 'postgres' in app.config['SQLALCHEMY_DATABASE_URI']:
-                    # PostgreSQL
                     result = conn.execute(text(
                         "SELECT column_name FROM information_schema.columns "
                         "WHERE table_name='message' AND column_name='image_url'"
@@ -112,13 +107,12 @@ def auto_migrate_database():
                         conn.commit()
                         print("✅ PostgreSQL migration complete!")
                 else:
-                    # SQLite
                     try:
                         conn.execute(text("ALTER TABLE message ADD COLUMN image_url VARCHAR(500)"))
                         conn.commit()
                         print("✅ SQLite migration complete!")
                     except:
-                        pass  # Column already exists
+                        pass
     except Exception as e:
         print(f"⚠️ Migration check: {e}")
 
@@ -126,21 +120,19 @@ def auto_migrate_database():
 
 FREE_MODELS = {
     'gemini-flash': {
-        'name': 'Gemini 2.5 Flash-Lite ⚡',
+        'name': 'Gemini 2.5 Flash ⚡',
         'provider': 'google',
         'model_id': 'gemini-2.5-flash-lite',
         'vision': True,
         'image_gen': True,
-        'video_gen': True,
         'free': True
     },
-    'veo-video': {
-        'name': 'Veo 3.1 🎬',
+    'gemini-pro': {
+        'name': 'Gemini 2.5 Pro 🧠',
         'provider': 'google',
-        'model_id': 'veo-3.1-fast-generate-preview',
-        'vision': False,
-        'image_gen': False,
-        'video_gen': True,
+        'model_id': 'gemini-2.5-pro-preview',
+        'vision': True,
+        'image_gen': True,
         'free': True
     },
     'claude-haiku': {
@@ -149,7 +141,6 @@ FREE_MODELS = {
         'path': 'anthropic/claude-3.5-haiku:free',
         'vision': False,
         'image_gen': False,
-        'video_gen': False,
         'free': True
     },
     'deepseek-v3': {
@@ -158,7 +149,6 @@ FREE_MODELS = {
         'path': 'deepseek/deepseek-chat:free',
         'vision': False,
         'image_gen': False,
-        'video_gen': False,
         'free': True
     },
     'mistral-7b': {
@@ -167,7 +157,6 @@ FREE_MODELS = {
         'path': 'mistralai/mistral-7b-instruct:free',
         'vision': False,
         'image_gen': False,
-        'video_gen': False,
         'free': True
     }
 }
@@ -194,7 +183,7 @@ def retry_api_call(func, max_retries=3, delay=2):
             print(f"Retry {attempt + 1}/{max_retries}: {str(e)}")
     raise Exception("Max retries exceeded")
 
-def call_google_api(model_id, messages, uploaded_file=None):
+def call_google_api(model_id, messages):
     def _call():
         model = genai.GenerativeModel(model_id)
         
@@ -221,11 +210,14 @@ def call_google_api(model_id, messages, uploaded_file=None):
             else:
                 prompt_parts.append(msg['content'])
         
+        # Increased max_output_tokens for Gemini 2.5 Pro
+        max_tokens = 8192 if 'pro' in model_id else 2048
+        
         generation_config = genai.types.GenerationConfig(
             temperature=0.7,
             top_p=0.95,
             top_k=40,
-            max_output_tokens=2048,
+            max_output_tokens=max_tokens,
         )
         
         response = model.generate_content(prompt_parts, generation_config=generation_config)
@@ -241,7 +233,7 @@ def call_openrouter_api(model_path, messages):
         headers = {
             "Authorization": f"Bearer {OPENROUTER_API_KEY}",
             "Content-Type": "application/json",
-            "HTTP-Referer": "https://nexa-ai-2d8d.onrender.com/",
+            "HTTP-Referer": "https://nexaai.app",
             "X-Title": "NexaAI"
         }
         
@@ -283,7 +275,7 @@ def call_openrouter_api(model_path, messages):
 def generate_image_pollinations(prompt):
     def _call():
         clean_prompt = prompt.lower()
-        for phrase in ['generate image', 'create image', 'make image', 'draw', 'picture of', 'photo of', 'generate an image of']:
+        for phrase in ['generate image', 'create image', 'make image', 'draw', 'picture of', 'photo of', 'generate an image of', 'generate a image of']:
             clean_prompt = clean_prompt.replace(phrase, '').strip()
         
         enhanced = f"{clean_prompt}, highly detailed, 4k uhd, professional, sharp focus, vivid colors"
@@ -358,25 +350,76 @@ def index():
 
 @app.route('/demo-chat', methods=['POST'])
 def demo_chat():
+    """Demo chat with memory and image generation"""
     user_message = request.json.get('message', '')
+    
     if not user_message:
         return jsonify({'error': 'Empty message'}), 400
     
+    # Initialize demo session history
+    if 'demo_history' not in session:
+        session['demo_history'] = []
+    
     try:
+        # Check if image generation request
+        is_image_gen = re.match(r'^(generate|create|make|draw).*(image|picture|photo|art)', user_message.lower())
+        
+        if is_image_gen:
+            image_url, clean_prompt, generator = generate_image_pollinations(user_message)
+            
+            session['demo_history'].append({"role": "user", "content": user_message})
+            session['demo_history'].append({
+                "role": "assistant",
+                "content": f"Generated image: {clean_prompt}",
+                "image_url": image_url
+            })
+            session.modified = True
+            
+            return jsonify({
+                'response': f'Generated image: {clean_prompt}',
+                'demo': True,
+                'model': 'Nano Banana (Demo)',
+                'image_url': image_url,
+                'is_image': True,
+                'generator': generator
+            })
+        
+        # Regular chat with memory
         if GOOGLE_API_KEY:
-            model = genai.GenerativeModel('gemini-2.5-flash')
-            response = model.generate_content(user_message)
+            messages = session['demo_history'][-4:]
+            messages.append({"role": "user", "content": user_message})
+            
+            model = genai.GenerativeModel('gemini-2.5-flash-lite')
+            
+            prompt_parts = []
+            for msg in messages:
+                if msg.get('image_url'):
+                    try:
+                        response = requests.get(msg['image_url'], timeout=30)
+                        import io
+                        img = Image.open(io.BytesIO(response.content))
+                        prompt_parts.append(msg['content'])
+                        prompt_parts.append(img)
+                    except:
+                        prompt_parts.append(msg['content'])
+                else:
+                    prompt_parts.append(msg['content'])
+            
+            response = model.generate_content(prompt_parts)
             bot_response = clean_response(response.text)
-            model_name = 'Gemini 2.5 Flash-Lite Demo'
+            
+            session['demo_history'].append({"role": "user", "content": user_message})
+            session['demo_history'].append({"role": "assistant", "content": bot_response})
+            session.modified = True
+            
+            return jsonify({
+                'response': bot_response,
+                'demo': True,
+                'model': 'Gemini 2.5 Flash (Demo)',
+                'is_image': False
+            })
         else:
             raise Exception("Google API key not configured")
-        
-        return jsonify({
-            'response': bot_response,
-            'demo': True,
-            'model': model_name,
-            'message': '✨ Sign up for full access!'
-        })
     except Exception as e:
         return jsonify({'error': f'Demo error: {str(e)}'}), 500
 
@@ -615,7 +658,7 @@ def chat_route():
         
         if provider == 'google':
             model_id = model_info['model_id']
-            bot_response = call_google_api(model_id, history, uploaded_file)
+            bot_response = call_google_api(model_id, history)
         elif provider == 'openrouter':
             model_path = model_info['path']
             bot_response = call_openrouter_api(model_path, history)
@@ -651,6 +694,8 @@ def chat_route():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-        auto_migrate_database()  # Auto-add image_url column
-        print("✅ NexaAI Ready - Image Context Memory Enabled!")
+        auto_migrate_database()
+        print("✅ NexaAI Ready!")
+        print("🚀 Gemini 2.5 Pro + Flash | Nano Banana Images")
+        print("💡 Demo: Memory + Image Generation Enabled")
     app.run(debug=True, port=5000, host='0.0.0.0')
