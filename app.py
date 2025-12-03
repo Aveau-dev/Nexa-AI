@@ -626,8 +626,31 @@ def chat_route():
             error_msg = 'Rate limit reached. Please wait.'
         return jsonify({'error': f'AI Error: {error_msg}'}), 500
 
+
+def migrate_database():
+    """Auto-migrate database on startup"""
+    try:
+        # Check if we need to add image_url column
+        with app.app_context():
+            from sqlalchemy import inspect, text
+            inspector = inspect(db.engine)
+            
+            if 'message' in inspector.get_table_names():
+                columns = [col['name'] for col in inspector.get_columns('message')]
+                
+                if 'image_url' not in columns:
+                    print("🔄 Migrating database: Adding image_url column...")
+                    with db.engine.connect() as conn:
+                        conn.execute(text("ALTER TABLE message ADD COLUMN image_url VARCHAR(500)"))
+                        conn.commit()
+                    print("✅ Migration complete!")
+    except Exception as e:
+        print(f"⚠️ Migration note: {e}")
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-        print("✅ NexaAI Ready - Image Context Memory Enabled!")
+        migrate_database()  # Auto-migrate
+        print("✅ Database ready!")
+        print("🚀 NexaAI - Image Context Memory Enabled!")
     app.run(debug=True, port=5000, host='0.0.0.0')
