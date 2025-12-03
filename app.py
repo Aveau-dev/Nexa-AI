@@ -23,6 +23,7 @@ import requests
 import stripe
 import google.generativeai as genai
 from flask_cors import CORS
+from sqlalchemy import text
 
 load_dotenv()
 
@@ -84,12 +85,42 @@ class Message(db.Model):
     model = db.Column(db.String(50))
     has_image = db.Column(db.Boolean, default=False)
     image_path = db.Column(db.String(500))
-    image_url = db.Column(db.String(500))  # Store generated image URL
+    image_url = db.Column(db.String(500))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.get(User, int(user_id))
+
+# ================== AUTO MIGRATION ==================
+
+def auto_migrate_database():
+    """Add image_url column if it doesn't exist"""
+    try:
+        with app.app_context():
+            with db.engine.connect() as conn:
+                # Check if column exists
+                if 'postgres' in app.config['SQLALCHEMY_DATABASE_URI']:
+                    # PostgreSQL
+                    result = conn.execute(text(
+                        "SELECT column_name FROM information_schema.columns "
+                        "WHERE table_name='message' AND column_name='image_url'"
+                    ))
+                    if not result.fetchone():
+                        print("🔄 Adding image_url column to PostgreSQL...")
+                        conn.execute(text("ALTER TABLE message ADD COLUMN image_url VARCHAR(500)"))
+                        conn.commit()
+                        print("✅ PostgreSQL migration complete!")
+                else:
+                    # SQLite
+                    try:
+                        conn.execute(text("ALTER TABLE message ADD COLUMN image_url VARCHAR(500)"))
+                        conn.commit()
+                        print("✅ SQLite migration complete!")
+                    except:
+                        pass  # Column already exists
+    except Exception as e:
+        print(f"⚠️ Migration check: {e}")
 
 # ================== MODEL CONFIG ==================
 
@@ -106,7 +137,7 @@ FREE_MODELS = {
     'veo-video': {
         'name': 'Veo 3.1 🎬',
         'provider': 'google',
-        'model_id': 'veo-3.1-generate-preview',
+        'model_id': 'veo-3.1-fast-generate-preview',
         'vision': False,
         'image_gen': False,
         'video_gen': True,
@@ -183,7 +214,6 @@ def call_google_api(model_id, messages, uploaded_file=None):
                             img = Image.open(io.BytesIO(base64.b64decode(image_data)))
                             prompt_parts.append(img)
                         elif image_url.startswith('http'):
-                            # Download and process external image
                             response = requests.get(image_url, timeout=30)
                             import io
                             img = Image.open(io.BytesIO(response.content))
@@ -211,7 +241,7 @@ def call_openrouter_api(model_path, messages):
         headers = {
             "Authorization": f"Bearer {OPENROUTER_API_KEY}",
             "Content-Type": "application/json",
-            "HTTP-Referer": "https://nexaai.app",
+            "HTTP-Referer": "https://nexa-ai-2d8d.onrender.com/",
             "X-Title": "NexaAI"
         }
         
@@ -259,7 +289,6 @@ def generate_image_pollinations(prompt):
         enhanced = f"{clean_prompt}, highly detailed, 4k uhd, professional, sharp focus, vivid colors"
         encoded = urllib.parse.quote(enhanced)
         
-        # Generate unique URL each time (no caching)
         seed = int(time.time())
         image_url = f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=1024&nologo=true&enhance=true&model=flux&seed={seed}"
         
@@ -289,7 +318,6 @@ def generate_chat_title(first_message):
     return title
 
 def get_chat_history(chat_id, limit=6):
-    """Get chat history with images included"""
     messages = (
         Message.query.filter_by(chat_id=chat_id)
         .order_by(Message.created_at.desc())
@@ -311,7 +339,6 @@ def get_chat_history(chat_id, limit=6):
             except:
                 history.append({"role": msg.role, "content": msg.content})
         elif msg.image_url:
-            # Include generated image in context
             history.append({
                 "role": msg.role,
                 "content": [
@@ -337,7 +364,7 @@ def demo_chat():
     
     try:
         if GOOGLE_API_KEY:
-            model = genai.GenerativeModel('gemini-2.5-flash-lite')
+            model = genai.GenerativeModel('gemini-2.5-flash')
             response = model.generate_content(user_message)
             bot_response = clean_response(response.text)
             model_name = 'Gemini 2.5 Flash-Lite Demo'
@@ -509,15 +536,12 @@ def chat_route():
     if not model_info:
         return jsonify({'error': 'Invalid model'}), 400
 
-    # Check if it's an image generation request
     is_image_gen = re.match(r'^(generate|create|make|draw).*(image|picture|photo|art)', user_message.lower())
     
     if is_image_gen and model_info.get('image_gen'):
-        # Generate image directly
         try:
             image_url, clean_prompt, generator = generate_image_pollinations(user_message)
             
-            # Save user message
             user_msg = Message(
                 chat_id=chat_id,
                 role='user',
@@ -525,7 +549,6 @@ def chat_route():
             )
             db.session.add(user_msg)
             
-            # Save assistant response with image
             assistant_msg = Message(
                 chat_id=chat_id,
                 role='assistant',
@@ -554,7 +577,6 @@ def chat_route():
             db.session.rollback()
             return jsonify({'error': f'Image generation failed: {str(e)}'}), 500
     
-    # Regular chat with context memory
     if uploaded_file and not model_info.get('vision'):
         return jsonify({'error': 'Selected model does not support image input'}), 400
 
@@ -626,31 +648,9 @@ def chat_route():
             error_msg = 'Rate limit reached. Please wait.'
         return jsonify({'error': f'AI Error: {error_msg}'}), 500
 
-
-def migrate_database():
-    """Auto-migrate database on startup"""
-    try:
-        # Check if we need to add image_url column
-        with app.app_context():
-            from sqlalchemy import inspect, text
-            inspector = inspect(db.engine)
-            
-            if 'message' in inspector.get_table_names():
-                columns = [col['name'] for col in inspector.get_columns('message')]
-                
-                if 'image_url' not in columns:
-                    print("🔄 Migrating database: Adding image_url column...")
-                    with db.engine.connect() as conn:
-                        conn.execute(text("ALTER TABLE message ADD COLUMN image_url VARCHAR(500)"))
-                        conn.commit()
-                    print("✅ Migration complete!")
-    except Exception as e:
-        print(f"⚠️ Migration note: {e}")
-
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-        migrate_database()  # Auto-migrate
-        print("✅ Database ready!")
-        print("🚀 NexaAI - Image Context Memory Enabled!")
+        auto_migrate_database()  # Auto-add image_url column
+        print("✅ NexaAI Ready - Image Context Memory Enabled!")
     app.run(debug=True, port=5000, host='0.0.0.0')
