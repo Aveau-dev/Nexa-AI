@@ -22,6 +22,7 @@ from PIL import Image
 import requests
 import stripe
 import google.generativeai as genai
+from flask_cors import CORS
 
 load_dotenv()
 
@@ -35,15 +36,15 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
+CORS(app, resources={r"/*": {"origins": "*"}})
+
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 db = SQLAlchemy(app)
 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 
-# API Keys
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
 
-# Configure Google Gemini
 if GOOGLE_API_KEY:
     genai.configure(api_key=GOOGLE_API_KEY)
 
@@ -53,7 +54,6 @@ login_manager.login_view = 'login'
 
 @app.route('/uploads/<path:filename>')
 def uploaded_file(filename):
-    """Public access to uploaded files"""
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 # ================== DATABASE MODELS ==================
@@ -84,6 +84,7 @@ class Message(db.Model):
     model = db.Column(db.String(50))
     has_image = db.Column(db.Boolean, default=False)
     image_path = db.Column(db.String(500))
+    image_url = db.Column(db.String(500))  # Store generated image URL
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 @login_manager.user_loader
@@ -100,18 +101,16 @@ FREE_MODELS = {
         'vision': True,
         'image_gen': True,
         'video_gen': True,
-        'free': True,
-        'note': '100% Free'
+        'free': True
     },
     'veo-video': {
         'name': 'Veo 3.1 🎬',
         'provider': 'google',
-        'model_id': 'veo-3.1-fast-generate-preview',
+        'model_id': 'veo-3.1-generate-preview',
         'vision': False,
         'image_gen': False,
         'video_gen': True,
-        'free': True,
-        'note': '100% Free'
+        'free': True
     },
     'claude-haiku': {
         'name': 'Claude 3.5 Haiku 🎭',
@@ -120,8 +119,7 @@ FREE_MODELS = {
         'vision': False,
         'image_gen': False,
         'video_gen': False,
-        'free': True,
-        'note': '100% Free'
+        'free': True
     },
     'deepseek-v3': {
         'name': 'DeepSeek V3 🔍',
@@ -130,8 +128,7 @@ FREE_MODELS = {
         'vision': False,
         'image_gen': False,
         'video_gen': False,
-        'free': True,
-        'note': '100% Free'
+        'free': True
     },
     'mistral-7b': {
         'name': 'Mistral 7B ⚡',
@@ -140,29 +137,36 @@ FREE_MODELS = {
         'vision': False,
         'image_gen': False,
         'video_gen': False,
-        'free': True,
-        'note': '100% Free'
+        'free': True
     }
 }
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
-# ================== AI API FUNCTIONS ==================
+# ================== AI FUNCTIONS ==================
 
 def clean_response(text):
-    """Clean AI response from special tokens"""
     text = re.sub(r'\[/?s\]', '', text)
     text = re.sub(r'</s>', '', text)
     text = re.sub(r'\[/?INST\]', '', text)
     text = re.sub(r'<<SYS>>.*?<</SYS>>', '', text, flags=re.DOTALL)
     return text.strip()
 
+def retry_api_call(func, max_retries=3, delay=2):
+    for attempt in range(max_retries):
+        try:
+            return func()
+        except Exception as e:
+            if attempt == max_retries - 1:
+                raise e
+            time.sleep(delay * (attempt + 1))
+            print(f"Retry {attempt + 1}/{max_retries}: {str(e)}")
+    raise Exception("Max retries exceeded")
+
 def call_google_api(model_id, messages, uploaded_file=None):
-    """Call Google Gemini API"""
-    try:
+    def _call():
         model = genai.GenerativeModel(model_id)
         
-        # Convert messages
         prompt_parts = []
         for msg in messages:
             if msg['role'] == 'system':
@@ -172,24 +176,38 @@ def call_google_api(model_id, messages, uploaded_file=None):
                     if part['type'] == 'text':
                         prompt_parts.append(part['text'])
                     elif part['type'] == 'image_url':
-                        image_data = part['image_url']['url'].split(',')[1]
-                        import io
-                        img = Image.open(io.BytesIO(base64.b64decode(image_data)))
-                        prompt_parts.append(img)
+                        image_url = part['image_url']['url']
+                        if image_url.startswith('data:'):
+                            image_data = image_url.split(',')[1]
+                            import io
+                            img = Image.open(io.BytesIO(base64.b64decode(image_data)))
+                            prompt_parts.append(img)
+                        elif image_url.startswith('http'):
+                            # Download and process external image
+                            response = requests.get(image_url, timeout=30)
+                            import io
+                            img = Image.open(io.BytesIO(response.content))
+                            prompt_parts.append(img)
             else:
                 prompt_parts.append(msg['content'])
         
-        response = model.generate_content(prompt_parts)
+        generation_config = genai.types.GenerationConfig(
+            temperature=0.7,
+            top_p=0.95,
+            top_k=40,
+            max_output_tokens=2048,
+        )
+        
+        response = model.generate_content(prompt_parts, generation_config=generation_config)
         return clean_response(response.text)
-    except Exception as e:
-        raise Exception(f"Google API error: {str(e)}")
+    
+    return retry_api_call(_call)
 
 def call_openrouter_api(model_path, messages):
-    """Call OpenRouter for free models"""
     if not OPENROUTER_API_KEY:
         raise Exception("OpenRouter API key not configured")
     
-    try:
+    def _call():
         headers = {
             "Authorization": f"Bearer {OPENROUTER_API_KEY}",
             "Content-Type": "application/json",
@@ -207,84 +225,47 @@ def call_openrouter_api(model_path, messages):
         
         payload = {
             "model": model_path,
-            "messages": formatted_messages
+            "messages": formatted_messages,
+            "temperature": 0.7,
+            "max_tokens": 2048
         }
         
         response = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
             headers=headers,
             json=payload,
-            timeout=120
+            timeout=180
         )
         
         response.raise_for_status()
         data = response.json()
         
         if 'error' in data:
-            error_msg = data['error'].get('message', 'Unknown error')
-            raise Exception(f"{error_msg}")
+            raise Exception(data['error'].get('message', 'Unknown error'))
         
         if 'choices' not in data or len(data['choices']) == 0:
             raise Exception("No response from model")
         
-        bot_response = data["choices"][0]["message"]["content"]
-        return clean_response(bot_response)
-        
-    except Exception as e:
-        raise Exception(f"{str(e)}")
+        return clean_response(data["choices"][0]["message"]["content"])
+    
+    return retry_api_call(_call)
 
-def generate_image_nano_banana(prompt):
-    """Generate images using Gemini Nano Banana"""
-    try:
-        # Clean prompt
+def generate_image_pollinations(prompt):
+    def _call():
         clean_prompt = prompt.lower()
-        for phrase in ['generate image', 'create image', 'make image', 'draw', 'picture of', 'photo of']:
+        for phrase in ['generate image', 'create image', 'make image', 'draw', 'picture of', 'photo of', 'generate an image of']:
             clean_prompt = clean_prompt.replace(phrase, '').strip()
         
-        # Use Gemini 2.5 Flash Image (Nano Banana)
-        model = genai.GenerativeModel('gemini-2.5-flash-image')
+        enhanced = f"{clean_prompt}, highly detailed, 4k uhd, professional, sharp focus, vivid colors"
+        encoded = urllib.parse.quote(enhanced)
         
-        response = model.generate_content(
-            clean_prompt,
-            generation_config={'response_modalities': ['IMAGE']}
-        )
+        # Generate unique URL each time (no caching)
+        seed = int(time.time())
+        image_url = f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=1024&nologo=true&enhance=true&model=flux&seed={seed}"
         
-        # Extract image from response
-        for part in response.parts:
-            if part.inline_data:
-                image_data = part.inline_data.data
-                return image_data, clean_prompt, 'Nano Banana (Gemini 2.5 Flash Image)'
-        
-        raise Exception("No image generated")
-        
-    except Exception as e:
-        # Fallback to Pollinations
-        try:
-            enhanced = f"{clean_prompt}, highly detailed, 4k uhd, professional, sharp focus, vivid colors"
-            encoded = urllib.parse.quote(enhanced)
-            image_url = f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=1024&nologo=true&enhance=true&model=flux"
-            
-            response = requests.get(image_url, timeout=120)
-            response.raise_for_status()
-            return response.content, clean_prompt, 'Pollinations AI (Fallback)'
-        except:
-            raise Exception(f"Image generation failed: {str(e)}")
-
-def generate_video_veo(prompt):
-    """Generate videos using Google Veo 3.1"""
-    try:
-        # Clean prompt
-        clean_prompt = prompt.lower()
-        for phrase in ['generate video', 'create video', 'make video']:
-            clean_prompt = clean_prompt.replace(phrase, '').strip()
-        
-        # Note: Veo API requires specific setup and may have rate limits
-        # Using placeholder for now - implement when you have Veo API access
-        
-        raise Exception("Veo video generation requires Google Cloud setup. Coming soon!")
-        
-    except Exception as e:
-        raise Exception(f"Video generation failed: {str(e)}")
+        return image_url, clean_prompt, 'Pollinations AI (Flux)'
+    
+    return retry_api_call(_call)
 
 # ================== HELPER FUNCTIONS ==================
 
@@ -307,7 +288,8 @@ def generate_chat_title(first_message):
         title += '...'
     return title
 
-def get_chat_history(chat_id, limit=4):
+def get_chat_history(chat_id, limit=6):
+    """Get chat history with images included"""
     messages = (
         Message.query.filter_by(chat_id=chat_id)
         .order_by(Message.created_at.desc())
@@ -328,11 +310,20 @@ def get_chat_history(chat_id, limit=4):
                 })
             except:
                 history.append({"role": msg.role, "content": msg.content})
+        elif msg.image_url:
+            # Include generated image in context
+            history.append({
+                "role": msg.role,
+                "content": [
+                    {"type": "text", "text": msg.content},
+                    {"type": "image_url", "image_url": {"url": msg.image_url}}
+                ]
+            })
         else:
             history.append({"role": msg.role, "content": msg.content})
     return history
 
-# ================== ROUTES: PUBLIC ==================
+# ================== ROUTES ==================
 
 @app.route('/')
 def index():
@@ -340,9 +331,7 @@ def index():
 
 @app.route('/demo-chat', methods=['POST'])
 def demo_chat():
-    """Demo chat using Gemini 2.5 Flash-Lite"""
     user_message = request.json.get('message', '')
-    
     if not user_message:
         return jsonify({'error': 'Empty message'}), 400
     
@@ -359,7 +348,7 @@ def demo_chat():
             'response': bot_response,
             'demo': True,
             'model': model_name,
-            'message': '✨ Sign up for: Vision, Image & Video Generation!'
+            'message': '✨ Sign up for full access!'
         })
     except Exception as e:
         return jsonify({'error': f'Demo error: {str(e)}'}), 500
@@ -415,8 +404,6 @@ def logout():
     logout_user()
     return redirect(url_for('index'))
 
-# ================== ROUTES: DASHBOARD ==================
-
 @app.route('/dashboard')
 @login_required
 def dashboard():
@@ -447,64 +434,6 @@ def upload_file():
             pass
         return jsonify({'success': True, 'filename': filename})
     return jsonify({'error': 'File type not allowed'}), 400
-
-@app.route('/generate-image', methods=['POST'])
-@login_required
-def generate_image_route():
-    """Generate images using Nano Banana"""
-    prompt = request.json.get('prompt', '').strip()
-    
-    if not prompt:
-        return jsonify({'error': 'Empty prompt'}), 400
-    
-    try:
-        image_data, clean_prompt, gen_model = generate_image_nano_banana(prompt)
-        
-        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"generated_{current_user.id}_{ts}.png"
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        
-        with open(filepath, 'wb') as f:
-            f.write(image_data)
-        
-        return jsonify({
-            'success': True,
-            'filename': filename,
-            'url': f'/uploads/{filename}',
-            'prompt': clean_prompt,
-            'generator': gen_model
-        })
-    except Exception as e:
-        return jsonify({'error': f'Generation failed: {str(e)}'}), 500
-
-@app.route('/generate-video', methods=['POST'])
-@login_required
-def generate_video_route():
-    """Generate videos using Veo 3.1"""
-    prompt = request.json.get('prompt', '').strip()
-    
-    if not prompt:
-        return jsonify({'error': 'Empty prompt'}), 400
-    
-    try:
-        video_data, clean_prompt, gen_model = generate_video_veo(prompt)
-        
-        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"generated_{current_user.id}_{ts}.mp4"
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        
-        with open(filepath, 'wb') as f:
-            f.write(video_data)
-        
-        return jsonify({
-            'success': True,
-            'filename': filename,
-            'url': f'/uploads/{filename}',
-            'prompt': clean_prompt,
-            'generator': gen_model
-        })
-    except Exception as e:
-        return jsonify({'error': f'Video generation: {str(e)}'}), 500
 
 @app.route('/chat/new', methods=['POST'])
 @login_required
@@ -552,7 +481,8 @@ def get_chat_messages(chat_id):
             'content': msg.content,
             'model': msg.model,
             'has_image': msg.has_image,
-            'image_path': msg.image_path
+            'image_path': msg.image_path,
+            'image_url': msg.image_url
         } for msg in messages],
         'title': chat.title
     })
@@ -579,6 +509,52 @@ def chat_route():
     if not model_info:
         return jsonify({'error': 'Invalid model'}), 400
 
+    # Check if it's an image generation request
+    is_image_gen = re.match(r'^(generate|create|make|draw).*(image|picture|photo|art)', user_message.lower())
+    
+    if is_image_gen and model_info.get('image_gen'):
+        # Generate image directly
+        try:
+            image_url, clean_prompt, generator = generate_image_pollinations(user_message)
+            
+            # Save user message
+            user_msg = Message(
+                chat_id=chat_id,
+                role='user',
+                content=user_message
+            )
+            db.session.add(user_msg)
+            
+            # Save assistant response with image
+            assistant_msg = Message(
+                chat_id=chat_id,
+                role='assistant',
+                content=f'Generated image: {clean_prompt}',
+                model=model_info['name'],
+                image_url=image_url
+            )
+            db.session.add(assistant_msg)
+            
+            if chat_obj.title == 'New Chat':
+                chat_obj.title = generate_chat_title(user_message)
+            
+            chat_obj.updated_at = datetime.utcnow()
+            db.session.commit()
+            
+            return jsonify({
+                'response': f'Generated image: {clean_prompt}',
+                'model': model_info['name'],
+                'chat_id': chat_id,
+                'chat_title': chat_obj.title,
+                'image_url': image_url,
+                'is_image': True,
+                'generator': generator
+            })
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': f'Image generation failed: {str(e)}'}), 500
+    
+    # Regular chat with context memory
     if uploaded_file and not model_info.get('vision'):
         return jsonify({'error': 'Selected model does not support image input'}), 400
 
@@ -638,25 +614,20 @@ def chat_route():
             'response': bot_response,
             'model': model_info['name'],
             'chat_id': chat_id,
-            'chat_title': chat_obj.title
+            'chat_title': chat_obj.title,
+            'is_image': False
         })
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'AI Error: {str(e)}'}), 500
-
-# ================== MAIN ==================
+        error_msg = str(e)
+        if 'timeout' in error_msg.lower():
+            error_msg = 'Request timeout. Please try again.'
+        elif 'rate limit' in error_msg.lower():
+            error_msg = 'Rate limit reached. Please wait.'
+        return jsonify({'error': f'AI Error: {error_msg}'}), 500
 
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-        print("✅ Database ready!")
-        print("🚀 NexaAI - 5 AI Models + Veo Video:")
-        print("   1. Gemini 2.5 Flash-Lite ⚡ (Vision + Nano Banana Images + Veo Video)")
-        print("   2. Veo 3.1 🎬 (Video Generation)")
-        print("   3. Claude 3.5 Haiku 🎭 (Text)")
-        print("   4. DeepSeek V3 🔍 (Text)")
-        print("   5. Mistral 7B ⚡ (Text)")
-        print("\n📝 Google API Key:", "✅ Configured" if GOOGLE_API_KEY else "❌ Missing")
-        print("📝 OpenRouter Key:", "✅ Configured" if OPENROUTER_API_KEY else "❌ Missing")
-    app.run(debug=True, port=5000)
-
+        print("✅ NexaAI Ready - Image Context Memory Enabled!")
+    app.run(debug=True, port=5000, host='0.0.0.0')
