@@ -106,7 +106,7 @@ FREE_MODELS = {
     'veo-video': {
         'name': 'Veo 3.1 🎬',
         'provider': 'google',
-        'model_id': 'veo-3.1-generate-preview',
+        'model_id': 'veo-3.1-fast-generate-preview',
         'vision': False,
         'image_gen': False,
         'video_gen': True,
@@ -659,3 +659,4 @@ if __name__ == '__main__':
         print("\n📝 Google API Key:", "✅ Configured" if GOOGLE_API_KEY else "❌ Missing")
         print("📝 OpenRouter Key:", "✅ Configured" if OPENROUTER_API_KEY else "❌ Missing")
     app.run(debug=True, port=5000)
+
