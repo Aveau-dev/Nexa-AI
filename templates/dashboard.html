@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NexaAI - Dashboard</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2319c37d' d='M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z'/></svg>">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='Css/style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -24,6 +24,8 @@
         .generated-media-container img,.generated-media-container video{width:100%;max-width:512px;display:block;}
         .download-media-btn{display:inline-block;margin-top:8px;padding:8px 16px;background:#19c37d;color:#000;text-decoration:none;border-radius:6px;font-weight:500;transition:.2s;}
         .download-media-btn:hover{background:#16a869;}
+        .footer-warning{display:flex;align-items:center;gap:8px;font-size:0.8rem;color:#9ca3af;margin-top:4px;}
+        .footer-warning svg{width:14px;height:14px;flex-shrink:0;}
     </style>
 </head>
 <body>
@@ -73,8 +75,7 @@
         <div class="model-selector-content">
             <div class="model-group">
                 <div class="model-group-header">
-                    <span class="group-badge free">✨ All Models 100% Free</span>
-                    <span class="group-title">Choose Your AI</span>
+                    <span class="group-title">Available Models</span>
                 </div>
                 
                 <!-- Gemini 2.5 Flash-Lite -->
@@ -94,12 +95,11 @@
                                 <span class="feature-badge vision">📷 Vision</span>
                                 <span class="feature-badge vision">🎨 Nano Banana</span>
                                 <span class="feature-badge vision">🎬 Veo Video</span>
-                                <span class="feature-badge free">✅ 100% Free</span>
                             </div>
                         </div>
                     </div>
                     <div class="model-description">
-                        All-in-one: Chat + Vision + Image Gen (Nano Banana) + Video (Veo 3.1)
+                        All-in-one: Chat + Vision + Image Generation + Video Generation
                     </div>
                 </div>
 
@@ -119,7 +119,6 @@
                             <div class="model-features">
                                 <span class="feature-badge vision">🎬 8s Videos</span>
                                 <span class="feature-badge vision">🔊 Native Audio</span>
-                                <span class="feature-badge free">✅ 100% Free</span>
                             </div>
                         </div>
                     </div>
@@ -143,7 +142,6 @@
                             <h4 class="model-name">Claude 3.5 Haiku 🎭</h4>
                             <div class="model-features">
                                 <span class="feature-badge speed">⚡ Fast</span>
-                                <span class="feature-badge free">✅ 100% Free</span>
                             </div>
                         </div>
                     </div>
@@ -167,12 +165,11 @@
                             <h4 class="model-name">DeepSeek V3 🔍</h4>
                             <div class="model-features">
                                 <span class="feature-badge speed">⚡ Fast</span>
-                                <span class="feature-badge free">✅ 100% Free</span>
                             </div>
                         </div>
                     </div>
                     <div class="model-description">
-                        Advanced reasoning & problem solving - Free forever
+                        Advanced reasoning & problem solving
                     </div>
                 </div>
 
@@ -191,7 +188,6 @@
                             <h4 class="model-name">Mistral 7B ⚡</h4>
                             <div class="model-features">
                                 <span class="feature-badge speed">⚡ Instant</span>
-                                <span class="feature-badge free">✅ 100% Free</span>
                             </div>
                         </div>
                     </div>
@@ -210,7 +206,6 @@
             <div class="user-info">
                 <div class="user-name">{{ user.name }}</div>
                 <div class="user-email">{{ user.email }}</div>
-                <div class="free-badge-small">✨ All Models Free Forever</div>
             </div>
         </div>
         <div class="menu-divider"></div>
@@ -299,7 +294,15 @@
                     </button>
                 </div>
                 <div class="input-footer">
-                    <span class="footer-text"><span id="model-info">Gemini 2.5 Flash-Lite ⚡</span> · All 5 models free + Nano Banana + Veo Video</span>
+                    <div class="footer-text">
+                        <strong id="model-info">Gemini 2.5 Flash-Lite ⚡</strong>
+                    </div>
+                    <div class="footer-warning">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+                        </svg>
+                        <span>NexaAI can make mistakes. Verify important information before use.</span>
+                    </div>
                 </div>
             </div>
         </div>
