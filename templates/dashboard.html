@@ -1,658 +1,59 @@
 <!DOCTYPE html>
-<html lang="en" data-color-scheme="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NexaAI - Dashboard</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2320C997' d='M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z'/></svg>">
+    <title>NexaAI Dashboard</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2319c37d' d='M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z'/></svg>">
+    <link rel="stylesheet" href="{{ url_for('static', filename='Css/style.css') }}">
+    
+    <!-- Markdown + Syntax Highlighting -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        :root[data-color-scheme="dark"] {
-            --bg-primary: #100E12;
-            --bg-secondary: #1C1A20;
-            --bg-tertiary: #2A2730;
-            --bg-hover: #35323A;
-            --text-primary: #FCFCF9;
-            --text-secondary: #A8A29E;
-            --text-tertiary: #78746D;
-            --accent: #20C997;
-            --accent-hover: #1AAB7E;
-            --border: #3A3840;
-            --gradient-1: linear-gradient(135deg, #20C997 0%, #60EFFF 100%);
-            --error: #EF4444;
-            --warning: #F59E0B;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            min-height: 100vh;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        }
-
-        /* Top Navigation */
-        .top-nav {
-            background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border);
-            padding: 12px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            z-index: 100;
-        }
-
-        .nav-left {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .nav-button {
-            background: transparent;
-            border: 1px solid var(--border);
-            color: var(--text-secondary);
-            padding: 8px 14px;
-            border-radius: 10px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 14px;
-            transition: all 0.2s;
-            font-weight: 500;
-        }
-
-        .nav-button:hover {
-            background: var(--bg-tertiary);
-            color: var(--text-primary);
-            border-color: var(--accent);
-        }
-
-        .logo {
-            font-size: 22px;
-            font-weight: 700;
-            background: var(--gradient-1);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            letter-spacing: -0.8px;
-            margin: 0 8px;
-        }
-
-        .model-selector {
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 8px 16px;
-            color: var(--text-primary);
-            font-size: 14px;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-weight: 500;
-        }
-
-        .model-selector:hover {
-            background: var(--bg-hover);
-            border-color: var(--accent);
-        }
-
-        .premium-badge {
-            background: linear-gradient(135deg, #FFD700, #FFA500);
-            color: #000;
-            padding: 4px 10px;
-            border-radius: 8px;
-            font-size: 12px;
-            font-weight: 600;
-            margin-left: 8px;
-        }
-
-        .user-avatar {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            background: var(--gradient-1);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 600;
-            font-size: 14px;
-            color: #000;
-            cursor: pointer;
-        }
-
-        /* Sidebar */
-        .sidebar {
-            position: fixed;
-            left: 0;
-            top: 60px;
-            width: 280px;
-            height: calc(100vh - 60px);
-            background: var(--bg-secondary);
-            border-right: 1px solid var(--border);
-            overflow-y: auto;
-            transition: transform 0.3s;
-            z-index: 50;
-        }
-
-        .sidebar.hidden {
-            transform: translateX(-100%);
-        }
-
-        .sidebar-header {
-            padding: 16px;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .sidebar-title {
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--text-secondary);
-            margin-bottom: 12px;
-        }
-
-        .chat-item {
-            padding: 12px 16px;
-            cursor: pointer;
-            transition: 0.2s;
-            border-left: 3px solid transparent;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 8px;
-        }
-
-        .chat-item:hover {
-            background: var(--bg-tertiary);
-        }
-
-        .chat-item.active {
-            background: var(--bg-tertiary);
-            border-left-color: var(--accent);
-        }
-
-        .chat-title {
-            flex: 1;
-            font-size: 14px;
-            color: var(--text-secondary);
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .chat-item.active .chat-title {
-            color: var(--text-primary);
-            font-weight: 500;
-        }
-
-        .chat-actions {
-            display: none;
-            gap: 4px;
-        }
-
-        .chat-item:hover .chat-actions {
-            display: flex;
-        }
-
-        .icon-btn {
-            background: transparent;
-            border: none;
-            padding: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            opacity: 0.6;
-            transition: 0.2s;
-        }
-
-        .icon-btn:hover {
-            opacity: 1;
-        }
-
-        .empty-state {
-            padding: 40px 16px;
-            text-align: center;
-            color: var(--text-tertiary);
-            font-size: 14px;
-        }
-
-        /* Main Container */
-        .main-container {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            margin-left: 280px;
-            transition: margin-left 0.3s;
-            overflow: hidden;
-        }
-
-        .main-container.full-width {
-            margin-left: 0;
-        }
-
-        .chat-area {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px;
-            padding-bottom: 200px;
-        }
-
-        .welcome {
-            text-align: center;
-            margin: 80px auto;
-            max-width: 800px;
-        }
-
-        .welcome h1 {
-            font-size: 52px;
-            font-weight: 700;
-            background: var(--gradient-1);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 16px;
-            letter-spacing: -1.5px;
-        }
-
-        .welcome p {
-            color: var(--text-secondary);
-            font-size: 17px;
-        }
-
-        /* Suggestions */
-        .suggestions {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 12px;
-            margin: 40px auto;
-            max-width: 900px;
-        }
-
-        .suggestion-card {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 18px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .suggestion-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: var(--gradient-1);
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-
-        .suggestion-card:hover {
-            background: var(--bg-tertiary);
-            transform: translateY(-4px);
-            border-color: var(--accent);
-            box-shadow: 0 8px 24px rgba(32, 201, 151, 0.15);
-        }
-
-        .suggestion-card:hover::before {
-            opacity: 1;
-        }
-
-        .suggestion-icon {
-            font-size: 32px;
-            margin-bottom: 10px;
-        }
-
-        .suggestion-text {
-            font-size: 14px;
-            color: var(--text-secondary);
-            line-height: 1.5;
-        }
-
-        /* Messages */
-        #messages {
-            max-width: 800px;
-            margin: 0 auto;
-        }
-
-        .message {
-            margin-bottom: 28px;
-            display: flex;
-            gap: 12px;
-        }
-
-        .message.user {
-            justify-content: flex-end;
-        }
-
-        .message-content {
-            max-width: 75%;
-            padding: 16px 20px;
-            border-radius: 20px;
-            line-height: 1.7;
-            font-size: 15px;
-        }
-
-        .message.user .message-content {
-            background: var(--accent);
-            color: #000;
-            font-weight: 500;
-            border-bottom-right-radius: 6px;
-        }
-
-        .message.assistant {
-            display: flex;
-            gap: 10px;
-        }
-
-        .avatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            background: var(--bg-tertiary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
-
-        .avatar svg {
-            fill: var(--accent);
-        }
-
-        .message.assistant .message-content {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-bottom-left-radius: 6px;
-        }
-
-        .generated-image {
-            border-radius: 12px;
-            max-width: 100%;
-            margin-top: 12px;
-            border: 1px solid var(--border);
-        }
-
-        /* Error Message with Retry */
-        .message.error .message-content {
-            background: rgba(239, 68, 68, 0.1);
-            border: 1px solid var(--error);
-            color: var(--error);
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            justify-content: space-between;
-        }
-
-        .retry-btn {
-            background: var(--error);
-            color: #fff;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 600;
-            transition: 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .retry-btn:hover {
-            background: #DC2626;
-            transform: translateY(-2px);
-        }
-
-        /* Typing Indicator */
-        .typing {
-            display: flex;
-            gap: 6px;
-            padding: 16px;
-        }
-
-        .typing span {
-            width: 10px;
-            height: 10px;
-            background: var(--accent);
-            border-radius: 50%;
-            animation: bounce 1.4s infinite ease-in-out;
-        }
-
-        .typing span:nth-child(2) { animation-delay: 0.2s; }
-        .typing span:nth-child(3) { animation-delay: 0.4s; }
-
-        @keyframes bounce {
-            0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
-            40% { transform: scale(1); opacity: 1; }
-        }
-
-        /* Input Area */
-        .input-wrapper {
-            position: fixed;
-            bottom: 0;
-            left: 280px;
-            right: 0;
-            background: linear-gradient(to top, var(--bg-primary) 90%, transparent);
-            padding: 20px;
-            z-index: 50;
-            transition: left 0.3s;
-        }
-
-        .input-wrapper.full-width {
-            left: 0;
-        }
-
-        .input-container {
-            max-width: 800px;
-            margin: 0 auto;
-        }
-
-        .input-box {
-            background: var(--bg-secondary);
-            border: 2px solid var(--border);
-            border-radius: 24px;
-            padding: 12px 20px;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .input-box:focus-within {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 3px rgba(32, 201, 151, 0.1);
-        }
-
-        #chat-input {
-            flex: 1;
-            background: transparent;
-            border: none;
-            color: var(--text-primary);
-            font-size: 16px;
-            outline: none;
-            resize: none;
-            max-height: 200px;
-            font-family: inherit;
-        }
-
-        #chat-input::placeholder {
-            color: var(--text-tertiary);
-        }
-
-        #send-btn {
-            background: var(--accent);
-            border: none;
-            border-radius: 50%;
-            width: 42px;
-            height: 42px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.2s;
-            flex-shrink: 0;
-        }
-
-        #send-btn:hover {
-            background: var(--accent-hover);
-            transform: scale(1.05);
-        }
-
-        #send-btn:active {
-            transform: scale(0.95);
-        }
-
-        .footer-note {
-            text-align: center;
-            color: var(--text-tertiary);
-            font-size: 13px;
-            margin-top: 12px;
-        }
-
-        .footer-note strong {
-            color: var(--text-secondary);
-        }
-
-        /* Code Blocks */
-        pre {
-            background: #0d0d0d !important;
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 16px;
-            overflow-x: auto;
-            margin: 12px 0;
-            position: relative;
-        }
-
-        code {
-            font-family: 'JetBrains Mono', 'Fira Code', monospace;
-            font-size: 14px;
-        }
-
-        .copy-code-btn {
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border);
-            color: var(--text-secondary);
-            padding: 6px 12px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 12px;
-            transition: 0.2s;
-        }
-
-        .copy-code-btn:hover {
-            background: var(--accent);
-            color: #000;
-        }
-
-        /* Scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: var(--bg-primary);
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: var(--bg-tertiary);
-            border-radius: 4px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: var(--border);
-        }
-
-        /* Responsive */
-        @media (max-width: 1024px) {
-            .sidebar {
-                transform: translateX(-100%);
-            }
-
-            .sidebar.show {
-                transform: translateX(0);
-            }
-
-            .main-container {
-                margin-left: 0 !important;
-            }
-
-            .input-wrapper {
-                left: 0 !important;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .welcome h1 {
-                font-size: 36px;
-            }
-            
-            .suggestions {
-                grid-template-columns: 1fr;
-            }
-            
-            .message-content {
-                max-width: 85%;
-            }
-
-            .nav-button span {
-                display: none;
-            }
-        }
-    </style>
 </head>
+
 <body>
     <!-- Top Navigation -->
     <nav class="top-nav">
         <div class="nav-left">
-            <button class="nav-button" id="sidebar-toggle" onclick="toggleSidebar()">
+            <button class="nav-button icon-only" id="sidebar-toggle" onclick="toggleSidebar()">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                     <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
                 </svg>
-                <span>Menu</span>
             </button>
-            <button class="nav-button" id="new-chat-btn" onclick="newChat()">
+            <button class="nav-button" onclick="newChat()">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                     <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
                 </svg>
                 <span>New chat</span>
             </button>
-            <div class="logo">⚡ NexaAI</div>
+            <div class="logo-container">
+                <svg class="logo-icon" viewBox="0 0 24 24" width="24" height="24">
+                    <path fill="currentColor" d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
+                </svg>
+                <span class="logo-text">NexaAI</span>
+            </div>
         </div>
         <div class="nav-right">
             {% if user.is_premium %}
-                <span class="premium-badge">⭐ PREMIUM</span>
+                <span class="premium-badge-nav">⭐ PREMIUM</span>
             {% else %}
-                <button class="nav-button" onclick="location.href='/checkout'" style="background: var(--gradient-1); color: #000; border: none; font-weight: 600;">
-                    ⭐ Upgrade to Premium
+                <button class="nav-button upgrade-btn" onclick="location.href='/checkout'">
+                    <span>⭐ Upgrade</span>
                 </button>
             {% endif %}
-            <select class="model-selector" id="model-select">
-                <optgroup label="🆓 Free Models">
+            
+            <select class="model-dropdown" id="model-select">
+                <optgroup label="🆓 Free">
                     <option value="gemini-flash">Gemini 2.5 Flash ⚡</option>
-                    <option value="gemini-pro">Gemini 2.5 Pro 🧠</option>
+                    <option value="chatgpt">ChatGPT 4o Mini 🤖</option>
                     <option value="claude-haiku">Claude 3.5 Haiku 🎭</option>
                     <option value="deepseek-v3">DeepSeek V3 🔍</option>
                     <option value="mistral-7b">Mistral 7B ⚡</option>
                 </optgroup>
                 {% if user.is_premium %}
-                <optgroup label="⭐ Premium Models">
+                <optgroup label="⭐ Premium">
                     <option value="gpt-4o">GPT-4o 🚀</option>
                     <option value="gpt-4o-mini">GPT-4o Mini 💎</option>
                     <option value="claude-sonnet">Claude 3.5 Sonnet 🎭</option>
@@ -660,76 +61,94 @@
                 </optgroup>
                 {% endif %}
             </select>
-            <div class="user-avatar" onclick="window.location.href='/logout'">{{ user.name[0].upper() }}</div>
+            
+            <div class="user-avatar" onclick="location.href='/logout'" title="Logout">
+                {{ user.name[0].upper() }}
+            </div>
         </div>
     </nav>
 
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <div class="sidebar-title">Chat History</div>
-        </div>
-        <div class="chat-history" id="chat-history">
-            {% if chats %}
-                {% for chat in chats %}
-                <div class="chat-item" data-chat-id="{{ chat.id }}" onclick="loadChat({{ chat.id }})">
-                    <span class="chat-title">{{ chat.title }}</span>
-                    <div class="chat-actions">
-                        <button class="icon-btn" onclick="event.stopPropagation(); renameChat({{ chat.id }})" title="Rename">✏️</button>
-                        <button class="icon-btn" onclick="event.stopPropagation(); deleteChat({{ chat.id }})" title="Delete">🗑️</button>
-                    </div>
+        <div class="sidebar-content">
+            <div class="sidebar-section">
+                <div class="section-title">Chat History</div>
+                <div class="chat-history" id="chat-history">
+                    {% if chats %}
+                        {% for chat in chats %}
+                        <div class="chat-item" data-chat-id="{{ chat.id }}" onclick="loadChat({{ chat.id }})">
+                            <span class="chat-title">{{ chat.title }}</span>
+                            <div class="chat-actions">
+                                <button class="icon-btn" onclick="event.stopPropagation(); renameChat({{ chat.id }})" title="Rename">✏️</button>
+                                <button class="icon-btn" onclick="event.stopPropagation(); deleteChat({{ chat.id }})" title="Delete">🗑️</button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-state">No chats yet.<br>Start a conversation!</div>
+                    {% endif %}
                 </div>
-                {% endfor %}
+            </div>
+        </div>
+        
+        <div class="sidebar-footer">
+            {% if user.is_premium %}
+                <div class="premium-info">⭐ Premium Active</div>
             {% else %}
-                <div class="empty-state">No chats yet.<br>Start a conversation!</div>
+                <div class="upgrade-cta-small">
+                    <a href="/checkout">⭐ Upgrade to Premium</a>
+                </div>
             {% endif %}
         </div>
     </aside>
 
-    <!-- Main Chat Area -->
-    <div class="main-container" id="main-content">
-        <div class="chat-area">
-            <div class="welcome" id="welcome">
-                <h1>What can I help with?</h1>
-                <p>Powered by Gemini 2.5 • {% if user.is_premium %}Premium Plan Active{% else %}Free Forever{% endif %}</p>
+    <!-- Main Content -->
+    <div class="main-container with-sidebar" id="main-container">
+        <div class="center-content">
+            <!-- Welcome Section -->
+            <div class="welcome-section" id="welcome-section">
+                <h1 class="main-heading">What can I help with?</h1>
+                
+                <div class="suggestion-cards">
+                    <div class="suggestion-card" onclick="useSuggestion('Generate an image of a sunset over mountains')">
+                        <div class="suggestion-icon">🎨</div>
+                        <div class="suggestion-text">Generate beautiful images</div>
+                    </div>
+                    <div class="suggestion-card" onclick="useSuggestion('Explain quantum computing in simple terms')">
+                        <div class="suggestion-icon">🔬</div>
+                        <div class="suggestion-text">Learn complex topics</div>
+                    </div>
+                    <div class="suggestion-card" onclick="useSuggestion('Write a Python function to reverse a string')">
+                        <div class="suggestion-icon">💻</div>
+                        <div class="suggestion-text">Get coding help</div>
+                    </div>
+                    <div class="suggestion-card" onclick="useSuggestion('Plan a 5-day trip to Tokyo')">
+                        <div class="suggestion-icon">✈️</div>
+                        <div class="suggestion-text">Plan adventures</div>
+                    </div>
+                </div>
             </div>
 
-            <div class="suggestions" id="suggestions">
-                <div class="suggestion-card" onclick="useSuggestion('Generate an image of a sunset over mountains')">
-                    <div class="suggestion-icon">🎨</div>
-                    <div class="suggestion-text">Generate beautiful images</div>
-                </div>
-                <div class="suggestion-card" onclick="useSuggestion('Explain quantum computing in simple terms')">
-                    <div class="suggestion-icon">🔬</div>
-                    <div class="suggestion-text">Learn complex topics</div>
-                </div>
-                <div class="suggestion-card" onclick="useSuggestion('Write a Python function to reverse a string')">
-                    <div class="suggestion-icon">💻</div>
-                    <div class="suggestion-text">Get coding help</div>
-                </div>
-                <div class="suggestion-card" onclick="useSuggestion('Plan a 5-day trip to Tokyo')">
-                    <div class="suggestion-icon">✈️</div>
-                    <div class="suggestion-text">Plan adventures</div>
-                </div>
-            </div>
-
-            <div id="messages"></div>
+            <!-- Messages Container -->
+            <div id="messages-container"></div>
         </div>
     </div>
 
     <!-- Input Area -->
     <div class="input-wrapper" id="input-wrapper">
-        <div class="input-container">
-            <div class="input-box">
+        <div class="input-box">
+            <div class="input-inner">
                 <textarea id="chat-input" placeholder="Ask anything or generate images..." rows="1"></textarea>
-                <button id="send-btn" onclick="sendMessage()">
-                    <svg width="20" height="20" fill="#000" viewBox="0 0 24 24">
+                <button class="send-button" onclick="sendMessage()" id="send-btn">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                         <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
                     </svg>
                 </button>
             </div>
-            <div class="footer-note">
-                <strong id="model-name">Gemini 2.5 Flash</strong> · NexaAI may make mistakes
+            <div class="input-footer">
+                <span class="footer-text">
+                    <span id="model-info">Gemini 2.5 Flash</span> · NexaAI may make mistakes
+                </span>
             </div>
         </div>
     </div>
@@ -740,38 +159,39 @@
         let isLoading = false;
         let lastUserMessage = '';
 
-        // Model selector
+        // Update model display
         document.getElementById('model-select').addEventListener('change', (e) => {
             currentModel = e.target.value;
-            document.getElementById('model-name').textContent = e.target.options[e.target.selectedIndex].text;
+            const selectedText = e.target.options[e.target.selectedIndex].text;
+            document.getElementById('model-info').textContent = selectedText;
         });
 
         // Textarea auto-resize
-        document.getElementById('chat-input').addEventListener('input', function() {
+        const chatInput = document.getElementById('chat-input');
+        chatInput.addEventListener('input', function() {
             this.style.height = 'auto';
             this.style.height = Math.min(this.scrollHeight, 200) + 'px';
         });
 
-        // Enter key to send
-        document.getElementById('chat-input').addEventListener('keydown', (e) => {
+        // Enter to send
+        chatInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 sendMessage();
             }
         });
 
-        // Sidebar toggle
+        // Toggle sidebar
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
-            const mainContent = document.getElementById('main-content');
+            const mainContainer = document.getElementById('main-container');
             const inputWrapper = document.getElementById('input-wrapper');
+            
+            sidebar.classList.toggle('collapsed');
+            mainContainer.classList.toggle('sidebar-collapsed');
             
             if (window.innerWidth <= 1024) {
                 sidebar.classList.toggle('show');
-            } else {
-                sidebar.classList.toggle('hidden');
-                mainContent.classList.toggle('full-width');
-                inputWrapper.classList.toggle('full-width');
             }
         }
 
@@ -786,15 +206,16 @@
                 
                 if (data.success) {
                     currentChatId = data.chat_id;
-                    document.getElementById('messages').innerHTML = '';
-                    document.getElementById('welcome').style.display = 'block';
-                    document.getElementById('suggestions').style.display = 'grid';
+                    document.getElementById('messages-container').innerHTML = '';
+                    document.getElementById('welcome-section').style.display = 'block';
                     document.getElementById('chat-input').value = '';
                     
                     addChatToSidebar(data.chat_id, data.title);
+                    
+                    document.querySelectorAll('.chat-item').forEach(el => el.classList.remove('active'));
                 }
             } catch (e) {
-                showError('Failed to create new chat');
+                console.error('Failed to create chat:', e);
             }
         }
 
@@ -808,13 +229,12 @@
                 const data = await res.json();
 
                 currentChatId = chatId;
-                document.getElementById('messages').innerHTML = '';
-                document.getElementById('welcome').style.display = 'none';
-                document.getElementById('suggestions').style.display = 'none';
+                document.getElementById('messages-container').innerHTML = '';
+                document.getElementById('welcome-section').style.display = 'none';
 
                 data.messages.forEach(msg => {
                     if (msg.image_url) {
-                        const imgHtml = `<img src="${msg.image_url}" class="generated-image" alt="Generated"/><br>${escapeHtml(msg.content)}`;
+                        const imgHtml = `<img src="${msg.image_url}" class="generated-image" style="max-width:100%;border-radius:12px;margin:8px 0" alt="Generated"/><br>${escapeHtml(msg.content)}`;
                         addMessage(imgHtml, msg.role, true);
                     } else {
                         addMessage(msg.content, msg.role);
@@ -828,7 +248,7 @@
                     document.getElementById('sidebar').classList.remove('show');
                 }
             } catch (e) {
-                showError('Failed to load chat');
+                console.error('Failed to load chat:', e);
             } finally {
                 isLoading = false;
             }
@@ -836,7 +256,7 @@
 
         // Rename chat
         async function renameChat(chatId) {
-            const newTitle = prompt('Enter new chat title:');
+            const newTitle = prompt('Enter new title:');
             if (!newTitle || !newTitle.trim()) return;
 
             try {
@@ -845,13 +265,12 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({title: newTitle.trim()})
                 });
-                const data = await res.json();
 
-                if (data.success) {
+                if (res.ok) {
                     document.querySelector(`[data-chat-id="${chatId}"] .chat-title`).textContent = newTitle.trim();
                 }
             } catch (e) {
-                showError('Failed to rename chat');
+                console.error('Failed to rename:', e);
             }
         }
 
@@ -861,25 +280,23 @@
 
             try {
                 const res = await fetch(`/chat/${chatId}/delete`, {method: 'DELETE'});
-                const data = await res.json();
 
-                if (data.success) {
+                if (res.ok) {
                     document.querySelector(`[data-chat-id="${chatId}"]`)?.remove();
                     
                     if (currentChatId === chatId) {
                         currentChatId = null;
-                        document.getElementById('messages').innerHTML = '';
-                        document.getElementById('welcome').style.display = 'block';
-                        document.getElementById('suggestions').style.display = 'grid';
+                        document.getElementById('messages-container').innerHTML = '';
+                        document.getElementById('welcome-section').style.display = 'block';
                     }
 
                     const history = document.getElementById('chat-history');
-                    if (history.children.length === 0) {
+                    if (!history.querySelector('.chat-item')) {
                         history.innerHTML = '<div class="empty-state">No chats yet.<br>Start a conversation!</div>';
                     }
                 }
             } catch (e) {
-                showError('Failed to delete chat');
+                console.error('Failed to delete:', e);
             }
         }
 
@@ -895,8 +312,8 @@
             item.innerHTML = `
                 <span class="chat-title">${escapeHtml(title)}</span>
                 <div class="chat-actions">
-                    <button class="icon-btn" onclick="event.stopPropagation(); renameChat(${chatId})" title="Rename">✏️</button>
-                    <button class="icon-btn" onclick="event.stopPropagation(); deleteChat(${chatId})" title="Delete">🗑️</button>
+                    <button class="icon-btn" onclick="event.stopPropagation(); renameChat(${chatId})">✏️</button>
+                    <button class="icon-btn" onclick="event.stopPropagation(); deleteChat(${chatId})">🗑️</button>
                 </div>
             `;
             item.onclick = () => loadChat(chatId);
@@ -920,8 +337,7 @@
             isLoading = true;
             lastUserMessage = message;
 
-            document.getElementById('welcome').style.display = 'none';
-            document.getElementById('suggestions').style.display = 'none';
+            document.getElementById('welcome-section').style.display = 'none';
 
             addMessage(message, 'user');
             input.value = '';
@@ -946,7 +362,7 @@
                     addErrorMessage(data.error);
                 } else {
                     if (data.image_url) {
-                        const imgHtml = `<img src="${data.image_url}" class="generated-image" alt="Generated"/><br>${escapeHtml(data.response)}`;
+                        const imgHtml = `<img src="${data.image_url}" class="generated-image" style="max-width:100%;border-radius:12px;margin:8px 0" alt="Generated"/><br>${escapeHtml(data.response)}`;
                         addMessage(imgHtml, 'assistant', true);
                     } else {
                         addMessage(data.response, 'assistant');
@@ -971,60 +387,66 @@
             }
         }
 
-        // Retry failed message
+        // Retry message
         async function retryMessage() {
             if (!lastUserMessage || isLoading) return;
             
-            // Remove error message
-            const errorMsg = document.querySelector('.message.error');
+            const errorMsg = document.querySelector('.message-row.error-row');
             if (errorMsg) errorMsg.remove();
             
-            // Resend
             document.getElementById('chat-input').value = lastUserMessage;
             sendMessage();
         }
 
-        // Add error message with retry button
+        // Add error with retry
         function addErrorMessage(errorText) {
-            const messagesDiv = document.getElementById('messages');
-            const msg = document.createElement('div');
-            msg.className = 'message error';
+            const container = document.getElementById('messages-container');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'message-row error-row';
 
-            msg.innerHTML = `
-                <div class="message-content">
-                    <span>⚠️ ${escapeHtml(errorText)}</span>
-                    <button class="retry-btn" onclick="retryMessage()">
-                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
-                        </svg>
-                        Retry
-                    </button>
+            msgDiv.innerHTML = `
+                <div class="message error-message">
+                    <div class="message-content" style="background:#4a1a1a;color:#ff6b6b;padding:1rem;border-radius:12px;display:flex;align-items:center;gap:12px;justify-content:space-between;">
+                        <span>⚠️ ${escapeHtml(errorText)}</span>
+                        <button onclick="retryMessage()" style="background:#ff6b6b;color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;">
+                            <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+                            </svg>
+                            Retry
+                        </button>
+                    </div>
                 </div>
             `;
 
-            messagesDiv.appendChild(msg);
-            msg.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            container.appendChild(msgDiv);
+            msgDiv.scrollIntoView({ behavior: 'smooth' });
         }
 
         // Add message
         function addMessage(text, role, isHtml = false) {
-            const messagesDiv = document.getElementById('messages');
-            const msg = document.createElement('div');
-            msg.className = `message ${role}`;
+            const container = document.getElementById('messages-container');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message-row ${role}-row`;
 
             if (role === 'user') {
-                msg.innerHTML = `<div class="message-content">${escapeHtml(text)}</div>`;
-            } else {
-                msg.innerHTML = `
-                    <div class="avatar">
-                        <svg viewBox="0 0 24 24" width="20" height="20">
-                            <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
-                        </svg>
+                msgDiv.innerHTML = `
+                    <div class="message user-message">
+                        <div class="message-content">${escapeHtml(text)}</div>
                     </div>
-                    <div class="message-content"></div>
                 `;
-                const contentDiv = msg.querySelector('.message-content');
+            } else {
+                msgDiv.innerHTML = `
+                    <div class="message assistant-message">
+                        <div class="avatar">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                                <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
+                            </svg>
+                        </div>
+                        <div class="message-content markdown-content"></div>
+                    </div>
+                `;
                 
+                const contentDiv = msgDiv.querySelector('.markdown-content');
                 if (isHtml) {
                     contentDiv.innerHTML = text;
                 } else {
@@ -1036,35 +458,38 @@
                 }
             }
 
-            messagesDiv.appendChild(msg);
-            msg.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            container.appendChild(msgDiv);
+            msgDiv.scrollIntoView({ behavior: 'smooth' });
         }
 
         // Typing indicator
         function showTyping() {
-            const messagesDiv = document.getElementById('messages');
+            const container = document.getElementById('messages-container');
             const typing = document.createElement('div');
-            typing.id = 'typing';
-            typing.className = 'message assistant';
+            typing.id = 'typing-indicator';
+            typing.className = 'message-row assistant-row';
             typing.innerHTML = `
-                <div class="avatar">
-                    <svg viewBox="0 0 24 24" width="20" height="20">
-                        <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
-                    </svg>
+                <div class="message assistant-message">
+                    <div class="avatar">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                            <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
+                        </svg>
+                    </div>
+                    <div class="typing-dots"><span></span><span></span><span></span></div>
                 </div>
-                <div class="typing"><span></span><span></span><span></span></div>
             `;
-            messagesDiv.appendChild(typing);
+            container.appendChild(typing);
             typing.scrollIntoView({ behavior: 'smooth' });
         }
 
         function removeTyping() {
-            document.getElementById('typing')?.remove();
+            document.getElementById('typing-indicator')?.remove();
         }
 
-        // Format message with markdown
+        // Format markdown
         function formatMessage(text) {
             if (typeof marked === 'undefined') return escapeHtml(text).replace(/\n/g, '<br>');
+            
             marked.setOptions({
                 gfm: true,
                 breaks: true,
@@ -1078,7 +503,7 @@
             return marked.parse(text);
         }
 
-        // Add copy buttons to code blocks
+        // Add copy buttons
         function addCopyButtons(container) {
             container.querySelectorAll('pre code').forEach((codeBlock) => {
                 const pre = codeBlock.parentElement;
@@ -1087,11 +512,17 @@
                 const btn = document.createElement('button');
                 btn.className = 'copy-code-btn';
                 btn.textContent = 'Copy';
+                btn.style.position = 'absolute';
+                btn.style.top = '8px';
+                btn.style.right = '8px';
+                
                 btn.addEventListener('click', () => {
                     navigator.clipboard.writeText(codeBlock.textContent);
                     btn.textContent = 'Copied!';
                     setTimeout(() => (btn.textContent = 'Copy'), 1500);
                 });
+
+                pre.style.position = 'relative';
                 pre.appendChild(btn);
             });
         }
@@ -1103,10 +534,18 @@
             return div.innerHTML;
         }
 
-        // Show error notification
-        function showError(message) {
-            alert(message);
-        }
+        // Mobile: Close sidebar when clicking outside
+        document.addEventListener('click', (e) => {
+            const sidebar = document.getElementById('sidebar');
+            const toggle = document.getElementById('sidebar-toggle');
+            
+            if (window.innerWidth <= 1024 && 
+                !sidebar.contains(e.target) && 
+                !toggle.contains(e.target) && 
+                sidebar.classList.contains('show')) {
+                sidebar.classList.remove('show');
+            }
+        });
     </script>
 </body>
 </html>
