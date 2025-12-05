@@ -178,7 +178,7 @@ def migrate_database():
 FREE_MODELS = {
     'gemini-flash': {
         'name': 'Gemini 2.5 Flash ⚡', 
-        'model': 'google/gemini-2.0-flash-exp:free', 
+        'model': 'google/gemini-2.0-flash-live-001', 
         'type': 'openrouter',
         'description': 'Fast and efficient'
     },
@@ -442,7 +442,7 @@ def demo_chat():
         # Text chat - Use OpenRouter
         try:
             response = call_openrouter(
-                'google/gemini-flash-2.5', 
+                'gemini-2.0-flash-live-001', 
                 [{'role': 'user', 'content': user_message}],
                 timeout=30
             )
@@ -450,7 +450,7 @@ def demo_chat():
             return jsonify({
                 'response': response,
                 'demo': True,
-                'model': 'Gemini 2.5 Flash'
+                'model': 'gemini-2.0-flash-live-001'
             })
         except Exception as e:
             return jsonify({'error': str(e)}), 500
@@ -954,5 +954,6 @@ init_database()
 # ============ MAIN ============
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
+
 
 
