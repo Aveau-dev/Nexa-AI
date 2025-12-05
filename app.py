@@ -21,16 +21,28 @@ app = Flask(__name__)
 CORS(app)
 
 # Configuration
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-this')
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-this-in-production-2025')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URI', 'sqlite:///database.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,
+    'pool_recycle': 300,
+}
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 db = SQLAlchemy(app)
-genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
+
+# Configure Gemini (optional - will use OpenRouter as fallback)
+try:
+    genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
+    GEMINI_AVAILABLE = True
+except:
+    GEMINI_AVAILABLE = False
+    print("⚠️ Gemini API not configured, using OpenRouter only")
+
 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 
 login_manager = LoginManager()
@@ -114,18 +126,54 @@ def migrate_database():
 
 # ============ AI MODELS ============
 FREE_MODELS = {
-    'gemini-flash': {'name': 'Gemini 2.5 Flash ⚡', 'model': 'gemini-2.0-flash-exp', 'type': 'gemini'},
-    'gemini-pro': {'name': 'Gemini 2.5 Pro 🧠', 'model': 'gemini-exp-1206', 'type': 'gemini'},
-    'claude-haiku': {'name': 'Claude 3.5 Haiku 🎭', 'model': 'anthropic/claude-3.5-haiku', 'type': 'openrouter'},
-    'deepseek-v3': {'name': 'DeepSeek V3 🔍', 'model': 'deepseek/deepseek-chat', 'type': 'openrouter'},
-    'mistral-7b': {'name': 'Mistral 7B ⚡', 'model': 'mistralai/mistral-7b-instruct', 'type': 'openrouter'},
+    'gemini-flash': {
+        'name': 'Gemini 2.5 Flash ⚡', 
+        'model': 'google/gemini-flash-1.5', 
+        'type': 'openrouter'
+    },
+    'gemini-pro': {
+        'name': 'Gemini 2.5 Pro 🧠', 
+        'model': 'google/gemini-pro-1.5', 
+        'type': 'openrouter'
+    },
+    'claude-haiku': {
+        'name': 'Claude 3.5 Haiku 🎭', 
+        'model': 'anthropic/claude-3.5-haiku', 
+        'type': 'openrouter'
+    },
+    'deepseek-v3': {
+        'name': 'DeepSeek V3 🔍', 
+        'model': 'deepseek/deepseek-chat', 
+        'type': 'openrouter'
+    },
+    'mistral-7b': {
+        'name': 'Mistral 7B ⚡', 
+        'model': 'mistralai/mistral-7b-instruct', 
+        'type': 'openrouter'
+    },
 }
 
 PREMIUM_MODELS = {
-    'gpt-4o': {'name': 'GPT-4o 🚀', 'model': 'openai/gpt-4o', 'type': 'openrouter'},
-    'gpt-4o-mini': {'name': 'GPT-4o Mini 💎', 'model': 'openai/gpt-4o-mini', 'type': 'openrouter'},
-    'claude-sonnet': {'name': 'Claude 3.5 Sonnet 🎭', 'model': 'anthropic/claude-3.5-sonnet', 'type': 'openrouter'},
-    'gemini-pro-vision': {'name': 'Gemini Pro Vision 👁️', 'model': 'google/gemini-pro-1.5', 'type': 'openrouter'},
+    'gpt-4o': {
+        'name': 'GPT-4o 🚀', 
+        'model': 'openai/gpt-4o', 
+        'type': 'openrouter'
+    },
+    'gpt-4o-mini': {
+        'name': 'GPT-4o Mini 💎', 
+        'model': 'openai/gpt-4o-mini', 
+        'type': 'openrouter'
+    },
+    'claude-sonnet': {
+        'name': 'Claude 3.5 Sonnet 🎭', 
+        'model': 'anthropic/claude-3.5-sonnet', 
+        'type': 'openrouter'
+    },
+    'gemini-pro-vision': {
+        'name': 'Gemini Pro Vision 👁️', 
+        'model': 'google/gemini-pro-1.5', 
+        'type': 'openrouter'
+    },
 }
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
@@ -136,8 +184,11 @@ def allowed_file(filename):
 
 def encode_image(image_path):
     """Encode image to base64"""
-    with open(image_path, 'rb') as image_file:
-        return base64.b64encode(image_file.read()).decode('utf-8')
+    try:
+        with open(image_path, 'rb') as image_file:
+            return base64.b64encode(image_file.read()).decode('utf-8')
+    except:
+        return None
 
 def compress_image(image_path, max_size=(1024, 1024)):
     """Compress image to reduce file size"""
@@ -167,13 +218,16 @@ def get_chat_history(chat_id, limit=10):
             if msg.has_image and msg.image_path:
                 try:
                     image_base64 = encode_image(msg.image_path)
-                    history.append({
-                        'role': msg.role,
-                        'content': [
-                            {'type': 'text', 'text': msg.content},
-                            {'type': 'image_url', 'image_url': {'url': f'data:image/jpeg;base64,{image_base64}'}}
-                        ]
-                    })
+                    if image_base64:
+                        history.append({
+                            'role': msg.role,
+                            'content': [
+                                {'type': 'text', 'text': msg.content},
+                                {'type': 'image_url', 'image_url': {'url': f'data:image/jpeg;base64,{image_base64}'}}
+                            ]
+                        })
+                    else:
+                        history.append({'role': msg.role, 'content': msg.content})
                 except:
                     history.append({'role': msg.role, 'content': msg.content})
             else:
@@ -184,49 +238,41 @@ def get_chat_history(chat_id, limit=10):
         print(f"Error getting chat history: {e}")
         return []
 
-def call_gemini(model_name, messages):
-    """Call Gemini API with retry logic"""
-    try:
-        model = genai.GenerativeModel(model_name)
-        
-        # Build prompt from history
-        prompt_parts = []
-        for msg in messages:
-            role = "User" if msg['role'] == 'user' else "Assistant"
-            content = msg['content'] if isinstance(msg['content'], str) else msg['content'][0]['text']
-            prompt_parts.append(f"{role}: {content}")
-        
-        prompt = "\n".join(prompt_parts[-10:])  # Only last 10 messages
-        
-        response = model.generate_content(prompt)
-        return response.text
-    except Exception as e:
-        raise Exception(f"Gemini API error: {str(e)}")
-
 def call_openrouter(model_path, messages):
     """Call OpenRouter API with retry logic"""
     try:
+        # Format messages for OpenRouter
+        formatted_messages = []
+        for msg in messages:
+            if isinstance(msg['content'], str):
+                formatted_messages.append({'role': msg['role'], 'content': msg['content']})
+            else:
+                # Handle complex content (images)
+                formatted_messages.append({'role': msg['role'], 'content': msg['content'][0]['text']})
+        
         response = requests.post(
             url="https://openrouter.ai/api/v1/chat/completions",
             headers={
                 "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://nexaai.app",
+                "X-Title": "NexaAI"
             },
             json={
                 "model": model_path,
-                "messages": messages
+                "messages": formatted_messages
             },
             timeout=60
         )
         
         if response.status_code != 200:
-            raise Exception(f"API returned status {response.status_code}")
+            raise Exception(f"API returned status {response.status_code}: {response.text}")
         
         return response.json()['choices'][0]['message']['content']
     except requests.Timeout:
         raise Exception("Request timed out. Please try again.")
     except Exception as e:
-        raise Exception(f"OpenRouter API error: {str(e)}")
+        raise Exception(f"API error: {str(e)}")
 
 def generate_image(prompt):
     """Generate image using Pollinations AI"""
@@ -259,9 +305,9 @@ def demo_chat():
         except Exception as e:
             return jsonify({'error': str(e)}), 500
     
-    # Text chat
+    # Text chat - Use OpenRouter as primary
     try:
-        response = call_gemini('gemini-2.0-flash-exp', [{'role': 'user', 'content': user_message}])
+        response = call_openrouter('google/gemini-flash-1.5', [{'role': 'user', 'content': user_message}])
         
         return jsonify({
             'response': response,
@@ -274,49 +320,70 @@ def demo_chat():
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     if request.method == 'POST':
-        data = request.get_json() if request.is_json else request.form
+        try:
+            data = request.get_json() if request.is_json else request.form
+            
+            email = data.get('email')
+            name = data.get('name')
+            password = data.get('password')
+            
+            if not email or not name or not password:
+                return jsonify({'error': 'All fields are required'}), 400
+            
+            if User.query.filter_by(email=email).first():
+                return jsonify({'error': 'Email already exists'}), 400
+            
+            new_user = User(
+                email=email,
+                name=name,
+                password=generate_password_hash(password, method='pbkdf2:sha256')
+            )
+            
+            db.session.add(new_user)
+            db.session.commit()
+            
+            if request.is_json:
+                return jsonify({'success': True, 'redirect': 'login'})
+            return redirect(url_for('login'))
         
-        email = data.get('email')
-        name = data.get('name')
-        password = data.get('password')
-        
-        if User.query.filter_by(email=email).first():
-            return jsonify({'error': 'Email already exists'}), 400
-        
-        new_user = User(
-            email=email,
-            name=name,
-            password=generate_password_hash(password, method='pbkdf2:sha256')
-        )
-        
-        db.session.add(new_user)
-        db.session.commit()
-        
-        if request.is_json:
-            return jsonify({'success': True, 'redirect': 'login'})
-        return redirect(url_for('login'))
+        except Exception as e:
+            db.session.rollback()
+            print(f"Signup error: {e}")
+            if request.is_json:
+                return jsonify({'error': 'An error occurred. Please try again.'}), 500
+            return render_template('signup.html', error='An error occurred. Please try again.')
     
     return render_template('signup.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        data = request.get_json() if request.is_json else request.form
-        
-        email = data.get('email')
-        password = data.get('password')
-        
-        user = User.query.filter_by(email=email).first()
-        
-        if user and check_password_hash(user.password, password):
-            login_user(user)
+        try:
+            data = request.get_json() if request.is_json else request.form
+            
+            email = data.get('email')
+            password = data.get('password')
+            
+            if not email or not password:
+                return jsonify({'error': 'Email and password are required'}), 400
+            
+            user = User.query.filter_by(email=email).first()
+            
+            if user and check_password_hash(user.password, password):
+                login_user(user)
+                if request.is_json:
+                    return jsonify({'success': True, 'redirect': 'dashboard'})
+                return redirect(url_for('dashboard'))
+            
             if request.is_json:
-                return jsonify({'success': True, 'redirect': 'dashboard'})
-            return redirect(url_for('dashboard'))
+                return jsonify({'error': 'Invalid credentials'}), 401
+            return render_template('login.html', error='Invalid credentials')
         
-        if request.is_json:
-            return jsonify({'error': 'Invalid credentials'}), 401
-        return render_template('login.html', error='Invalid credentials')
+        except Exception as e:
+            print(f"Login error: {e}")
+            if request.is_json:
+                return jsonify({'error': 'An error occurred. Please try again.'}), 500
+            return render_template('login.html', error='An error occurred. Please try again.')
     
     return render_template('login.html')
 
@@ -365,99 +432,114 @@ def upload_file():
 @app.route('/chat/new', methods=['POST'])
 @login_required
 def new_chat():
-    new_chat_obj = Chat(user_id=current_user.id, title='New Chat')
-    db.session.add(new_chat_obj)
-    db.session.commit()
-    
-    return jsonify({
-        'success': True,
-        'chat_id': new_chat_obj.id,
-        'title': new_chat_obj.title
-    })
+    try:
+        new_chat_obj = Chat(user_id=current_user.id, title='New Chat')
+        db.session.add(new_chat_obj)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'chat_id': new_chat_obj.id,
+            'title': new_chat_obj.title
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/chat/<int:chat_id>/rename', methods=['POST'])
 @login_required
 def rename_chat(chat_id):
-    chat = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first()
-    if not chat:
-        return jsonify({'error': 'Chat not found'}), 404
-    
-    new_title = request.json.get('title')
-    chat.title = new_title
-    db.session.commit()
-    
-    return jsonify({'success': True})
+    try:
+        chat = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first()
+        if not chat:
+            return jsonify({'error': 'Chat not found'}), 404
+        
+        new_title = request.json.get('title')
+        chat.title = new_title
+        db.session.commit()
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/chat/<int:chat_id>/delete', methods=['DELETE'])
 @login_required
 def delete_chat(chat_id):
-    chat = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first()
-    if not chat:
-        return jsonify({'error': 'Chat not found'}), 404
-    
-    # Delete uploaded files
-    for message in chat.messages:
-        if message.has_image and message.image_path:
-            try:
-                os.remove(message.image_path)
-            except:
-                pass
-    
-    db.session.delete(chat)
-    db.session.commit()
-    
-    return jsonify({'success': True})
+    try:
+        chat = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first()
+        if not chat:
+            return jsonify({'error': 'Chat not found'}), 404
+        
+        # Delete uploaded files
+        for message in chat.messages:
+            if message.has_image and message.image_path:
+                try:
+                    os.remove(message.image_path)
+                except:
+                    pass
+        
+        db.session.delete(chat)
+        db.session.commit()
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/chat/<int:chat_id>/messages', methods=['GET'])
 @login_required
 def get_chat_messages(chat_id):
-    chat = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first()
-    if not chat:
-        return jsonify({'error': 'Chat not found'}), 404
-    
-    messages = Message.query.filter_by(chat_id=chat_id)\
-        .order_by(Message.created_at.asc()).all()
-    
-    return jsonify({
-        'messages': [{
-            'role': msg.role,
-            'content': msg.content,
-            'model': msg.model,
-            'image_url': msg.image_url,
-            'created_at': msg.created_at.isoformat()
-        } for msg in messages],
-        'title': chat.title
-    })
+    try:
+        chat = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first()
+        if not chat:
+            return jsonify({'error': 'Chat not found'}), 404
+        
+        messages = Message.query.filter_by(chat_id=chat_id)\
+            .order_by(Message.created_at.asc()).all()
+        
+        return jsonify({
+            'messages': [{
+                'role': msg.role,
+                'content': msg.content,
+                'model': msg.model,
+                'image_url': msg.image_url,
+                'created_at': msg.created_at.isoformat()
+            } for msg in messages],
+            'title': chat.title
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/chat', methods=['POST'])
 @login_required
 def chat_route():
-    user_message = request.json.get('message')
-    selected_model = request.json.get('model', 'gemini-flash')
-    chat_id = request.json.get('chat_id')
-    uploaded_file = request.json.get('uploaded_file')
-    
-    # Get or create chat
-    if chat_id:
-        chat_obj = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first()
-        if not chat_obj:
-            return jsonify({'error': 'Chat not found'}), 404
-    else:
-        chat_obj = Chat(user_id=current_user.id, title='New Chat')
-        db.session.add(chat_obj)
-        db.session.commit()
-        chat_id = chat_obj.id
-    
-    # Check for premium models
-    if selected_model in PREMIUM_MODELS and not current_user.is_premium:
-        return jsonify({
-            'error': 'This model requires Premium subscription',
-            'upgrade_url': '/checkout'
-        }), 403
-    
-    # Check for image generation
-    if any(keyword in user_message.lower() for keyword in ['generate image', 'create image', 'draw', 'picture of', 'image of']):
-        try:
+    try:
+        user_message = request.json.get('message')
+        selected_model = request.json.get('model', 'gemini-flash')
+        chat_id = request.json.get('chat_id')
+        uploaded_file = request.json.get('uploaded_file')
+        
+        # Get or create chat
+        if chat_id:
+            chat_obj = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first()
+            if not chat_obj:
+                return jsonify({'error': 'Chat not found'}), 404
+        else:
+            chat_obj = Chat(user_id=current_user.id, title='New Chat')
+            db.session.add(chat_obj)
+            db.session.commit()
+            chat_id = chat_obj.id
+        
+        # Check for premium models
+        if selected_model in PREMIUM_MODELS and not current_user.is_premium:
+            return jsonify({
+                'error': 'This model requires Premium subscription',
+                'upgrade_url': '/checkout'
+            }), 403
+        
+        # Check for image generation
+        if any(keyword in user_message.lower() for keyword in ['generate image', 'create image', 'draw', 'picture of', 'image of']):
             image_url = generate_image(user_message)
             
             # Save user message
@@ -492,40 +574,34 @@ def chat_route():
                 'chat_id': chat_id,
                 'chat_title': chat_obj.title
             })
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
-    
-    # Get model info
-    if selected_model in FREE_MODELS:
-        model_info = FREE_MODELS[selected_model]
-    elif selected_model in PREMIUM_MODELS:
-        model_info = PREMIUM_MODELS[selected_model]
-    else:
-        return jsonify({'error': 'Invalid model'}), 400
-    
-    # Save user message
-    user_msg = Message(
-        chat_id=chat_id,
-        role='user',
-        content=user_message,
-        has_image=bool(uploaded_file),
-        image_path=uploaded_file
-    )
-    db.session.add(user_msg)
-    
-    if chat_obj.title == 'New Chat':
-        chat_obj.title = generate_chat_title(user_message)
-    
-    # Get chat history
-    history = get_chat_history(chat_id)
-    history.append({'role': 'user', 'content': user_message})
-    
-    try:
-        # Call appropriate API
-        if model_info['type'] == 'openrouter':
-            bot_response = call_openrouter(model_info['model'], history)
+        
+        # Get model info
+        if selected_model in FREE_MODELS:
+            model_info = FREE_MODELS[selected_model]
+        elif selected_model in PREMIUM_MODELS:
+            model_info = PREMIUM_MODELS[selected_model]
         else:
-            bot_response = call_gemini(model_info['model'], history)
+            return jsonify({'error': 'Invalid model'}), 400
+        
+        # Save user message
+        user_msg = Message(
+            chat_id=chat_id,
+            role='user',
+            content=user_message,
+            has_image=bool(uploaded_file),
+            image_path=uploaded_file
+        )
+        db.session.add(user_msg)
+        
+        if chat_obj.title == 'New Chat':
+            chat_obj.title = generate_chat_title(user_message)
+        
+        # Get chat history
+        history = get_chat_history(chat_id)
+        history.append({'role': 'user', 'content': user_message})
+        
+        # Call API
+        bot_response = call_openrouter(model_info['model'], history)
         
         # Save assistant message
         assistant_msg = Message(
@@ -549,6 +625,7 @@ def chat_route():
     
     except Exception as e:
         db.session.rollback()
+        print(f"Chat error: {e}")
         return jsonify({'error': str(e)}), 500
 
 # ============ STRIPE CHECKOUT ============
