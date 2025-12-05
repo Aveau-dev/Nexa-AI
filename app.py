@@ -128,12 +128,12 @@ def migrate_database():
 FREE_MODELS = {
     'gemini-flash': {
         'name': 'Gemini 2.5 Flash ⚡', 
-        'model': 'google/gemini-flash-1.5', 
+        'model': 'google/gemini-flash-2.5', 
         'type': 'openrouter'
     },
     'gemini-pro': {
         'name': 'Gemini 2.5 Pro 🧠', 
-        'model': 'google/gemini-pro-1.5', 
+        'model': 'google/gemini-pro-2.5', 
         'type': 'openrouter'
     },
     'claude-haiku': {
@@ -693,3 +693,4 @@ if __name__ == '__main__':
         print("🚀 Starting NexaAI...")
     
     app.run(debug=True, port=5000)
+
