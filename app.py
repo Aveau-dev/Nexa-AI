@@ -442,7 +442,7 @@ def demo_chat():
         # Text chat - Use OpenRouter
         try:
             response = call_openrouter(
-                'google/gemini-flash-1.5', 
+                'google/gemini-flash-2.5', 
                 [{'role': 'user', 'content': user_message}],
                 timeout=30
             )
@@ -950,3 +950,4 @@ if __name__ == '__main__':
             traceback.print_exc()
     
     app.run(debug=True, host='0.0.0.0', port=5000)
+
