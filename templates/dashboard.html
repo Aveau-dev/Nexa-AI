@@ -107,6 +107,16 @@
             border-color: var(--accent);
         }
 
+        .premium-badge {
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            color: #000;
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+
         .user-avatar {
             width: 36px;
             height: 36px;
@@ -375,6 +385,37 @@
             border: 1px solid var(--border);
         }
 
+        /* Error Message with Retry */
+        .message.error .message-content {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid var(--error);
+            color: var(--error);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            justify-content: space-between;
+        }
+
+        .retry-btn {
+            background: var(--error);
+            color: #fff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .retry-btn:hover {
+            background: #DC2626;
+            transform: translateY(-2px);
+        }
+
         /* Typing Indicator */
         .typing {
             display: flex;
@@ -595,12 +636,29 @@
             <div class="logo">⚡ NexaAI</div>
         </div>
         <div class="nav-right">
+            {% if user.is_premium %}
+                <span class="premium-badge">⭐ PREMIUM</span>
+            {% else %}
+                <button class="nav-button" onclick="location.href='/checkout'" style="background: var(--gradient-1); color: #000; border: none; font-weight: 600;">
+                    ⭐ Upgrade to Premium
+                </button>
+            {% endif %}
             <select class="model-selector" id="model-select">
-                <option value="gemini-flash">Gemini 2.5 Flash ⚡</option>
-                <option value="gemini-pro">Gemini 2.5 Pro 🧠</option>
-                <option value="claude-haiku">Claude 3.5 Haiku 🎭</option>
-                <option value="deepseek-v3">DeepSeek V3 🔍</option>
-                <option value="mistral-7b">Mistral 7B ⚡</option>
+                <optgroup label="🆓 Free Models">
+                    <option value="gemini-flash">Gemini 2.5 Flash ⚡</option>
+                    <option value="gemini-pro">Gemini 2.5 Pro 🧠</option>
+                    <option value="claude-haiku">Claude 3.5 Haiku 🎭</option>
+                    <option value="deepseek-v3">DeepSeek V3 🔍</option>
+                    <option value="mistral-7b">Mistral 7B ⚡</option>
+                </optgroup>
+                {% if user.is_premium %}
+                <optgroup label="⭐ Premium Models">
+                    <option value="gpt-4o">GPT-4o 🚀</option>
+                    <option value="gpt-4o-mini">GPT-4o Mini 💎</option>
+                    <option value="claude-sonnet">Claude 3.5 Sonnet 🎭</option>
+                    <option value="gemini-pro-vision">Gemini Pro Vision 👁️</option>
+                </optgroup>
+                {% endif %}
             </select>
             <div class="user-avatar" onclick="window.location.href='/logout'">{{ user.name[0].upper() }}</div>
         </div>
@@ -633,7 +691,7 @@
         <div class="chat-area">
             <div class="welcome" id="welcome">
                 <h1>What can I help with?</h1>
-                <p>Powered by Gemini 2.5 Pro • Free Forever</p>
+                <p>Powered by Gemini 2.5 • {% if user.is_premium %}Premium Plan Active{% else %}Free Forever{% endif %}</p>
             </div>
 
             <div class="suggestions" id="suggestions">
@@ -680,6 +738,7 @@
         let currentModel = 'gemini-flash';
         let currentChatId = null;
         let isLoading = false;
+        let lastUserMessage = '';
 
         // Model selector
         document.getElementById('model-select').addEventListener('change', (e) => {
@@ -732,11 +791,10 @@
                     document.getElementById('suggestions').style.display = 'grid';
                     document.getElementById('chat-input').value = '';
                     
-                    // Add to sidebar
                     addChatToSidebar(data.chat_id, data.title);
                 }
             } catch (e) {
-                alert('Failed to create new chat');
+                showError('Failed to create new chat');
             }
         }
 
@@ -763,16 +821,14 @@
                     }
                 });
 
-                // Update active state
                 document.querySelectorAll('.chat-item').forEach(el => el.classList.remove('active'));
                 document.querySelector(`[data-chat-id="${chatId}"]`)?.classList.add('active');
 
-                // Close sidebar on mobile
                 if (window.innerWidth <= 1024) {
                     document.getElementById('sidebar').classList.remove('show');
                 }
             } catch (e) {
-                alert('Failed to load chat');
+                showError('Failed to load chat');
             } finally {
                 isLoading = false;
             }
@@ -795,7 +851,7 @@
                     document.querySelector(`[data-chat-id="${chatId}"] .chat-title`).textContent = newTitle.trim();
                 }
             } catch (e) {
-                alert('Failed to rename chat');
+                showError('Failed to rename chat');
             }
         }
 
@@ -817,14 +873,13 @@
                         document.getElementById('suggestions').style.display = 'grid';
                     }
 
-                    // Check if empty
                     const history = document.getElementById('chat-history');
                     if (history.children.length === 0) {
                         history.innerHTML = '<div class="empty-state">No chats yet.<br>Start a conversation!</div>';
                     }
                 }
             } catch (e) {
-                alert('Failed to delete chat');
+                showError('Failed to delete chat');
             }
         }
 
@@ -863,6 +918,8 @@
             if (!message || isLoading) return;
 
             isLoading = true;
+            lastUserMessage = message;
+
             document.getElementById('welcome').style.display = 'none';
             document.getElementById('suggestions').style.display = 'none';
 
@@ -886,7 +943,7 @@
                 removeTyping();
 
                 if (data.error) {
-                    addMessage('⚠️ ' + data.error, 'assistant');
+                    addErrorMessage(data.error);
                 } else {
                     if (data.image_url) {
                         const imgHtml = `<img src="${data.image_url}" class="generated-image" alt="Generated"/><br>${escapeHtml(data.response)}`;
@@ -897,7 +954,6 @@
 
                     currentChatId = data.chat_id;
 
-                    // Update or add to sidebar
                     if (data.chat_title) {
                         const existing = document.querySelector(`[data-chat-id="${data.chat_id}"]`);
                         if (existing) {
@@ -909,10 +965,45 @@
                 }
             } catch (e) {
                 removeTyping();
-                addMessage('⚠️ Connection error. Please try again.', 'assistant');
+                addErrorMessage('Hmm! Something went wrong');
             } finally {
                 isLoading = false;
             }
+        }
+
+        // Retry failed message
+        async function retryMessage() {
+            if (!lastUserMessage || isLoading) return;
+            
+            // Remove error message
+            const errorMsg = document.querySelector('.message.error');
+            if (errorMsg) errorMsg.remove();
+            
+            // Resend
+            document.getElementById('chat-input').value = lastUserMessage;
+            sendMessage();
+        }
+
+        // Add error message with retry button
+        function addErrorMessage(errorText) {
+            const messagesDiv = document.getElementById('messages');
+            const msg = document.createElement('div');
+            msg.className = 'message error';
+
+            msg.innerHTML = `
+                <div class="message-content">
+                    <span>⚠️ ${escapeHtml(errorText)}</span>
+                    <button class="retry-btn" onclick="retryMessage()">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+                        </svg>
+                        Retry
+                    </button>
+                </div>
+            `;
+
+            messagesDiv.appendChild(msg);
+            msg.scrollIntoView({ behavior: 'smooth', block: 'end' });
         }
 
         // Add message
@@ -1010,6 +1101,11 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        // Show error notification
+        function showError(message) {
+            alert(message);
         }
     </script>
 </body>
