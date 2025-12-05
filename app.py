@@ -926,28 +926,33 @@ def health_check():
         'stripe_configured': bool(stripe.api_key)
     })
 
-# ============ MAIN ============
-if __name__ == '__main__':
-    with app.app_context():
-        try:
-            # Run migration
+# ============ DATABASE INITIALIZATION ============
+def init_database():
+    """Initialize database tables"""
+    try:
+        with app.app_context():
+            # Run migration first
             migrate_database()
             
             # Create all tables
             db.create_all()
             
             print("\n" + "="*50)
-            print("✅ Database ready!")
+            print("✅ Database initialized successfully!")
             print("✅ All tables created")
             print(f"✅ Gemini: {'Available' if GEMINI_AVAILABLE else 'Using OpenRouter only'}")
             print(f"✅ Stripe: {'Configured' if stripe.api_key else 'Not configured'}")
-            print("="*50)
-            print("🚀 Starting NexaAI on http://localhost:5000")
             print("="*50 + "\n")
             
-        except Exception as e:
-            print(f"❌ Initialization error: {e}")
-            traceback.print_exc()
-    
+    except Exception as e:
+        print(f"❌ Database initialization error: {e}")
+        traceback.print_exc()
+
+# Initialize database on startup (works with Gunicorn)
+init_database()
+
+# ============ MAIN ============
+if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
+
 
