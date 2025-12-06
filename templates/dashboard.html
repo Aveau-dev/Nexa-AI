@@ -1,19 +1,362 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="system">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NexaAI Dashboard</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2319c37d' d='M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z'/></svg>">
+    <title>NexaAI - Dashboard</title>
+    <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2319c37d' d='M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z'/></svg>">
     <link rel="stylesheet" href="{{ url_for('static', filename='Css/style.css') }}">
-    
-    <!-- Markdown + Syntax Highlighting -->
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <style>
+        /* Theme Variables */
+        :root[data-theme="light"] {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f5f5f5;
+            --bg-tertiary: #e8e8e8;
+            --text-primary: #1a1a1a;
+            --text-secondary: #666666;
+            --border-color: #d0d0d0;
+            --accent-color: #19c37d;
+            --hover-bg: #f0f0f0;
+            --message-user-bg: #19c37d;
+            --message-user-text: #ffffff;
+            --shadow: rgba(0, 0, 0, 0.1);
+        }
+
+        :root[data-theme="dark"] {
+            --bg-primary: #212121;
+            --bg-secondary: #2f2f2f;
+            --bg-tertiary: #424242;
+            --text-primary: #ececec;
+            --text-secondary: #b4b4b4;
+            --border-color: #4e4e4e;
+            --accent-color: #19c37d;
+            --hover-bg: #2f2f2f;
+            --message-user-bg: #424242;
+            --message-user-text: #ececec;
+            --shadow: rgba(0, 0, 0, 0.3);
+        }
+
+        /* Voice Recording Animation */
+        .recording-indicator {
+            display: none;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: #ff4444;
+            color: white;
+            border-radius: 20px;
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            z-index: 1001;
+            animation: pulse 1.5s infinite;
+        }
+
+        .recording-indicator.active {
+            display: flex;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        /* Settings Panel */
+        .settings-panel {
+            position: fixed;
+            right: -400px;
+            top: 60px;
+            width: 400px;
+            height: calc(100vh - 60px);
+            background: var(--bg-primary);
+            border-left: 1px solid var(--border-color);
+            z-index: 999;
+            transition: right 0.3s;
+            overflow-y: auto;
+            padding: 1.5rem;
+        }
+
+        .settings-panel.open {
+            right: 0;
+        }
+
+        .settings-section {
+            margin-bottom: 2rem;
+        }
+
+        .settings-section h3 {
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        .setting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .setting-item label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        /* Toggle Switch */
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 26px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--bg-tertiary);
+            transition: 0.4s;
+            border-radius: 26px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: 0.4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .toggle-slider {
+            background-color: var(--accent-color);
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(24px);
+        }
+
+        /* Theme Selector */
+        .theme-selector {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .theme-option {
+            flex: 1;
+            padding: 0.5rem;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: center;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .theme-option.active {
+            border-color: var(--accent-color);
+            background: var(--accent-color);
+            color: white;
+        }
+
+        /* Voice Button */
+        .voice-button {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 50%;
+            transition: all 0.2s;
+        }
+
+        .voice-button:hover {
+            background: var(--hover-bg);
+            color: var(--accent-color);
+        }
+
+        .voice-button.recording {
+            color: #ff4444;
+            animation: pulse 1.5s infinite;
+        }
+
+        /* Export Button */
+        .export-btn {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .export-btn:hover {
+            opacity: 0.9;
+        }
+
+        /* Message Actions */
+        .message-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .message-row:hover .message-actions {
+            opacity: 1;
+        }
+
+        .action-btn {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            transition: all 0.2s;
+        }
+
+        .action-btn:hover {
+            background: var(--hover-bg);
+            color: var(--accent-color);
+        }
+
+        /* Stop Generation Button */
+        .stop-generation {
+            display: none;
+            position: fixed;
+            bottom: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #ff4444;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(255, 68, 68, 0.3);
+        }
+
+        .stop-generation.show {
+            display: block;
+        }
+
+        /* Image Preview */
+        .image-preview {
+            position: relative;
+            display: inline-block;
+            margin-top: 0.5rem;
+        }
+
+        .image-preview img {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 12px;
+            cursor: pointer;
+        }
+
+        .image-preview-close {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Keyboard Shortcuts Help */
+        .shortcuts-help {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2rem;
+            max-width: 500px;
+            z-index: 2000;
+            display: none;
+            box-shadow: 0 8px 32px var(--shadow);
+        }
+
+        .shortcuts-help.show {
+            display: block;
+        }
+
+        .shortcut-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .shortcut-key {
+            background: var(--bg-tertiary);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+
+        /* Mobile Responsiveness */
+        @media (max-width: 768px) {
+            .settings-panel {
+                width: 100%;
+                right: -100%;
+            }
+        }
+    </style>
 </head>
 
 <body>
+    <!-- Recording Indicator -->
+    <div class="recording-indicator" id="recording-indicator">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            ircle cx="12" cy="12" r="8"/>
+        </svg>
+        <span>Recording...</span>
+    </div>
+
+    <!-- Stop Generation Button -->
+    <button class="stop-generation" id="stop-generation-btn">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="display: inline-block; margin-right: 8px;">
+            <rect x="6" y="6" width="12" height="12"/>
+        </svg>
+        Stop Generating
+    </button>
+
     <!-- Top Navigation Bar -->
     <nav class="top-nav">
         <div class="nav-left">
@@ -33,7 +376,7 @@
                     <path fill="currentColor" d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z" />
                 </svg>
                 <button class="model-selector-btn" id="model-selector-btn">
-                    <span id="selected-model-name">GPT-3.5 Turbo</span>
+                    <span id="selected-model-name">Gemini 2.0 Flash</span>
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                         <path d="M7 10l5 5 5-5z" />
                     </svg>
@@ -41,6 +384,11 @@
             </div>
         </div>
         <div class="nav-right">
+            <button class="nav-button icon-only" id="settings-btn" title="Settings">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                    <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
+                </svg>
+            </button>
             {% if not user.is_premium %}
             <button class="nav-button upgrade-btn" onclick="location.href='/checkout'">
                 <span>⭐ Upgrade to Premium</span>
@@ -54,14 +402,152 @@
         </div>
     </nav>
 
+    <!-- Settings Panel -->
+    <div class="settings-panel" id="settings-panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <h2 style="font-size: 1.25rem; color: var(--text-primary);">Settings</h2>
+            <button class="nav-button icon-only" id="close-settings-btn">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Theme Settings -->
+        <div class="settings-section">
+            <h3>🎨 Appearance</h3>
+            <div class="setting-item" style="display: block;">
+                <label style="display: block; margin-bottom: 0.75rem;">Theme</label>
+                <div class="theme-selector">
+                    <div class="theme-option" data-theme="light">
+                        <div>☀️</div>
+                        <div>Light</div>
+                    </div>
+                    <div class="theme-option active" data-theme="dark">
+                        <div>🌙</div>
+                        <div>Dark</div>
+                    </div>
+                    <div class="theme-option" data-theme="system">
+                        <div>💻</div>
+                        <div>System</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Voice Settings -->
+        <div class="settings-section">
+            <h3>🎤 Voice & Audio</h3>
+            <div class="setting-item">
+                <label>Voice Input</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="voice-input-toggle" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="setting-item">
+                <label>Auto-play Responses</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="tts-toggle">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Chat Settings -->
+        <div class="settings-section">
+            <h3>💬 Chat Preferences</h3>
+            <div class="setting-item">
+                <label>Code Syntax Highlighting</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="syntax-highlight-toggle" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="setting-item">
+                <label>Show Timestamps</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="timestamps-toggle">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Export -->
+        <div class="settings-section">
+            <h3>📥 Export</h3>
+            <button class="export-btn" id="export-chat-btn">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="display: inline-block; margin-right: 8px;">
+                    <path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2z"/>
+                </svg>
+                Export Current Chat
+            </button>
+        </div>
+
+        <!-- Keyboard Shortcuts -->
+        <div class="settings-section">
+            <h3>⌨️ Keyboard Shortcuts</h3>
+            <button class="export-btn" id="show-shortcuts-btn" style="background: var(--bg-tertiary); color: var(--text-primary);">
+                View Shortcuts
+            </button>
+        </div>
+
+        <!-- Account Info -->
+        <div class="settings-section">
+            <h3>👤 Account</h3>
+            <div style="padding: 1rem; background: var(--bg-secondary); border-radius: 8px;">
+                <p style="margin-bottom: 0.5rem; color: var(--text-primary);"><strong>{{ user.name }}</strong></p>
+                <p style="margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.9rem;">{{ user.email }}</p>
+                {% if user.is_premium %}
+                <span style="background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); color: #000; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem; font-weight: 600;">⭐ Premium</span>
+                {% else %}
+                <span style="background: var(--bg-tertiary); color: var(--text-secondary); padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem;">Free Account</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Keyboard Shortcuts Help -->
+    <div class="shortcuts-help" id="shortcuts-help">
+        <h3 style="margin-bottom: 1.5rem; color: var(--text-primary);">⌨️ Keyboard Shortcuts</h3>
+        <div class="shortcut-item">
+            <span>New Chat</span>
+            <span class="shortcut-key">Ctrl + K</span>
+        </div>
+        <div class="shortcut-item">
+            <span>Toggle Sidebar</span>
+            <span class="shortcut-key">Ctrl + B</span>
+        </div>
+        <div class="shortcut-item">
+            <span>Settings</span>
+            <span class="shortcut-key">Ctrl + ,</span>
+        </div>
+        <div class="shortcut-item">
+            <span>Focus Input</span>
+            <span class="shortcut-key">Ctrl + /</span>
+        </div>
+        <div class="shortcut-item">
+            <span>Voice Input</span>
+            <span class="shortcut-key">Ctrl + Shift + V</span>
+        </div>
+        <div class="shortcut-item">
+            <span>Export Chat</span>
+            <span class="shortcut-key">Ctrl + E</span>
+        </div>
+        <div class="shortcut-item">
+            <span>Show Shortcuts</span>
+            <span class="shortcut-key">Ctrl + ?</span>
+        </div>
+        <button class="export-btn" id="close-shortcuts-btn" style="margin-top: 1rem; width: 100%;">Close</button>
+    </div>
+
     <!-- Model Selector Dropdown -->
     <div id="model-selector" class="model-selector-dropdown" style="display:none;">
         <div class="model-selector-header">
             <h3>Select AI Model</h3>
             <button class="close-selector" id="close-selector-btn">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                    <path
-                        d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
                 </svg>
             </button>
         </div>
@@ -73,15 +559,13 @@
                     <span class="group-badge free">Free</span>
                     <span class="group-title">Available for Everyone</span>
                 </div>
-                {% for model_key, model_data in models.items() if model_key in
-                ['gpt-3.5-turbo','claude-3-haiku','gemini-flash','deepseek-chat'] %}
-                <div class="model-card {% if loop.first %}active{% endif %}" data-model="{{ model_key }}"
-                    data-name="{{ model_data.name }}">
+                {% for model_key, model_data in models.items() if model_key in ['gemini-flash','gpt-3.5-turbo','claude-3-haiku','deepseek-chat'] %}
+                <div class="model-card {% if loop.first %}active{% endif %}" data-model="{{ model_key }}" data-name="{{ model_data.name }}">
                     <div class="model-card-header">
                         <div class="model-icon">
-                            {% if 'gpt' in model_key %}<span class="icon-text">🤖</span>
+                            {% if 'gemini' in model_key %}<span class="icon-text">⚡</span>
+                            {% elif 'gpt' in model_key %}<span class="icon-text">🤖</span>
                             {% elif 'claude' in model_key %}<span class="icon-text">🎭</span>
-                            {% elif 'gemini' in model_key %}<span class="icon-text">✨</span>
                             {% elif 'deepseek' in model_key %}<span class="icon-text">🔍</span>
                             {% else %}<span class="icon-text">💬</span>{% endif %}
                         </div>
@@ -89,19 +573,12 @@
                             <h4 class="model-name">{{ model_data.name }}</h4>
                             <div class="model-features">
                                 {% if model_data.vision %}<span class="feature-badge vision">📷 Vision</span>{% endif %}
-                                {% if model_data.limit %}<span class="feature-badge limit">{{ model_data.limit
-                                    }}/day</span>{% endif %}
+                                {% if model_data.limit %}<span class="feature-badge limit">{{ model_data.limit }}/day</span>{% endif %}
                                 <span class="feature-badge speed">⚡ Fast</span>
                             </div>
                         </div>
                     </div>
-                    <div class="model-description">
-                        {% if 'gpt-3.5' in model_key %}Fast and efficient for everyday tasks
-                        {% elif 'claude-3-haiku' in model_key %}Fast Claude model, great for quick responses
-                        {% elif 'gemini-flash' in model_key %}Google's fast and efficient model
-                        {% elif 'deepseek' in model_key %}Advanced reasoning with daily limit
-                        {% else %}Versatile AI model{% endif %}
-                    </div>
+                    <div class="model-description">{{ model_data.description }}</div>
                 </div>
                 {% endfor %}
             </div>
@@ -113,8 +590,7 @@
                     <span class="group-badge premium">⭐ Premium</span>
                     <span class="group-title">Unlimited Access</span>
                 </div>
-                {% for model_key, model_data in models.items() if model_key in
-                ['gpt-4o','gpt-4o-mini','claude-3.5-sonnet','claude-3-opus','gemini-pro','deepseek-r1'] %}
+                {% for model_key, model_data in models.items() if model_key in ['gpt-4o','gpt-4o-mini','claude-3.5-sonnet','claude-3-opus','gemini-pro','deepseek-r1'] %}
                 <div class="model-card premium" data-model="{{ model_key }}" data-name="{{ model_data.name }}">
                     <div class="model-card-header">
                         <div class="model-icon premium">
@@ -132,15 +608,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="model-description">
-                        {% if 'gpt-4o-mini' in model_key %}Fast and cost-effective GPT-4 variant
-                        {% elif 'gpt-4o' in model_key %}Most advanced GPT with vision & reasoning
-                        {% elif 'claude-3.5' in model_key %}Best for coding, writing & analysis
-                        {% elif 'claude-3-opus' in model_key %}Most capable Claude model
-                        {% elif 'gemini-pro' in model_key %}Google's most capable AI
-                        {% elif 'deepseek-r1' in model_key %}Advanced reasoning & problem solving
-                        {% else %}High-performance AI model{% endif %}
-                    </div>
+                    <div class="model-description">{{ model_data.description }}</div>
                 </div>
                 {% endfor %}
             </div>
@@ -195,8 +663,7 @@
         {% endif %}
         <a href="/logout" class="menu-item">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                <path
-                    d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z" />
+                <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z" />
             </svg>
             Log out
         </a>
@@ -231,7 +698,7 @@
                     {% if not user.is_premium %}
                     <div class="usage-item">
                         <span class="usage-label">DeepSeek Today:</span>
-                        <span class="usage-value">{{ user.deepseek_count }}/50</span>
+                        <span class="usage-value">{{ user.deepseek_count or 0 }}/50</span>
                     </div>
                     <div class="upgrade-cta-small">
                         <a href="/checkout">Upgrade for unlimited access →</a>
@@ -275,18 +742,22 @@
         <div class="input-wrapper">
             <div class="input-box">
                 <div class="input-inner">
-                    <!-- Hidden file input -->
                     <input type="file" id="file-input" accept="image/*,application/pdf" style="display:none;">
 
-                    <!-- Attach button -->
                     <button class="attach-button" id="attach-btn" title="Attach file">
                         <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                            <path
-                                d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z" />
+                            <path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z" />
                         </svg>
                     </button>
 
                     <textarea id="chat-input" placeholder="Ask anything..." rows="1"></textarea>
+
+                    <button class="voice-button" id="voice-btn" title="Voice input (Ctrl+Shift+V)">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                        </svg>
+                    </button>
 
                     <button class="send-button" id="send-btn">
                         <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
@@ -296,353 +767,239 @@
                 </div>
                 <div class="input-footer">
                     <span class="footer-text">
-                        <span id="model-info">GPT-3.5 Turbo</span> · NexaAI can make mistakes. Check important info.
+                        <span id="model-info">Gemini 2.0 Flash</span> · NexaAI can make mistakes. Check important info.
                     </span>
                 </div>
             </div>
         </div>
+    </div>
 
     <script>
         let currentModel = 'gemini-flash';
         let currentChatId = null;
         let isLoading = false;
-        let lastUserMessage = '';
+        let currentUploadedFile = null;
+        let currentTheme = localStorage.getItem('theme') || 'dark';
+        let isRecording = false;
+        let recognition = null;
+        let speechSynthesis = window.speechSynthesis;
 
-        // Update model display
-        document.getElementById('model-select').addEventListener('change', (e) => {
-            currentModel = e.target.value;
-            const selectedText = e.target.options[e.target.selectedIndex].text;
-            document.getElementById('model-info').textContent = selectedText;
+        // Initialize theme
+        document.documentElement.setAttribute('data-theme', currentTheme);
+
+        // Web Speech API setup
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'en-US';
+
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                document.getElementById('chat-input').value = transcript;
+                stopRecording();
+            };
+
+            recognition.onerror = (event) => {
+                console.error('Speech recognition error:', event.error);
+                stopRecording();
+            };
+
+            recognition.onend = () => {
+                stopRecording();
+            };
+        }
+
+        // Theme management
+        function setTheme(theme) {
+            if (theme === 'system') {
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                theme = prefersDark ? 'dark' : 'light';
+            }
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+            currentTheme = theme;
+            
+            // Update active theme button
+            document.querySelectorAll('.theme-option').forEach(opt => {
+                opt.classList.remove('active');
+                if (opt.dataset.theme === localStorage.getItem('theme')) {
+                    opt.classList.add('active');
+                }
+            });
+        }
+
+        // Theme selector
+        document.querySelectorAll('.theme-option').forEach(option => {
+            option.addEventListener('click', function() {
+                const theme = this.dataset.theme;
+                localStorage.setItem('theme', theme);
+                setTheme(theme);
+            });
         });
 
-        // Textarea auto-resize
-        const chatInput = document.getElementById('chat-input');
-        chatInput.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = Math.min(this.scrollHeight, 200) + 'px';
+        // Settings panel
+        document.getElementById('settings-btn').addEventListener('click', () => {
+            document.getElementById('settings-panel').classList.add('open');
         });
 
-        // Enter to send
-        chatInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
+        document.getElementById('close-settings-btn').addEventListener('click', () => {
+            document.getElementById('settings-panel').classList.remove('open');
         });
 
-        // Toggle sidebar
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const mainContainer = document.getElementById('main-container');
-            const inputWrapper = document.getElementById('input-wrapper');
+        // Voice recording
+        function startRecording() {
+            if (!recognition) {
+                alert('Voice input is not supported in your browser');
+                return;
+            }
             
-            sidebar.classList.toggle('collapsed');
-            mainContainer.classList.toggle('sidebar-collapsed');
+            if (isRecording) return;
             
-            if (window.innerWidth <= 1024) {
-                sidebar.classList.toggle('show');
-            }
+            isRecording = true;
+            document.getElementById('voice-btn').classList.add('recording');
+            document.getElementById('recording-indicator').classList.add('active');
+            recognition.start();
         }
 
-        // New chat
-        async function newChat() {
-            try {
-                const res = await fetch('/chat/new', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'}
-                });
-                const data = await res.json();
-                
-                if (data.success) {
-                    currentChatId = data.chat_id;
-                    document.getElementById('messages-container').innerHTML = '';
-                    document.getElementById('welcome-section').style.display = 'block';
-                    document.getElementById('chat-input').value = '';
-                    
-                    addChatToSidebar(data.chat_id, data.title);
-                    
-                    document.querySelectorAll('.chat-item').forEach(el => el.classList.remove('active'));
-                }
-            } catch (e) {
-                console.error('Failed to create chat:', e);
-            }
-        }
-
-        // Load chat
-        async function loadChat(chatId) {
-            if (isLoading) return;
-            isLoading = true;
-
-            try {
-                const res = await fetch(`/chat/${chatId}/messages`);
-                const data = await res.json();
-
-                currentChatId = chatId;
-                document.getElementById('messages-container').innerHTML = '';
-                document.getElementById('welcome-section').style.display = 'none';
-
-                data.messages.forEach(msg => {
-                    if (msg.image_url) {
-                        const imgHtml = `<img src="${msg.image_url}" class="generated-image" style="max-width:100%;border-radius:12px;margin:8px 0" alt="Generated"/><br>${escapeHtml(msg.content)}`;
-                        addMessage(imgHtml, msg.role, true);
-                    } else {
-                        addMessage(msg.content, msg.role);
-                    }
-                });
-
-                document.querySelectorAll('.chat-item').forEach(el => el.classList.remove('active'));
-                document.querySelector(`[data-chat-id="${chatId}"]`)?.classList.add('active');
-
-                if (window.innerWidth <= 1024) {
-                    document.getElementById('sidebar').classList.remove('show');
-                }
-            } catch (e) {
-                console.error('Failed to load chat:', e);
-            } finally {
-                isLoading = false;
-            }
-        }
-
-        // Rename chat
-        async function renameChat(chatId) {
-            const newTitle = prompt('Enter new title:');
-            if (!newTitle || !newTitle.trim()) return;
-
-            try {
-                const res = await fetch(`/chat/${chatId}/rename`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({title: newTitle.trim()})
-                });
-
-                if (res.ok) {
-                    document.querySelector(`[data-chat-id="${chatId}"] .chat-title`).textContent = newTitle.trim();
-                }
-            } catch (e) {
-                console.error('Failed to rename:', e);
-            }
-        }
-
-        // Delete chat
-        async function deleteChat(chatId) {
-            if (!confirm('Delete this chat?')) return;
-
-            try {
-                const res = await fetch(`/chat/${chatId}/delete`, {method: 'DELETE'});
-
-                if (res.ok) {
-                    document.querySelector(`[data-chat-id="${chatId}"]`)?.remove();
-                    
-                    if (currentChatId === chatId) {
-                        currentChatId = null;
-                        document.getElementById('messages-container').innerHTML = '';
-                        document.getElementById('welcome-section').style.display = 'block';
-                    }
-
-                    const history = document.getElementById('chat-history');
-                    if (!history.querySelector('.chat-item')) {
-                        history.innerHTML = '<div class="empty-state">No chats yet.<br>Start a conversation!</div>';
-                    }
-                }
-            } catch (e) {
-                console.error('Failed to delete:', e);
-            }
-        }
-
-        // Add chat to sidebar
-        function addChatToSidebar(chatId, title) {
-            const history = document.getElementById('chat-history');
-            const emptyState = history.querySelector('.empty-state');
-            if (emptyState) emptyState.remove();
-
-            const item = document.createElement('div');
-            item.className = 'chat-item active';
-            item.dataset.chatId = chatId;
-            item.innerHTML = `
-                <span class="chat-title">${escapeHtml(title)}</span>
-                <div class="chat-actions">
-                    <button class="icon-btn" onclick="event.stopPropagation(); renameChat(${chatId})">✏️</button>
-                    <button class="icon-btn" onclick="event.stopPropagation(); deleteChat(${chatId})">🗑️</button>
-                </div>
-            `;
-            item.onclick = () => loadChat(chatId);
-
-            document.querySelectorAll('.chat-item').forEach(el => el.classList.remove('active'));
-            history.insertBefore(item, history.firstChild);
-        }
-
-        // Use suggestion
-        function useSuggestion(text) {
-            document.getElementById('chat-input').value = text;
-            sendMessage();
-        }
-
-        // Send message
-        async function sendMessage() {
-            const input = document.getElementById('chat-input');
-            const message = input.value.trim();
-            if (!message || isLoading) return;
-
-            isLoading = true;
-            lastUserMessage = message;
-
-            document.getElementById('welcome-section').style.display = 'none';
-
-            addMessage(message, 'user');
-            input.value = '';
-            input.style.height = 'auto';
-            showTyping();
-
-            try {
-                const res = await fetch('/chat', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        message,
-                        model: currentModel,
-                        chat_id: currentChatId
-                    })
-                });
-
-                const data = await res.json();
-                removeTyping();
-
-                if (data.error) {
-                    addErrorMessage(data.error);
-                } else {
-                    if (data.image_url) {
-                        const imgHtml = `<img src="${data.image_url}" class="generated-image" style="max-width:100%;border-radius:12px;margin:8px 0" alt="Generated"/><br>${escapeHtml(data.response)}`;
-                        addMessage(imgHtml, 'assistant', true);
-                    } else {
-                        addMessage(data.response, 'assistant');
-                    }
-
-                    currentChatId = data.chat_id;
-
-                    if (data.chat_title) {
-                        const existing = document.querySelector(`[data-chat-id="${data.chat_id}"]`);
-                        if (existing) {
-                            existing.querySelector('.chat-title').textContent = data.chat_title;
-                        } else {
-                            addChatToSidebar(data.chat_id, data.chat_title);
-                        }
-                    }
-                }
-            } catch (e) {
-                removeTyping();
-                addErrorMessage('Hmm! Something went wrong');
-            } finally {
-                isLoading = false;
-            }
-        }
-
-        // Retry message
-        async function retryMessage() {
-            if (!lastUserMessage || isLoading) return;
+        function stopRecording() {
+            if (!isRecording) return;
             
-            const errorMsg = document.querySelector('.message-row.error-row');
-            if (errorMsg) errorMsg.remove();
-            
-            document.getElementById('chat-input').value = lastUserMessage;
-            sendMessage();
+            isRecording = false;
+            document.getElementById('voice-btn').classList.remove('recording');
+            document.getElementById('recording-indicator').classList.remove('active');
+            if (recognition) recognition.stop();
         }
 
-        // Add error with retry
-        function addErrorMessage(errorText) {
-            const container = document.getElementById('messages-container');
-            const msgDiv = document.createElement('div');
-            msgDiv.className = 'message-row error-row';
-
-            msgDiv.innerHTML = `
-                <div class="message error-message">
-                    <div class="message-content" style="background:#4a1a1a;color:#ff6b6b;padding:1rem;border-radius:12px;display:flex;align-items:center;gap:12px;justify-content:space-between;">
-                        <span>⚠️ ${escapeHtml(errorText)}</span>
-                        <button onclick="retryMessage()" style="background:#ff6b6b;color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;">
-                            <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
-                            </svg>
-                            Retry
-                        </button>
-                    </div>
-                </div>
-            `;
-
-            container.appendChild(msgDiv);
-            msgDiv.scrollIntoView({ behavior: 'smooth' });
-        }
-
-        // Add message
-        function addMessage(text, role, isHtml = false) {
-            const container = document.getElementById('messages-container');
-            const msgDiv = document.createElement('div');
-            msgDiv.className = `message-row ${role}-row`;
-
-            if (role === 'user') {
-                msgDiv.innerHTML = `
-                    <div class="message user-message">
-                        <div class="message-content">${escapeHtml(text)}</div>
-                    </div>
-                `;
+        document.getElementById('voice-btn').addEventListener('click', () => {
+            if (isRecording) {
+                stopRecording();
             } else {
-                msgDiv.innerHTML = `
-                    <div class="message assistant-message">
-                        <div class="avatar">
-                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                                <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
-                            </svg>
-                        </div>
-                        <div class="message-content markdown-content"></div>
-                    </div>
-                `;
-                
-                const contentDiv = msgDiv.querySelector('.markdown-content');
-                if (isHtml) {
-                    contentDiv.innerHTML = text;
+                startRecording();
+            }
+        });
+
+        // Text-to-speech
+        function speakText(text) {
+            if (!document.getElementById('tts-toggle').checked) return;
+            
+            if (speechSynthesis.speaking) {
+                speechSynthesis.cancel();
+            }
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+            speechSynthesis.speak(utterance);
+        }
+
+        // Export chat
+        document.getElementById('export-chat-btn').addEventListener('click', () => {
+            if (!currentChatId) {
+                alert('No active chat to export');
+                return;
+            }
+            
+            const messages = document.querySelectorAll('.message-row');
+            let exportText = `NexaAI Chat Export\n`;
+            exportText += `Date: ${new Date().toLocaleString()}\n\n`;
+            exportText += `${'='.repeat(50)}\n\n`;
+            
+            messages.forEach(msg => {
+                const role = msg.classList.contains('user-row') ? 'You' : 'AI';
+                const content = msg.querySelector('.message-text').textContent;
+                exportText += `${role}:\n${content}\n\n`;
+            });
+            
+            const blob = new Blob([exportText], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `chat-${currentChatId}-${Date.now()}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            // Ctrl+K: New chat
+            if (e.ctrlKey && e.key === 'k') {
+                e.preventDefault();
+                newChat();
+            }
+            
+            // Ctrl+B: Toggle sidebar
+            if (e.ctrlKey && e.key === 'b') {
+                e.preventDefault();
+                toggleSidebar();
+            }
+            
+            // Ctrl+,: Settings
+            if (e.ctrlKey && e.key === ',') {
+                e.preventDefault();
+                document.getElementById('settings-panel').classList.toggle('open');
+            }
+            
+            // Ctrl+/: Focus input
+            if (e.ctrlKey && e.key === '/') {
+                e.preventDefault();
+                document.getElementById('chat-input').focus();
+            }
+            
+            // Ctrl+Shift+V: Voice input
+            if (e.ctrlKey && e.shiftKey && e.key === 'V') {
+                e.preventDefault();
+                if (isRecording) {
+                    stopRecording();
                 } else {
-                    contentDiv.innerHTML = formatMessage(text);
-                    contentDiv.querySelectorAll('pre code').forEach(block => {
-                        if (typeof hljs !== 'undefined') hljs.highlightElement(block);
-                    });
-                    addCopyButtons(contentDiv);
+                    startRecording();
                 }
             }
-
-            container.appendChild(msgDiv);
-            msgDiv.scrollIntoView({ behavior: 'smooth' });
-        }
-
-        // Typing indicator
-        function showTyping() {
-            const container = document.getElementById('messages-container');
-            const typing = document.createElement('div');
-            typing.id = 'typing-indicator';
-            typing.className = 'message-row assistant-row';
-            typing.innerHTML = `
-                <div class="message assistant-message">
-                    <div class="avatar">
-                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                            <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
-                        </svg>
-                    </div>
-                    <div class="typing-dots"><span></span><span></span><span></span></div>
-                </div>
-            `;
-            container.appendChild(typing);
-            typing.scrollIntoView({ behavior: 'smooth' });
-        }
-
-        function removeTyping() {
-            document.getElementById('typing-indicator')?.remove();
-        }
-
-        // Format markdown
-        function formatMessage(text) {
-            if (typeof marked === 'undefined') return escapeHtml(text).replace(/\n/g, '<br>');
             
+            // Ctrl+E: Export
+            if (e.ctrlKey && e.key === 'e') {
+                e.preventDefault();
+                document.getElementById('export-chat-btn').click();
+            }
+            
+            // Ctrl+?: Show shortcuts
+            if (e.ctrlKey && e.key === '?') {
+                e.preventDefault();
+                document.getElementById('shortcuts-help').classList.add('show');
+            }
+            
+            // Escape: Close modals
+            if (e.key === 'Escape') {
+                document.getElementById('shortcuts-help').classList.remove('show');
+                document.getElementById('settings-panel').classList.remove('open');
+                document.getElementById('model-selector').style.display = 'none';
+            }
+        });
+
+        // Shortcuts help
+        document.getElementById('show-shortcuts-btn').addEventListener('click', () => {
+            document.getElementById('shortcuts-help').classList.add('show');
+        });
+
+        document.getElementById('close-shortcuts-btn').addEventListener('click', () => {
+            document.getElementById('shortcuts-help').classList.remove('show');
+        });
+
+        function escapeHtml(text) {
+            const d = document.createElement('div');
+            d.textContent = text;
+            return d.innerHTML;
+        }
+
+        function formatMessage(text) {
+            if (typeof marked === 'undefined') {
+                return escapeHtml(text).replace(/\n/g, '<br>');
+            }
             marked.setOptions({
                 gfm: true,
                 breaks: true,
-                highlight: function(code, lang) {
+                highlight: function (code, lang) {
                     if (typeof hljs !== 'undefined' && lang && hljs.getLanguage(lang)) {
                         return hljs.highlight(code, { language: lang }).value;
                     }
@@ -652,50 +1009,422 @@
             return marked.parse(text);
         }
 
-        // Add copy buttons
         function addCopyButtons(container) {
             container.querySelectorAll('pre code').forEach((codeBlock) => {
                 const pre = codeBlock.parentElement;
-                if (pre.querySelector('.copy-code-btn')) return;
-
                 const btn = document.createElement('button');
                 btn.className = 'copy-code-btn';
                 btn.textContent = 'Copy';
-                btn.style.position = 'absolute';
-                btn.style.top = '8px';
-                btn.style.right = '8px';
-                
                 btn.addEventListener('click', () => {
                     navigator.clipboard.writeText(codeBlock.textContent);
                     btn.textContent = 'Copied!';
                     setTimeout(() => (btn.textContent = 'Copy'), 1500);
                 });
-
                 pre.style.position = 'relative';
+                btn.style.position = 'absolute';
+                btn.style.top = '8px';
+                btn.style.right = '8px';
                 pre.appendChild(btn);
             });
         }
 
-        // Escape HTML
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
+        function toggleSidebar() {
+            const s = document.getElementById('sidebar');
+            const m = document.getElementById('main-content');
+            if (window.innerWidth <= 1024) {
+                s.classList.toggle('show');
+            } else {
+                s.classList.toggle('collapsed');
+                m.classList.toggle('sidebar-collapsed');
+            }
         }
 
-        // Mobile: Close sidebar when clicking outside
+        function toggleUserMenu() {
+            const m = document.getElementById('user-menu');
+            m.style.display = m.style.display === 'block' ? 'none' : 'block';
+        }
+
+        function toggleModelSelector() {
+            const s = document.getElementById('model-selector');
+            s.style.display = s.style.display === 'block' ? 'none' : 'block';
+        }
+
+        function selectModel(key, name) {
+            currentModel = key;
+            document.getElementById('selected-model-name').textContent = name;
+            document.getElementById('model-info').textContent = name;
+            document.querySelectorAll('.model-card').forEach(c => c.classList.remove('active'));
+            document.querySelector(`[data-model="${key}"]`)?.classList.add('active');
+            toggleModelSelector();
+        }
+
+        async function newChat() {
+            try {
+                const res = await fetch('/chat/new', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const d = await res.json();
+                if (d.success) {
+                    currentChatId = d.chat_id;
+                    document.getElementById('messages-container').innerHTML = '';
+                    document.getElementById('welcome-section').style.display = 'block';
+                    document.getElementById('chat-input').value = '';
+                    addChatToSidebar(d.chat_id, d.title, true);
+                }
+            } catch {
+                alert('Failed to create new chat');
+            }
+        }
+
+        async function loadChat(id) {
+            if (isLoading) return;
+            isLoading = true;
+            try {
+                const res = await fetch(`/chat/${id}/messages`);
+                const d = await res.json();
+                if (d.error) {
+                    alert(d.error);
+                    return;
+                }
+                currentChatId = id;
+                const mc = document.getElementById('messages-container');
+                mc.innerHTML = '';
+                document.getElementById('welcome-section').style.display = 'none';
+                d.messages.forEach(m => addMessage(m.content, m.role, m.model || '', false));
+                document.querySelectorAll('.chat-item').forEach(el => el.classList.remove('active'));
+                document.querySelector(`[data-chat-id="${id}"]`)?.classList.add('active');
+                if (window.innerWidth <= 1024) document.getElementById('sidebar').classList.remove('show');
+            } catch {
+                alert('Failed to load chat');
+            } finally {
+                isLoading = false;
+            }
+        }
+
+        async function renameChat(id) {
+            const title = prompt('Enter new chat title:');
+            if (!title || !title.trim()) return;
+            try {
+                const res = await fetch(`/chat/${id}/rename`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title: title.trim() })
+                });
+                const d = await res.json();
+                if (d.success) {
+                    document.querySelector(`[data-chat-id="${id}"] .chat-title`).textContent = title.trim();
+                }
+            } catch {
+                alert('Failed to rename chat');
+            }
+        }
+
+        async function deleteChat(id) {
+            if (!confirm('Delete this chat?')) return;
+            try {
+                const res = await fetch(`/chat/${id}/delete`, { method: 'DELETE' });
+                const d = await res.json();
+                if (d.success) {
+                    document.querySelector(`[data-chat-id="${id}"]`)?.remove();
+                    if (currentChatId === id) {
+                        currentChatId = null;
+                        document.getElementById('messages-container').innerHTML = '';
+                        document.getElementById('welcome-section').style.display = 'block';
+                    }
+                }
+            } catch {
+                alert('Failed to delete chat');
+            }
+        }
+
+        function addChatToSidebar(id, title, prepend = false) {
+            const h = document.querySelector('.chat-history');
+            const e = h.querySelector('.empty-state');
+            if (e) e.remove();
+            const item = document.createElement('div');
+            item.className = 'chat-item';
+            item.dataset.chatId = id;
+            item.innerHTML = `
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                    <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+                </svg>
+                <span class="chat-title">${escapeHtml(title)}</span>
+                <div class="chat-actions">
+                    <button class="icon-btn rename-chat-btn" data-chat-id="${id}">✏️</button>
+                    <button class="icon-btn delete-chat-btn" data-chat-id="${id}">🗑️</button>
+                </div>`;
+            if (prepend) h.insertBefore(item, h.firstChild);
+            else h.appendChild(item);
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            if (!message || isLoading) return;
+            isLoading = true;
+
+            document.getElementById('welcome-section').style.display = 'none';
+            addMessage(message, 'user', '', false);
+            input.value = '';
+            input.style.height = 'auto';
+            showTypingIndicator();
+            document.getElementById('stop-generation-btn').classList.add('show');
+
+            try {
+                const res = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message,
+                        model: currentModel,
+                        chat_id: currentChatId,
+                        uploaded_file: currentUploadedFile
+                    })
+                });
+                const d = await res.json();
+                removeTypingIndicator();
+                document.getElementById('stop-generation-btn').classList.remove('show');
+
+                currentUploadedFile = null;
+                const attachBtn = document.getElementById('attach-btn');
+                attachBtn.style.color = '#9ca3af';
+                attachBtn.title = 'Attach file';
+
+                if (d.error) {
+                    addMessage(d.error, 'error', '', false);
+                } else {
+                    addMessage(d.response, 'assistant', d.model, true);
+                    currentChatId = d.chat_id;
+                    
+                    // Text-to-speech for response
+                    speakText(d.response);
+                    
+                    if (d.chat_title) {
+                        const ex = document.querySelector(`[data-chat-id="${d.chat_id}"]`);
+                        if (ex) ex.querySelector('.chat-title').textContent = d.chat_title;
+                        else addChatToSidebar(d.chat_id, d.chat_title, true);
+                    }
+                }
+            } catch {
+                removeTypingIndicator();
+                document.getElementById('stop-generation-btn').classList.remove('show');
+                addMessage('Network error talking to server.', 'error', '', false);
+            } finally {
+                isLoading = false;
+            }
+        }
+
+        function addMessage(text, role, model = '', useMarkdown = false) {
+            const c = document.getElementById('messages-container');
+            const row = document.createElement('div');
+            row.className = `message-row ${role}-row`;
+
+            if (role === 'user') {
+                row.innerHTML = `
+                    <div class="message user-message">
+                        <div class="message-content">
+                            <div class="message-text">${escapeHtml(text)}</div>
+                        </div>
+                    </div>`;
+                c.appendChild(row);
+                c.scrollTop = c.scrollHeight;
+                return;
+            }
+
+            if (role === 'assistant') {
+                row.innerHTML = `
+                    <div class="message assistant-message">
+                        <div class="avatar">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                                <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
+                            </svg>
+                        </div>
+                        <div class="message-content">
+                            ${model ? `<div class="model-badge">${escapeHtml(model)}</div>` : ''}
+                            <div class="message-text markdown-content"></div>
+                            <div class="message-actions">
+                                <button class="action-btn copy-message-btn">
+                                    <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+                                        <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                                    </svg>
+                                    Copy
+                                </button>
+                                <button class="action-btn speak-btn">
+                                    <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+                                        <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
+                                    </svg>
+                                    Speak
+                                </button>
+                            </div>
+                        </div>
+                    </div>`;
+                c.appendChild(row);
+                const el = row.querySelector('.message-text');
+                el.innerHTML = formatMessage(text);
+                el.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
+                addCopyButtons(el);
+                
+                // Add copy message functionality
+                row.querySelector('.copy-message-btn').addEventListener('click', () => {
+                    navigator.clipboard.writeText(text);
+                    const btn = row.querySelector('.copy-message-btn');
+                    btn.textContent = 'Copied!';
+                    setTimeout(() => btn.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>Copy', 2000);
+                });
+                
+                // Add speak functionality
+                row.querySelector('.speak-btn').addEventListener('click', () => {
+                    speakText(text);
+                });
+                
+                c.scrollTop = c.scrollHeight;
+                return;
+            }
+
+            row.innerHTML = `
+                <div class="message error-message">
+                    <div class="message-content">⚠️ ${escapeHtml(text)}</div>
+                </div>`;
+            c.appendChild(row);
+            c.scrollTop = c.scrollHeight;
+        }
+
+        function showTypingIndicator() {
+            const c = document.getElementById('messages-container');
+            const d = document.createElement('div');
+            d.className = 'message-row assistant-row typing-indicator';
+            d.id = 'typing-indicator';
+            d.innerHTML = `
+                <div class="message assistant-message">
+                    <div class="avatar">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                            <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
+                        </svg>
+                    </div>
+                    <div class="typing-dots"><span></span><span></span><span></span></div>
+                </div>`;
+            c.appendChild(d);
+            c.scrollTop = c.scrollHeight;
+        }
+
+        function removeTypingIndicator() {
+            document.getElementById('typing-indicator')?.remove();
+        }
+
+        // Attach button
+        document.getElementById('attach-btn')?.addEventListener('click', () => {
+            document.getElementById('file-input').click();
+        });
+
+        // File input handler
+        document.getElementById('file-input')?.addEventListener('change', async function (e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const res = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    currentUploadedFile = data.filepath;
+                    const attachBtn = document.getElementById('attach-btn');
+                    attachBtn.style.color = '#19c37d';
+                    attachBtn.title = `Attached: ${file.name}`;
+                } else {
+                    alert(data.error || 'Upload failed');
+                }
+            } catch (err) {
+                alert('Failed to upload file');
+            }
+            e.target.value = '';
+        });
+
+        // Global click handlers
         document.addEventListener('click', (e) => {
-            const sidebar = document.getElementById('sidebar');
-            const toggle = document.getElementById('sidebar-toggle');
+            if (e.target.closest('.chat-item') && !e.target.closest('.chat-actions')) {
+                const id = e.target.closest('.chat-item').dataset.chatId;
+                if (id) loadChat(parseInt(id));
+            }
+            if (e.target.closest('.rename-chat-btn')) {
+                e.stopPropagation();
+                const id = parseInt(e.target.closest('.rename-chat-btn').dataset.chatId);
+                renameChat(id);
+            }
+            if (e.target.closest('.delete-chat-btn')) {
+                e.stopPropagation();
+                const id = parseInt(e.target.closest('.delete-chat-btn').dataset.chatId);
+                deleteChat(id);
+            }
+
+            const menu = document.getElementById('user-menu');
+            if (menu && !e.target.closest('#user-menu-btn') && !menu.contains(e.target)) {
+                menu.style.display = 'none';
+            }
+            const sel = document.getElementById('model-selector');
+            if (sel.style.display === 'block' &&
+                !e.target.closest('#model-selector-btn') &&
+                !e.target.closest('#close-selector-btn') &&
+                !sel.contains(e.target)) {
+                sel.style.display = 'none';
+            }
+            if (window.innerWidth <= 1024) {
+                const s = document.getElementById('sidebar');
+                if (s.classList.contains('show') &&
+                    !e.target.closest('#sidebar-toggle') &&
+                    !s.contains(e.target)) {
+                    s.classList.remove('show');
+                }
+            }
             
-            if (window.innerWidth <= 1024 && 
-                !sidebar.contains(e.target) && 
-                !toggle.contains(e.target) && 
-                sidebar.classList.contains('show')) {
-                sidebar.classList.remove('show');
+            // Close settings when clicking outside
+            const settingsPanel = document.getElementById('settings-panel');
+            if (settingsPanel.classList.contains('open') &&
+                !e.target.closest('#settings-btn') &&
+                !settingsPanel.contains(e.target)) {
+                settingsPanel.classList.remove('open');
             }
         });
+
+        // Suggestions
+        document.querySelectorAll('.model-card').forEach(card => {
+            card.addEventListener('click', function () {
+                selectModel(this.dataset.model, this.dataset.name);
+            });
+        });
+        document.querySelectorAll('.suggestion-card').forEach(card => {
+            card.addEventListener('click', function () {
+                document.getElementById('chat-input').value = this.dataset.suggestion;
+                sendMessage();
+            });
+        });
+
+        document.getElementById('sidebar-toggle')?.addEventListener('click', toggleSidebar);
+        document.getElementById('new-chat-btn')?.addEventListener('click', newChat);
+        document.getElementById('model-selector-btn')?.addEventListener('click', toggleModelSelector);
+        document.getElementById('close-selector-btn')?.addEventListener('click', toggleModelSelector);
+        document.getElementById('user-menu-btn')?.addEventListener('click', toggleUserMenu);
+        document.getElementById('send-btn')?.addEventListener('click', sendMessage);
+        document.getElementById('chat-input')?.addEventListener('keydown', e => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+        document.getElementById('chat-input')?.addEventListener('input', function () {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 200) + 'px';
+        });
+
+        // Initialize theme on page load
+        setTheme(localStorage.getItem('theme') || 'dark');
     </script>
 </body>
-</html>
 
+</html>
