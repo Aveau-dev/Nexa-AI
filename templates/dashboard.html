@@ -14,144 +14,293 @@
 </head>
 
 <body>
-    <!-- Top Navigation -->
+    <!-- Top Navigation Bar -->
     <nav class="top-nav">
         <div class="nav-left">
-            <button class="nav-button icon-only" id="sidebar-toggle" onclick="toggleSidebar()">
+            <button class="nav-button icon-only" id="sidebar-toggle">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                    <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+                    <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" />
                 </svg>
             </button>
-            <button class="nav-button" onclick="newChat()">
+            <button class="nav-button" id="new-chat-btn">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
                 </svg>
                 <span>New chat</span>
             </button>
             <div class="logo-container">
-                <svg class="logo-icon" viewBox="0 0 24 24" width="24" height="24">
-                    <path fill="currentColor" d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
+                <svg class="logo-icon" viewBox="0 0 24 24" width="20" height="20">
+                    <path fill="currentColor" d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z" />
                 </svg>
-                <span class="logo-text">NexaAI</span>
+                <button class="model-selector-btn" id="model-selector-btn">
+                    <span id="selected-model-name">GPT-3.5 Turbo</span>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <path d="M7 10l5 5 5-5z" />
+                    </svg>
+                </button>
             </div>
         </div>
         <div class="nav-right">
-            {% if user.is_premium %}
-                <span class="premium-badge-nav">⭐ PREMIUM</span>
+            {% if not user.is_premium %}
+            <button class="nav-button upgrade-btn" onclick="location.href='/checkout'">
+                <span>⭐ Upgrade to Premium</span>
+            </button>
             {% else %}
-                <button class="nav-button upgrade-btn" onclick="location.href='/checkout'">
-                    <span>⭐ Upgrade</span>
-                </button>
+            <div class="premium-badge-nav">⭐ Premium</div>
             {% endif %}
-            
-            <select class="model-dropdown" id="model-select">
-                <optgroup label="🆓 Free">
-                    <option value="gemini-flash">Gemini 2.5 Flash ⚡</option>
-                    <option value="chatgpt">ChatGPT 4o Mini 🤖</option>
-                    <option value="claude-haiku">Claude 3.5 Haiku 🎭</option>
-                    <option value="deepseek-v3">DeepSeek V3 🔍</option>
-                    <option value="mistral-7b">Mistral 7B ⚡</option>
-                </optgroup>
-                {% if user.is_premium %}
-                <optgroup label="⭐ Premium">
-                    <option value="gpt-4o">GPT-4o 🚀</option>
-                    <option value="gpt-4o-mini">GPT-4o Mini 💎</option>
-                    <option value="claude-sonnet">Claude 3.5 Sonnet 🎭</option>
-                    <option value="gemini-pro-vision">Gemini Pro Vision 👁️</option>
-                </optgroup>
-                {% endif %}
-            </select>
-            
-            <div class="user-avatar" onclick="location.href='/logout'" title="Logout">
-                {{ user.name[0].upper() }}
-            </div>
+            <button class="nav-button icon-only" id="user-menu-btn">
+                <div class="user-avatar">{{ user.name[0].upper() }}</div>
+            </button>
         </div>
     </nav>
+
+    <!-- Model Selector Dropdown -->
+    <div id="model-selector" class="model-selector-dropdown" style="display:none;">
+        <div class="model-selector-header">
+            <h3>Select AI Model</h3>
+            <button class="close-selector" id="close-selector-btn">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                    <path
+                        d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                </svg>
+            </button>
+        </div>
+
+        <div class="model-selector-content">
+            <!-- Free models -->
+            <div class="model-group">
+                <div class="model-group-header">
+                    <span class="group-badge free">Free</span>
+                    <span class="group-title">Available for Everyone</span>
+                </div>
+                {% for model_key, model_data in models.items() if model_key in
+                ['gpt-3.5-turbo','claude-3-haiku','gemini-flash','deepseek-chat'] %}
+                <div class="model-card {% if loop.first %}active{% endif %}" data-model="{{ model_key }}"
+                    data-name="{{ model_data.name }}">
+                    <div class="model-card-header">
+                        <div class="model-icon">
+                            {% if 'gpt' in model_key %}<span class="icon-text">🤖</span>
+                            {% elif 'claude' in model_key %}<span class="icon-text">🎭</span>
+                            {% elif 'gemini' in model_key %}<span class="icon-text">✨</span>
+                            {% elif 'deepseek' in model_key %}<span class="icon-text">🔍</span>
+                            {% else %}<span class="icon-text">💬</span>{% endif %}
+                        </div>
+                        <div class="model-info">
+                            <h4 class="model-name">{{ model_data.name }}</h4>
+                            <div class="model-features">
+                                {% if model_data.vision %}<span class="feature-badge vision">📷 Vision</span>{% endif %}
+                                {% if model_data.limit %}<span class="feature-badge limit">{{ model_data.limit
+                                    }}/day</span>{% endif %}
+                                <span class="feature-badge speed">⚡ Fast</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="model-description">
+                        {% if 'gpt-3.5' in model_key %}Fast and efficient for everyday tasks
+                        {% elif 'claude-3-haiku' in model_key %}Fast Claude model, great for quick responses
+                        {% elif 'gemini-flash' in model_key %}Google's fast and efficient model
+                        {% elif 'deepseek' in model_key %}Advanced reasoning with daily limit
+                        {% else %}Versatile AI model{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Premium models -->
+            {% if user.is_premium %}
+            <div class="model-group">
+                <div class="model-group-header">
+                    <span class="group-badge premium">⭐ Premium</span>
+                    <span class="group-title">Unlimited Access</span>
+                </div>
+                {% for model_key, model_data in models.items() if model_key in
+                ['gpt-4o','gpt-4o-mini','claude-3.5-sonnet','claude-3-opus','gemini-pro','deepseek-r1'] %}
+                <div class="model-card premium" data-model="{{ model_key }}" data-name="{{ model_data.name }}">
+                    <div class="model-card-header">
+                        <div class="model-icon premium">
+                            {% if 'gpt-4' in model_key %}<span class="icon-text">🧠</span>
+                            {% elif 'claude' in model_key %}<span class="icon-text">🎭</span>
+                            {% elif 'gemini' in model_key %}<span class="icon-text">💎</span>
+                            {% elif 'deepseek-r1' in model_key %}<span class="icon-text">🚀</span>
+                            {% else %}<span class="icon-text">⚡</span>{% endif %}
+                        </div>
+                        <div class="model-info">
+                            <h4 class="model-name">{{ model_data.name }}</h4>
+                            <div class="model-features">
+                                {% if model_data.vision %}<span class="feature-badge vision">📷 Vision</span>{% endif %}
+                                <span class="feature-badge unlimited">∞ Unlimited</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="model-description">
+                        {% if 'gpt-4o-mini' in model_key %}Fast and cost-effective GPT-4 variant
+                        {% elif 'gpt-4o' in model_key %}Most advanced GPT with vision & reasoning
+                        {% elif 'claude-3.5' in model_key %}Best for coding, writing & analysis
+                        {% elif 'claude-3-opus' in model_key %}Most capable Claude model
+                        {% elif 'gemini-pro' in model_key %}Google's most capable AI
+                        {% elif 'deepseek-r1' in model_key %}Advanced reasoning & problem solving
+                        {% else %}High-performance AI model{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="model-group locked">
+                <div class="model-group-header">
+                    <span class="group-badge premium">⭐ Premium</span>
+                    <span class="group-title">Unlock Advanced Models</span>
+                </div>
+                <div class="upgrade-card" onclick="location.href='/checkout'">
+                    <div class="upgrade-content">
+                        <div class="upgrade-icon">🔓</div>
+                        <h3>Upgrade to Premium</h3>
+                        <p>Get unlimited access to GPT-4, Claude 3.5, Gemini Pro & more</p>
+                        <ul class="upgrade-features">
+                            <li>✓ GPT-4o & GPT-4o Mini</li>
+                            <li>✓ Claude 3.5 Sonnet (Best for coding)</li>
+                            <li>✓ Unlimited messages</li>
+                            <li>✓ Priority support</li>
+                        </ul>
+                        <button class="upgrade-button">Upgrade Now - $19.99/mo</button>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- User Menu -->
+    <div id="user-menu" class="dropdown-menu" style="display:none;">
+        <div class="menu-header">
+            <div class="user-avatar-large">{{ user.name[0].upper() }}</div>
+            <div class="user-info">
+                <div class="user-name">{{ user.name }}</div>
+                <div class="user-email">{{ user.email }}</div>
+                {% if user.is_premium %}
+                <div class="premium-badge-small">⭐ Premium Member</div>
+                {% else %}
+                <div class="free-badge-small">Free Account</div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="menu-divider"></div>
+        {% if not user.is_premium %}
+        <a href="/checkout" class="menu-item">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                <path d="M12 2L2 12h3v8h14v-8h3L12 2zm0 2.84L18 10v8h-3v-6H9v6H6v-8l6-5.16z" />
+            </svg>
+            Upgrade to Premium
+        </a>
+        <div class="menu-divider"></div>
+        {% endif %}
+        <a href="/logout" class="menu-item">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                <path
+                    d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z" />
+            </svg>
+            Log out
+        </a>
+    </div>
 
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-content">
             <div class="sidebar-section">
                 <div class="section-title">Chat History</div>
-                <div class="chat-history" id="chat-history">
+                <div class="chat-history">
                     {% if chats %}
-                        {% for chat in chats %}
-                        <div class="chat-item" data-chat-id="{{ chat.id }}" onclick="loadChat({{ chat.id }})">
-                            <span class="chat-title">{{ chat.title }}</span>
-                            <div class="chat-actions">
-                                <button class="icon-btn" onclick="event.stopPropagation(); renameChat({{ chat.id }})" title="Rename">✏️</button>
-                                <button class="icon-btn" onclick="event.stopPropagation(); deleteChat({{ chat.id }})" title="Delete">🗑️</button>
-                            </div>
+                    {% for chat in chats %}
+                    <div class="chat-item" data-chat-id="{{ chat.id }}">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                            <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z" />
+                        </svg>
+                        <span class="chat-title">{{ chat.title }}</span>
+                        <div class="chat-actions">
+                            <button class="icon-btn rename-chat-btn" data-chat-id="{{ chat.id }}">✏️</button>
+                            <button class="icon-btn delete-chat-btn" data-chat-id="{{ chat.id }}">🗑️</button>
                         </div>
-                        {% endfor %}
+                    </div>
+                    {% endfor %}
                     {% else %}
-                        <div class="empty-state">No chats yet.<br>Start a conversation!</div>
+                    <div class="empty-state">No chats yet. Start a new conversation!</div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="sidebar-footer">
+                <div class="usage-info">
+                    {% if not user.is_premium %}
+                    <div class="usage-item">
+                        <span class="usage-label">DeepSeek Today:</span>
+                        <span class="usage-value">{{ user.deepseek_count }}/50</span>
+                    </div>
+                    <div class="upgrade-cta-small">
+                        <a href="/checkout">Upgrade for unlimited access →</a>
+                    </div>
+                    {% else %}
+                    <div class="premium-info">✨ You have unlimited access to all models</div>
                     {% endif %}
                 </div>
             </div>
         </div>
-        
-        <div class="sidebar-footer">
-            {% if user.is_premium %}
-                <div class="premium-info">⭐ Premium Active</div>
-            {% else %}
-                <div class="upgrade-cta-small">
-                    <a href="/checkout">⭐ Upgrade to Premium</a>
-                </div>
-            {% endif %}
-        </div>
     </aside>
 
-    <!-- Main Content -->
-    <div class="main-container with-sidebar" id="main-container">
+    <!-- Main Chat Area -->
+    <div class="main-container with-sidebar" id="main-content">
         <div class="center-content">
-            <!-- Welcome Section -->
             <div class="welcome-section" id="welcome-section">
                 <h1 class="main-heading">What can I help with?</h1>
-                
                 <div class="suggestion-cards">
-                    <div class="suggestion-card" onclick="useSuggestion('Generate an image of a sunset over mountains')">
-                        <div class="suggestion-icon">🎨</div>
-                        <div class="suggestion-text">Generate beautiful images</div>
+                    <div class="suggestion-card" data-suggestion="Create a weekly schedule for studying programming">
+                        <div class="suggestion-icon">📅</div>
+                        <div class="suggestion-text">Create a schedule</div>
                     </div>
-                    <div class="suggestion-card" onclick="useSuggestion('Explain quantum computing in simple terms')">
-                        <div class="suggestion-icon">🔬</div>
-                        <div class="suggestion-text">Learn complex topics</div>
-                    </div>
-                    <div class="suggestion-card" onclick="useSuggestion('Write a Python function to reverse a string')">
+                    <div class="suggestion-card" data-suggestion="Write Python code to sort a list">
                         <div class="suggestion-icon">💻</div>
-                        <div class="suggestion-text">Get coding help</div>
+                        <div class="suggestion-text">Write code</div>
                     </div>
-                    <div class="suggestion-card" onclick="useSuggestion('Plan a 5-day trip to Tokyo')">
-                        <div class="suggestion-icon">✈️</div>
-                        <div class="suggestion-text">Plan adventures</div>
+                    <div class="suggestion-card" data-suggestion="Explain machine learning concepts">
+                        <div class="suggestion-icon">🧠</div>
+                        <div class="suggestion-text">Learn AI concepts</div>
+                    </div>
+                    <div class="suggestion-card" data-suggestion="Help me write a creative story">
+                        <div class="suggestion-icon">✍️</div>
+                        <div class="suggestion-text">Write a story</div>
                     </div>
                 </div>
             </div>
 
-            <!-- Messages Container -->
             <div id="messages-container"></div>
         </div>
-    </div>
 
-    <!-- Input Area -->
-    <div class="input-wrapper" id="input-wrapper">
-        <div class="input-box">
-            <div class="input-inner">
-                <textarea id="chat-input" placeholder="Ask anything or generate images..." rows="1"></textarea>
-                <button class="send-button" onclick="sendMessage()" id="send-btn">
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-                    </svg>
-                </button>
-            </div>
-            <div class="input-footer">
-                <span class="footer-text">
-                    <span id="model-info">Gemini 2.5 Flash</span> · NexaAI may make mistakes
-                </span>
+        <div class="input-wrapper">
+            <div class="input-box">
+                <div class="input-inner">
+                    <!-- Hidden file input -->
+                    <input type="file" id="file-input" accept="image/*,application/pdf" style="display:none;">
+
+                    <!-- Attach button -->
+                    <button class="attach-button" id="attach-btn" title="Attach file">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                            <path
+                                d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z" />
+                        </svg>
+                    </button>
+
+                    <textarea id="chat-input" placeholder="Ask anything..." rows="1"></textarea>
+
+                    <button class="send-button" id="send-btn">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="input-footer">
+                    <span class="footer-text">
+                        <span id="model-info">GPT-3.5 Turbo</span> · NexaAI can make mistakes. Check important info.
+                    </span>
+                </div>
             </div>
         </div>
-    </div>
 
     <script>
         let currentModel = 'gemini-flash';
@@ -549,3 +698,4 @@
     </script>
 </body>
 </html>
+
