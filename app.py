@@ -21,6 +21,10 @@ import base64
 from PIL import Image
 import traceback
 import logging
+import openai
+
+# Google Generative AI for Gemini
+import google.generativeai as genai
 
 # Load environment
 load_dotenv()
@@ -50,6 +54,27 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'
 login_manager.session_protection = 'strong'
 
+# -------- Configure AI APIs --------
+# Google Generative AI
+google_api_key = os.getenv('GOOGLE_API_KEY')
+if google_api_key:
+    genai.configure(api_key=google_api_key)
+    log.info("✅ Google Generative AI configured")
+else:
+    log.warning("⚠️ GOOGLE_API_KEY not found")
+
+# OpenRouter client
+openrouter_api_key = os.getenv('OPENROUTER_API_KEY')
+if openrouter_api_key:
+    openrouter_client = openai.OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=openrouter_api_key,
+    )
+    log.info("✅ OpenRouter configured")
+else:
+    openrouter_client = None
+    log.warning("⚠️ OPENROUTER_API_KEY not found")
+
 # ============ MODELS ============
 class User(UserMixin, db.Model):
     __tablename__ = 'user'
@@ -59,6 +84,8 @@ class User(UserMixin, db.Model):
     name = db.Column(db.String(100), nullable=False)
     is_premium = db.Column(db.Boolean, default=False)
     subscription_id = db.Column(db.String(100), nullable=True)
+    deepseek_count = db.Column(db.Integer, default=0)
+    deepseek_date = db.Column(db.String(10))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     chats = db.relationship('Chat', backref='user', lazy=True, cascade='all, delete-orphan')
 
@@ -103,8 +130,7 @@ def load_user(user_id):
 
 # ============ DATABASE MIGRATION (sqlite only; safe checks) ============
 def migrate_database_sqlite():
-    """Attempt to add missing columns for older sqlite DBs (best-effort).
-    If you're using a production DB use Alembic instead of this helper."""
+    """Attempt to add missing columns for older sqlite DBs (best-effort)."""
     try:
         uri = app.config['SQLALCHEMY_DATABASE_URI']
         if not uri.startswith('sqlite:///'):
@@ -136,7 +162,6 @@ def migrate_database_sqlite():
                 cur.execute("ALTER TABLE message ADD COLUMN image_url TEXT")
                 log.info("Added message.image_url")
         except sqlite3.OperationalError:
-            # table may not exist yet
             log.info("Message table not present yet (will be created).")
 
         # User table
@@ -148,6 +173,12 @@ def migrate_database_sqlite():
             if 'is_premium' not in cols:
                 cur.execute("ALTER TABLE user ADD COLUMN is_premium BOOLEAN DEFAULT 0")
                 log.info("Added user.is_premium")
+            if 'deepseek_count' not in cols:
+                cur.execute("ALTER TABLE user ADD COLUMN deepseek_count INTEGER DEFAULT 0")
+                log.info("Added user.deepseek_count")
+            if 'deepseek_date' not in cols:
+                cur.execute("ALTER TABLE user ADD COLUMN deepseek_date TEXT")
+                log.info("Added user.deepseek_date")
         except sqlite3.OperationalError:
             log.info("User table not present yet (will be created).")
 
@@ -160,34 +191,36 @@ def migrate_database_sqlite():
 # ============ AI MODELS CONFIG ============
 FREE_MODELS = {
     "gemini-flash": {
-        "name": "Gemini Flash ⚡",
-        "model": "google/gemini-2.5-flash-lite",
-        "type": "openrouter",
+        "name": "Gemini 2.5 Flash ⚡",
+        "model": "gemini-2.5-flash-lite",
+        "provider": "google",
+        "vision": True,
+        "limit": None,
         "description": "Fast and efficient Gemini Flash model"
     },
-    "chatgpt": {
-        "name": "ChatGPT 4o Mini 🤖",
-        "model": "openai/gpt-4o-mini:free",
-        "type": "openrouter",
-        "description": "OpenAI GPT-4o Mini – lightweight"
+    "gpt-3.5-turbo": {
+        "name": "ChatGPT 3.5 Turbo 🤖",
+        "model": "openai/gpt-3.5-turbo",
+        "provider": "openrouter",
+        "vision": False,
+        "limit": None,
+        "description": "OpenAI GPT-3.5 Turbo"
     },
-    "claude-haiku": {
-        "name": "Claude 3.5 Haiku 🎭",
-        "model": "anthropic/claude-3-5-haiku:free",
-        "type": "openrouter",
+    "claude-3-haiku": {
+        "name": "Claude 3 Haiku 🎭",
+        "model": "anthropic/claude-3-haiku",
+        "provider": "openrouter",
+        "vision": True,
+        "limit": None,
         "description": "Fast Claude model"
     },
-    "deepseek-v3": {
-        "name": "DeepSeek V3 🔍",
-        "model": "deepseek/deepseek-chat-v3:free",
-        "type": "openrouter",
-        "description": "Powerful for code & logic"
-    },
-    "mistral-7b": {
-        "name": "Mistral 7B ⚡",
-        "model": "mistralai/mistral-7b-instruct:free",
-        "type": "openrouter",
-        "description": "Balanced 7B instruction model"
+    "deepseek-chat": {
+        "name": "DeepSeek Chat 🔍",
+        "model": "deepseek/deepseek-chat",
+        "provider": "openrouter",
+        "vision": False,
+        "limit": 50,
+        "description": "Powerful for code & logic (50/day for free users)"
     },
 }
 
@@ -195,33 +228,148 @@ PREMIUM_MODELS = {
     "gpt-4o": {
         "name": "GPT-4o 🚀",
         "model": "openai/gpt-4o",
-        "type": "openrouter",
+        "provider": "openrouter",
+        "vision": True,
         "description": "Most capable GPT-4 family model"
     },
     "gpt-4o-mini": {
         "name": "GPT-4o Mini 💎",
         "model": "openai/gpt-4o-mini",
-        "type": "openrouter",
+        "provider": "openrouter",
+        "vision": True,
         "description": "Efficient GPT-4 style model"
     },
-    "claude-sonnet": {
+    "claude-3.5-sonnet": {
         "name": "Claude 3.5 Sonnet 🎭",
-        "model": "anthropic/claude-3-5-sonnet",
-        "type": "openrouter",
-        "description": "High-quality Claude variant"
+        "model": "anthropic/claude-3.5-sonnet",
+        "provider": "openrouter",
+        "vision": True,
+        "description": "Best for coding & analysis"
     },
-    "gemini-pro-vision": {
-        "name": "Gemini Pro Vision 👁️",
-        "model": "google/gemini-pro-1.5",
-        "type": "openrouter",
+    "claude-3-opus": {
+        "name": "Claude 3 Opus 👑",
+        "model": "anthropic/claude-3-opus",
+        "provider": "openrouter",
+        "vision": True,
+        "description": "Most capable Claude model"
+    },
+    "gemini-pro": {
+        "name": "Gemini 1.5 Pro 👁️",
+        "model": "gemini-1.5-pro",
+        "provider": "google",
+        "vision": True,
         "description": "Multimodal vision-capable"
+    },
+    "deepseek-r1": {
+        "name": "DeepSeek R1 🚀",
+        "model": "deepseek/deepseek-r1",
+        "provider": "openrouter",
+        "vision": False,
+        "description": "Advanced reasoning model"
     },
 }
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
 
-# ============ HELPERS ============
+# ============ AI API CALLING FUNCTIONS ============
+
+def call_google_gemini(model_path, messages, timeout=60):
+    """Call Google Generative AI for Gemini models"""
+    try:
+        if not google_api_key:
+            raise Exception("Google API key not configured")
+        
+        model = genai.GenerativeModel(model_path)
+        
+        # Convert messages to Gemini format
+        gemini_history = []
+        last_message = None
+        
+        for msg in messages:
+            role = msg.get('role', 'user')
+            content = msg.get('content', '')
+            
+            # Skip system messages (Gemini doesn't use them explicitly)
+            if role == 'system':
+                continue
+            
+            # Convert role
+            gemini_role = 'user' if role == 'user' else 'model'
+            
+            # Store last message separately (will be sent via send_message)
+            if msg == messages[-1]:
+                last_message = {'role': gemini_role, 'parts': [content]}
+            else:
+                gemini_history.append({'role': gemini_role, 'parts': [content]})
+        
+        # Start chat with history
+        chat = model.start_chat(history=gemini_history)
+        
+        # Send last message
+        if last_message:
+            response = chat.send_message(last_message['parts'][0])
+        else:
+            response = chat.send_message(messages[-1].get('content', ''))
+        
+        return response.text
+    
+    except Exception as e:
+        log.exception("Google Gemini API error")
+        raise Exception(f"Google Gemini API error: {str(e)}")
+
+
+def call_openrouter(model_path, messages, timeout=60):
+    """Call OpenRouter API for GPT, Claude, DeepSeek models"""
+    try:
+        if not openrouter_client:
+            raise Exception("OpenRouter API key not configured")
+        
+        response = openrouter_client.chat.completions.create(
+            model=model_path,
+            messages=messages,
+            timeout=timeout
+        )
+        
+        return response.choices[0].message.content
+    
+    except Exception as e:
+        log.exception("OpenRouter API error")
+        raise Exception(f"OpenRouter API error: {str(e)}")
+
+
+def call_ai_model(model_key, messages, uploaded_file=None):
+    """Universal function to call any AI model - routes to correct provider"""
+    # Get model config
+    if model_key in FREE_MODELS:
+        model_config = FREE_MODELS[model_key]
+    elif model_key in PREMIUM_MODELS:
+        model_config = PREMIUM_MODELS[model_key]
+    else:
+        raise Exception(f"Model {model_key} not found")
+    
+    provider = model_config['provider']
+    model_path = model_config['model']
+    
+    # Handle image uploads for vision models
+    if uploaded_file and model_config.get('vision'):
+        try:
+            if os.path.exists(uploaded_file):
+                # Add image context to the last user message
+                messages[-1]['content'] = f"{messages[-1]['content']}\n[Image attached: {uploaded_file}]"
+        except Exception as e:
+            log.exception("Error processing image")
+    
+    # Route to appropriate provider
+    if provider == 'google':
+        return call_google_gemini(model_path, messages)
+    elif provider == 'openrouter':
+        return call_openrouter(model_path, messages)
+    else:
+        raise Exception(f"Unknown provider: {provider}")
+
+
+# ============ HELPER FUNCTIONS ============
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
@@ -236,12 +384,10 @@ def encode_image(image_path):
 def compress_image(image_path, max_size=(1024, 1024), quality=85):
     try:
         img = Image.open(image_path)
-        # Normalize mode
         if getattr(img, "mode", None) == "RGBA":
             bg = Image.new("RGB", img.size, (255, 255, 255))
             bg.paste(img, mask=img.split()[3])
             img = bg
-        # Resize/thumbnail
         resample = getattr(Image, "Resampling", None)
         if resample:
             resample_filter = Image.Resampling.LANCZOS
@@ -259,65 +405,47 @@ def generate_chat_title(first_message):
         title += "..."
     return title
 
+def check_deepseek_limit(user):
+    """Check and reset DeepSeek daily limit"""
+    today = datetime.utcnow().strftime('%Y-%m-%d')
+    
+    if user.deepseek_date != today:
+        user.deepseek_count = 0
+        user.deepseek_date = today
+        db.session.commit()
+    
+    return user.deepseek_count < 50
+
 def get_chat_history(chat_id, limit=10):
-    """Return last `limit` messages as list (oldest -> newest) with minimal content suitable for API."""
+    """Return last `limit` messages as list for API"""
     try:
         messages = Message.query.filter_by(chat_id=chat_id).order_by(Message.created_at.desc()).limit(limit).all()
-        messages = list(reversed(messages))  # oldest -> newest
-        history = []
-        for msg in messages:
-            if msg.has_image and msg.image_path:
-                # If image exists on disk, convert to data URI else fallback to image_url
-                data_uri = None
-                if msg.image_path and os.path.exists(msg.image_path):
-                    b64 = encode_image(msg.image_path)
-                    if b64:
-                        # assume jpeg if extension unknown
-                        ext = msg.image_path.rsplit('.', 1)[-1].lower()
-                        mime = "image/jpeg" if ext in ['jpg', 'jpeg'] else f"image/{ext}"
-                        data_uri = f"data:{mime};base64,{b64}"
-                history.append({
-                    'role': msg.role,
-                    'content': msg.content,
-                    'image_data': data_uri or msg.image_url
-                })
-            else:
-                history.append({'role': msg.role, 'content': msg.content})
-        # Convert into simple structure expected by OpenRouter (role/content only) when calling API
+        messages = list(reversed(messages))
+        
         formatted = []
-        for item in history:
-            content = item.get('content', '')
-            # If image_data exists we append a textual hint for the model; models usually won't fetch images,
-            # but keeping a descriptive placeholder is useful.
-            if item.get('image_data'):
-                content = f"{content}\n[image: {item.get('image_data')}]"
-            formatted.append({'role': item.get('role', 'user'), 'content': content})
+        for msg in messages:
+            content = msg.content
+            
+            # Add image reference if exists
+            if msg.has_image and (msg.image_path or msg.image_url):
+                img_ref = msg.image_url or msg.image_path
+                content = f"{content}\n[Image: {img_ref}]"
+            
+            formatted.append({
+                'role': msg.role,
+                'content': content
+            })
+        
         return formatted
     except Exception:
         log.exception("Failed to fetch chat history")
         return []
 
-def call_openrouter(model_path, messages, timeout=60):
-    """Call OpenRouter API - WORKING VERSION"""
-    try:
-        response = openrouter_client.chat.completions.create(
-            model=model_path,
-            messages=messages,
-            timeout=timeout
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        raise Exception(f"OpenRouter API error: {str(e)}")
-
 def generate_image(prompt):
-    """
-    Construct an image URL using Pollinations-style endpoint.
-    NOTE: many public endpoints may rate-limit or change behavior; this returns a URL you can display.
-    """
+    """Generate image URL using Pollinations"""
     try:
         encoded_prompt = requests.utils.quote(prompt)
         seed = int(datetime.utcnow().timestamp())
-        # Constructed URL — don't HEAD-check (some providers block HEAD). Let frontend load it.
         return f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&seed={seed}"
     except Exception:
         log.exception("Failed to construct image URL")
@@ -348,7 +476,7 @@ def index():
 
 @app.route('/uploads/<path:filename>')
 def uploaded_file(filename):
-    """Serve uploaded files (simple). In production use a proper static server or CDN."""
+    """Serve uploaded files"""
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 @app.route('/demo-chat', methods=['POST'])
@@ -359,6 +487,7 @@ def demo_chat():
         if not message:
             return jsonify({'error': 'Message is required'}), 400
 
+        # Image generation check
         image_keywords = ['generate image', 'create image', 'draw', 'picture of', 'image of', 'make an image']
         if any(k in message.lower() for k in image_keywords):
             try:
@@ -372,11 +501,18 @@ def demo_chat():
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
 
-        # fallback text demo - choose a safe free model if available
+        # Use Gemini Flash for demo
         try:
-            model_path = FREE_MODELS.get('gemini-flash', FREE_MODELS.get('chatgpt'))['model']
-            response_text = call_openrouter(model_path, [{'role': 'user', 'content': message}], timeout=30)
-            return jsonify({'response': response_text, 'demo': True, 'model': model_path})
+            messages = [
+                {'role': 'system', 'content': 'You are a helpful AI assistant.'},
+                {'role': 'user', 'content': message}
+            ]
+            response_text = call_ai_model('gemini-flash', messages)
+            return jsonify({
+                'response': response_text,
+                'demo': True,
+                'model': 'gemini 2.5 flash lite'
+            })
         except Exception as e:
             log.exception("Demo chat failed")
             return jsonify({'error': str(e)}), 500
@@ -385,7 +521,7 @@ def demo_chat():
         log.exception("Demo chat outer error")
         return jsonify({'error': 'An error occurred. Please try again.'}), 500
 
-# -------- Auth routes (signup/login/logout) --------
+# -------- Auth routes --------
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     if request.method == 'POST':
@@ -403,7 +539,12 @@ def signup():
                 return jsonify({'error': 'Email already exists'}), 400
 
             hashed = generate_password_hash(password)
-            new_user = User(email=email, name=name, password=hashed)
+            new_user = User(
+                email=email,
+                name=name,
+                password=hashed,
+                deepseek_date=datetime.utcnow().strftime('%Y-%m-%d')
+            )
             db.session.add(new_user)
             db.session.commit()
             log.info("New user registered: %s", email)
@@ -460,12 +601,13 @@ def logout():
 def dashboard():
     try:
         chats = Chat.query.filter_by(user_id=current_user.id).order_by(Chat.updated_at.desc()).all()
-        return render_template('dashboard.html', user=current_user, chats=chats)
+        all_models = {**FREE_MODELS, **PREMIUM_MODELS}
+        return render_template('dashboard.html', user=current_user, chats=chats, models=all_models)
     except Exception:
         log.exception("Dashboard load failed")
-        return render_template('dashboard.html', user=current_user, chats=[])
+        return render_template('dashboard.html', user=current_user, chats=[], models={})
 
-# -------- upload endpoint --------
+# -------- Upload --------
 @app.route('/upload', methods=['POST'])
 @login_required
 def upload_file():
@@ -483,18 +625,24 @@ def upload_file():
         filename = f"{current_user.id}_{timestamp}_{filename}"
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
+        
         try:
             compress_image(filepath)
         except Exception:
             pass
 
         file_url = url_for('uploaded_file', filename=filename, _external=True)
-        return jsonify({'success': True, 'filename': filename, 'filepath': filepath, 'url': file_url})
+        return jsonify({
+            'success': True,
+            'filename': filename,
+            'filepath': filepath,
+            'url': file_url
+        })
     except Exception:
         log.exception("Upload failed")
         return jsonify({'error': 'Upload failed. Please try again.'}), 500
 
-# -------- chat management --------
+# -------- Chat management --------
 @app.route('/chat/new', methods=['POST'])
 @login_required
 def new_chat():
@@ -534,10 +682,11 @@ def delete_chat(chat_id):
         chat = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first()
         if not chat:
             return jsonify({'error': 'Chat not found'}), 404
+        
+        # Delete attached files
         for msg in chat.messages:
             if msg.has_image and msg.image_path:
                 try:
-                    # Remove file if it's inside upload folder
                     if os.path.isabs(msg.image_path):
                         path = msg.image_path
                     else:
@@ -546,6 +695,7 @@ def delete_chat(chat_id):
                         os.remove(path)
                 except Exception:
                     log.exception("Failed to delete attached file")
+        
         db.session.delete(chat)
         db.session.commit()
         return jsonify({'success': True})
@@ -561,6 +711,7 @@ def get_chat_messages(chat_id):
         chat = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first()
         if not chat:
             return jsonify({'error': 'Chat not found'}), 404
+        
         messages = Message.query.filter_by(chat_id=chat_id).order_by(Message.created_at.asc()).all()
         out = []
         for msg in messages:
@@ -577,7 +728,7 @@ def get_chat_messages(chat_id):
         log.exception("Get messages failed")
         return jsonify({'error': 'Failed to load messages'}), 500
 
-# -------- main chat endpoint --------
+# -------- Main chat endpoint (UPDATED) --------
 @app.route('/chat', methods=['POST'])
 @login_required
 def chat_route():
@@ -586,12 +737,12 @@ def chat_route():
         user_message = (data.get('message') or '').strip()
         selected_model = data.get('model') or 'gemini-flash'
         chat_id = data.get('chat_id')
-        uploaded_file_path = data.get('uploaded_file')  # expects an absolute path or filename returned by /upload
+        uploaded_file_path = data.get('uploaded_file')
 
         if not user_message:
             return jsonify({'error': 'Message cannot be empty'}), 400
 
-        # get or create chat
+        # Get or create chat
         if chat_id:
             chat_obj = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first()
             if not chat_obj:
@@ -602,21 +753,42 @@ def chat_route():
             db.session.commit()
             chat_id = chat_obj.id
 
-        # premium check
-        if selected_model in PREMIUM_MODELS and not current_user.is_premium:
+        # Get model config
+        if selected_model in FREE_MODELS:
+            model_info = FREE_MODELS[selected_model]
+            is_premium_model = False
+        elif selected_model in PREMIUM_MODELS:
+            model_info = PREMIUM_MODELS[selected_model]
+            is_premium_model = True
+        else:
+            return jsonify({'error': 'Invalid model selected'}), 400
+
+        # Premium check
+        if is_premium_model and not current_user.is_premium:
             return jsonify({
                 'error': 'This model requires Premium subscription',
                 'upgrade_required': True,
                 'upgrade_url': url_for('checkout')
             }), 403
 
-        # image-generation detection
+        # DeepSeek limit check
+        if selected_model == 'deepseek-chat' and not current_user.is_premium:
+            if not check_deepseek_limit(current_user):
+                return jsonify({
+                    'error': 'Daily limit reached for DeepSeek (50/day). Upgrade to premium for unlimited access.',
+                    'upgrade_required': True,
+                    'upgrade_url': url_for('checkout')
+                }), 429
+
+        # Image generation detection
         image_keywords = ['generate image', 'create image', 'draw', 'picture of', 'image of', 'make an image']
         if any(k in user_message.lower() for k in image_keywords):
             try:
                 image_url = generate_image(user_message)
+                
                 user_msg = Message(chat_id=chat_id, role='user', content=user_message)
                 db.session.add(user_msg)
+                
                 assistant_text = "I've generated the image for you!"
                 assistant_msg = Message(
                     chat_id=chat_id,
@@ -627,10 +799,13 @@ def chat_route():
                     has_image=True
                 )
                 db.session.add(assistant_msg)
+                
                 if chat_obj.title == 'New Chat':
                     chat_obj.title = generate_chat_title(user_message)
+                
                 chat_obj.updated_at = datetime.utcnow()
                 db.session.commit()
+                
                 return jsonify({
                     'response': assistant_text,
                     'image_url': image_url,
@@ -643,15 +818,7 @@ def chat_route():
                 log.exception("Image generation failed")
                 return jsonify({'error': str(e)}), 500
 
-        # resolve model info
-        if selected_model in FREE_MODELS:
-            model_info = FREE_MODELS[selected_model]
-        elif selected_model in PREMIUM_MODELS:
-            model_info = PREMIUM_MODELS[selected_model]
-        else:
-            return jsonify({'error': 'Invalid model selected'}), 400
-
-        # Save user message to DB (do not commit yet - commit after assistant saved)
+        # Save user message
         user_msg = Message(
             chat_id=chat_id,
             role='user',
@@ -664,19 +831,20 @@ def chat_route():
         if chat_obj.title == 'New Chat':
             chat_obj.title = generate_chat_title(user_message)
 
-        # Build history for API
+        # Build conversation history
         history = get_chat_history(chat_id, limit=10)
-        # Note: get_chat_history returns role/content formatted for API already
+        history.append({'role': 'system', 'content': 'You are a helpful AI assistant.'})
         history.append({'role': 'user', 'content': user_message})
 
-        # Call model API
+        # Call AI model
         try:
-            bot_response = call_openrouter(model_info['model'], history, timeout=60)
+            bot_response = call_ai_model(selected_model, history, uploaded_file_path)
         except Exception as e:
             db.session.rollback()
             log.exception("AI call failed")
             return jsonify({'error': str(e)}), 500
 
+        # Save assistant response
         assistant_msg = Message(
             chat_id=chat_id,
             role='assistant',
@@ -685,7 +853,11 @@ def chat_route():
         )
         db.session.add(assistant_msg)
 
-        # Finalize chat
+        # Update DeepSeek count if applicable
+        if selected_model == 'deepseek-chat' and not current_user.is_premium:
+            current_user.deepseek_count += 1
+
+        # Finalize
         chat_obj.updated_at = datetime.utcnow()
         db.session.commit()
 
@@ -696,25 +868,29 @@ def chat_route():
             'chat_title': chat_obj.title,
             'premium': current_user.is_premium
         })
+        
     except Exception:
         db.session.rollback()
         log.exception("Chat route failed")
         return jsonify({'error': 'An error occurred. Please try again.'}), 500
 
-# ============ STRIPE CONFIG ============
+# ============ STRIPE ROUTES ============
 stripe_key = os.getenv('STRIPE_SECRET_KEY')
 if stripe_key:
     stripe.api_key = stripe_key
-    log.info("Stripe configured")
+    log.info("✅ Stripe configured")
 else:
     stripe.api_key = None
-    log.warning("Stripe not configured")
+    log.warning("⚠️ Stripe not configured")
 
 @app.route('/checkout')
 @login_required
 def checkout():
     if not stripe.api_key:
         return "Payment system not configured", 503
+    if current_user.is_premium:
+        return redirect(url_for('dashboard'))
+    
     try:
         session_obj = stripe.checkout.Session.create(
             payment_method_types=['card'],
@@ -724,16 +900,16 @@ def checkout():
                     'currency': 'usd',
                     'product_data': {
                         'name': 'NexaAI Premium',
-                        'description': 'Unlimited access to premium models',
+                        'description': 'Unlimited access to premium AI models',
                     },
-                    'unit_amount': 1999,  # in cents ($19.99)
+                    'unit_amount': 1999,
                     'recurring': {'interval': 'month'}
                 },
                 'quantity': 1
             }],
             mode='subscription',
-            success_url=url_for('payment_success', _external=True),
-            cancel_url=url_for('dashboard', _external=True)
+            success_url=url_for('payment_success', _external=True) + '?session_id={CHECKOUT_SESSION_ID}',
+            cancel_url=url_for('dashboard', _external=True),
         )
         return redirect(session_obj.url)
     except Exception:
@@ -743,23 +919,41 @@ def checkout():
 @app.route('/payment-success')
 @login_required
 def payment_success():
-    return '<h1>Payment Successful!</h1><p>Your premium features are now active.</p><a href="/dashboard">Go to Dashboard</a>'
+    session_id = request.args.get('session_id')
+    
+    if session_id:
+        try:
+            session = stripe.checkout.Session.retrieve(session_id)
+            if session.payment_status == 'paid':
+                current_user.is_premium = True
+                current_user.subscription_id = session.subscription
+                db.session.commit()
+                log.info("User upgraded to premium: %s", current_user.email)
+        except Exception as e:
+            log.exception("Payment verification failed")
+    
+    return redirect(url_for('dashboard'))
 
 @app.route('/webhook', methods=['POST'])
 def stripe_webhook():
     payload = request.data
     sig_header = request.headers.get('Stripe-Signature')
     webhook_secret = os.getenv('STRIPE_WEBHOOK_SECRET')
+    
     if not webhook_secret:
-        # If webhook secret not configured, accept but do nothing
         return '', 200
+    
     try:
-        event = stripe.Webhook.construct_event(payload=payload, sig_header=sig_header, secret=webhook_secret)
+        event = stripe.Webhook.construct_event(
+            payload=payload,
+            sig_header=sig_header,
+            secret=webhook_secret
+        )
     except Exception:
         log.exception("Webhook signature verification failed")
         return '', 400
 
-    # handle events
+    # Handle events
     if event['type'] == 'checkout.session.completed':
         sess = event['data']['object']
         customer_email = sess.get('customer_email')
@@ -770,7 +964,8 @@ def stripe_webhook():
                 user.is_premium = True
                 user.subscription_id = sub_id
                 db.session.commit()
-                log.info("User upgraded to premium: %s", user.email)
+                log.info("User upgraded via webhook: %s", user.email)
+    
     elif event['type'] == 'customer.subscription.deleted':
         subscription = event['data']['object']
         user = User.query.filter_by(subscription_id=subscription.get('id')).first()
@@ -782,7 +977,7 @@ def stripe_webhook():
 
     return '', 200
 
-# ============ simple API endpoints ============
+# ============ API ENDPOINTS ============
 @app.route('/api/models', methods=['GET'])
 def get_models():
     return jsonify({'free': FREE_MODELS, 'premium': PREMIUM_MODELS})
@@ -792,19 +987,20 @@ def health_check():
     return jsonify({
         'status': 'healthy',
         'timestamp': datetime.utcnow().isoformat(),
+        'google_ai_configured': bool(google_api_key),
+        'openrouter_configured': bool(openrouter_client),
         'stripe_configured': bool(stripe.api_key),
         'upload_folder': app.config['UPLOAD_FOLDER']
     })
 
 # ============ DB INIT ============
 def init_database():
-    """Create tables and run best-effort sqlite migrations."""
+    """Create tables and run migrations"""
     try:
         with app.app_context():
-            # If sqlite, try to migrate existing DB first (best-effort)
             migrate_database_sqlite()
             db.create_all()
-            log.info("Database initialized / tables created")
+            log.info("✅ Database initialized successfully")
     except Exception:
         log.exception("Database initialization failed")
 
@@ -813,4 +1009,3 @@ init_database()
 # ============ RUN ============
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
-
