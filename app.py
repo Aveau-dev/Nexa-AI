@@ -21,7 +21,6 @@ import base64
 from PIL import Image
 import traceback
 import logging
-import openai
 
 # Google Generative AI for Gemini
 import google.generativeai as genai
@@ -59,7 +58,6 @@ app.config['UPLOAD_FOLDER'] = os.getenv('UPLOAD_FOLDER', 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB
 app.config['JSON_AS_ASCII'] = False
 
-
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # -------- DB & login --------
@@ -69,32 +67,26 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'
 login_manager.session_protection = 'strong'
 
-# -------- Configure AI APIs --------
+# ============ Configure AI APIs ============
+log.info("Configuring AI APIs...")
+
 # Google Generative AI
 google_api_key = os.getenv('GOOGLE_API_KEY')
 if google_api_key:
-    genai.configure(api_key=google_api_key)
-    log.info("✅ Google Generative AI configured")
+    try:
+        genai.configure(api_key=google_api_key)
+        log.info("✅ Google Generative AI configured")
+    except Exception as e:
+        log.error(f"Google AI config error: {e}")
 else:
-    log.warning("⚠️ GOOGLE_API_KEY not found")
+    log.warning("⚠️ GOOGLE_API_KEY not set")
 
-# OpenRouter client - FIXED for newer OpenAI versions
+# OpenRouter API Key (using requests library - no OpenAI SDK needed)
 openrouter_api_key = os.getenv('OPENROUTER_API_KEY')
 if openrouter_api_key:
-    try:
-        openrouter_client = openai.OpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=openrouter_api_key,
-            timeout=60.0,
-            max_retries=2
-        )
-        log.info("✅ OpenRouter configured")
-    except Exception as e:
-        log.error(f"OpenRouter initialization failed: {e}")
-        openrouter_client = None
+    log.info("✅ OpenRouter API key configured")
 else:
-    openrouter_client = None
-    log.warning("⚠️ OPENROUTER_API_KEY not found")
+    log.warning("⚠️ OPENROUTER_API_KEY not set")
 
 # ============ MODELS ============
 class User(UserMixin, db.Model):
@@ -212,7 +204,7 @@ def migrate_database_sqlite():
 # ============ AI MODELS CONFIG ============
 FREE_MODELS = {
     "gemini-flash": {
-        "name": "Gemini 2.5 Flash ⚡",
+        "name": "Gemini 2.0 Flash ⚡",
         "model": "gemini-2.5-flash-lite",
         "provider": "google",
         "vision": True,
@@ -292,7 +284,6 @@ PREMIUM_MODELS = {
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
-
 # ============ AI API CALLING FUNCTIONS ============
 
 def call_google_gemini(model_path, messages, timeout=60):
@@ -341,22 +332,85 @@ def call_google_gemini(model_path, messages, timeout=60):
 
 
 def call_openrouter(model_path, messages, timeout=60):
-    """Call OpenRouter API for GPT, Claude, DeepSeek models"""
+    """
+    Call OpenRouter API using requests library - No OpenAI SDK needed!
+    This avoids all dependency conflicts with Python 3.13.4
+    """
     try:
-        if not openrouter_client:
+        if not openrouter_api_key:
             raise Exception("OpenRouter API key not configured")
         
-        response = openrouter_client.chat.completions.create(
-            model=model_path,
-            messages=messages,
+        # OpenRouter API headers
+        headers = {
+            "Authorization": f"Bearer {openrouter_api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": os.getenv("APP_URL", "https://nexaai.app"),
+            "X-Title": "NexaAI"
+        }
+        
+        # Request payload
+        payload = {
+            "model": model_path,
+            "messages": messages,
+            "temperature": 0.7,
+            "max_tokens": 2000
+        }
+        
+        # Make HTTP POST request
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers,
+            json=payload,
             timeout=timeout
         )
         
-        return response.choices[0].message.content
+        # Check for HTTP errors
+        response.raise_for_status()
+        
+        # Parse JSON response
+        data = response.json()
+        
+        # Validate response structure
+        if 'choices' not in data or len(data['choices']) == 0:
+            raise Exception("No response from model")
+        
+        # Extract and return the content
+        return data['choices'][0]['message']['content']
+    
+    except requests.exceptions.Timeout:
+        log.error("OpenRouter request timed out")
+        raise Exception("Request timed out. Please try again.")
+    
+    except requests.exceptions.HTTPError as e:
+        log.error(f"OpenRouter HTTP error: {e}")
+        status_code = response.status_code if 'response' in locals() else 0
+        
+        if status_code == 429:
+            raise Exception("Rate limit reached. Please try again later.")
+        elif status_code == 401:
+            raise Exception("Invalid API key. Please check your configuration.")
+        elif status_code == 402:
+            raise Exception("Insufficient credits. Please check your OpenRouter account.")
+        elif status_code == 500:
+            raise Exception("OpenRouter server error. Please try again later.")
+        else:
+            raise Exception(f"API error (Status {status_code})")
+    
+    except requests.exceptions.ConnectionError:
+        log.error("OpenRouter connection failed")
+        raise Exception("Network connection error. Please check your internet.")
+    
+    except requests.exceptions.RequestException as e:
+        log.error(f"OpenRouter request failed: {e}")
+        raise Exception(f"Network error: {str(e)}")
+    
+    except (KeyError, IndexError, ValueError) as e:
+        log.error(f"Invalid response format: {e}")
+        raise Exception("Invalid response from API")
     
     except Exception as e:
-        log.exception("OpenRouter API error")
-        raise Exception(f"OpenRouter API error: {str(e)}")
+        log.exception("OpenRouter API call failed")
+        raise Exception(f"API error: {str(e)}")
 
 
 def call_ai_model(model_key, messages, uploaded_file=None):
@@ -532,7 +586,7 @@ def demo_chat():
             return jsonify({
                 'response': response_text,
                 'demo': True,
-                'model': 'gemini 2.5 flash lite'
+                'model': 'Gemini 2.5 Flash lite'
             })
         except Exception as e:
             log.exception("Demo chat failed")
@@ -749,7 +803,7 @@ def get_chat_messages(chat_id):
         log.exception("Get messages failed")
         return jsonify({'error': 'Failed to load messages'}), 500
 
-# -------- Main chat endpoint (UPDATED) --------
+# -------- Main chat endpoint --------
 @app.route('/chat', methods=['POST'])
 @login_required
 def chat_route():
@@ -1009,7 +1063,7 @@ def health_check():
         'status': 'healthy',
         'timestamp': datetime.utcnow().isoformat(),
         'google_ai_configured': bool(google_api_key),
-        'openrouter_configured': bool(openrouter_client),
+        'openrouter_configured': bool(openrouter_api_key),
         'stripe_configured': bool(stripe.api_key),
         'upload_folder': app.config['UPLOAD_FOLDER']
     })
@@ -1030,5 +1084,3 @@ init_database()
 # ============ RUN ============
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
-
-
