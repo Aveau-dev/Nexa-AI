@@ -21,6 +21,7 @@ import base64
 from PIL import Image
 import traceback
 import logging
+import time
 
 # Google Generative AI for Gemini
 import google.generativeai as genai
@@ -32,8 +33,11 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-# Basic logging
-logging.basicConfig(level=logging.INFO)
+# Enhanced logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 log = logging.getLogger(__name__)
 
 # ============ CONFIGURATION ============
@@ -46,13 +50,17 @@ if database_url:
     if database_url.startswith('postgres://'):
         database_url = database_url.replace('postgres://', 'postgresql://', 1)
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+    log.info("🐘 Using PostgreSQL database")
 else:
     app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URI', 'sqlite:///database.db')
+    log.info("📁 Using SQLite database")
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_pre_ping': True,
     'pool_recycle': 300,
+    'pool_timeout': 30,
+    'max_overflow': 10,
 }
 app.config['UPLOAD_FOLDER'] = os.getenv('UPLOAD_FOLDER', 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB
@@ -68,7 +76,7 @@ login_manager.login_view = 'login'
 login_manager.session_protection = 'strong'
 
 # ============ Configure AI APIs ============
-log.info("Configuring AI APIs...")
+log.info("🤖 Configuring AI APIs...")
 
 # Google Generative AI
 google_api_key = os.getenv('GOOGLE_API_KEY')
@@ -77,7 +85,7 @@ if google_api_key:
         genai.configure(api_key=google_api_key)
         log.info("✅ Google Generative AI configured")
     except Exception as e:
-        log.error(f"Google AI config error: {e}")
+        log.error(f"❌ Google AI config error: {e}")
 else:
     log.warning("⚠️ GOOGLE_API_KEY not set")
 
@@ -141,6 +149,27 @@ def load_user(user_id):
         log.exception("Error loading user")
         return None
 
+# ============ DATABASE UTILITIES ============
+def test_database_connection():
+    """Test if database is accessible"""
+    try:
+        db.session.execute(db.text('SELECT 1'))
+        db.session.commit()
+        return True
+    except Exception as e:
+        log.error(f"Database connection test failed: {e}")
+        return False
+
+def get_table_names():
+    """Get list of existing tables"""
+    try:
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        return inspector.get_table_names()
+    except Exception as e:
+        log.error(f"Failed to get table names: {e}")
+        return []
+
 # ============ DATABASE MIGRATION (sqlite only; safe checks) ============
 def migrate_database_sqlite():
     """Attempt to add missing columns for older sqlite DBs (best-effort)."""
@@ -197,7 +226,7 @@ def migrate_database_sqlite():
 
         conn.commit()
         conn.close()
-        log.info("SQLite migration (best-effort) completed.")
+        log.info("✅ SQLite migration (best-effort) completed.")
     except Exception:
         log.exception("SQLite migration failed (best-effort).")
 
@@ -540,8 +569,9 @@ def too_large(e):
 @app.errorhandler(500)
 def internal_error(e):
     db.session.rollback()
+    log.exception("Internal server error")
     if request.accept_mimetypes.accept_json:
-        return jsonify({'error': 'Internal server error'}), 500
+        return jsonify({'error': 'Internal server error. Please try again.'}), 500
     return render_template('500.html'), 500
 
 # ============ ROUTES ============
@@ -607,10 +637,15 @@ def signup():
             password = data.get('password') or ''
 
             if not email or not name or not password:
+                log.warning(f"Signup attempt with missing fields")
                 return jsonify({'error': 'All fields are required'}), 400
             if len(password) < 6:
                 return jsonify({'error': 'Password must be at least 6 characters'}), 400
-            if User.query.filter_by(email=email).first():
+            
+            # Check existing user
+            existing_user = User.query.filter_by(email=email).first()
+            if existing_user:
+                log.warning(f"Signup attempt with existing email: {email}")
                 return jsonify({'error': 'Email already exists'}), 400
 
             hashed = generate_password_hash(password)
@@ -622,17 +657,19 @@ def signup():
             )
             db.session.add(new_user)
             db.session.commit()
-            log.info("New user registered: %s", email)
+            log.info(f"✅ New user registered: {email}")
 
             if request.is_json:
                 return jsonify({'success': True, 'redirect': url_for('login')})
             return redirect(url_for('login'))
-        except Exception:
+            
+        except Exception as e:
             db.session.rollback()
-            log.exception("Signup failed")
+            log.exception(f"Signup failed: {e}")
+            error_msg = 'Database error. Please try again or contact support.'
             if request.is_json:
-                return jsonify({'error': 'An error occurred. Please try again.'}), 500
-            return render_template('signup.html', error='An error occurred. Please try again.')
+                return jsonify({'error': error_msg}), 500
+            return render_template('signup.html', error=error_msg)
 
     return render_template('signup.html')
 
@@ -643,25 +680,30 @@ def login():
             data = request.get_json() if request.is_json else request.form
             email = (data.get('email') or '').strip().lower()
             password = data.get('password') or ''
+            
             if not email or not password:
                 return jsonify({'error': 'Email and password are required'}), 400
 
             user = User.query.filter_by(email=email).first()
             if user and check_password_hash(user.password, password):
                 login_user(user, remember=True)
-                log.info("User logged in: %s", email)
+                log.info(f"✅ User logged in: {email}")
                 if request.is_json:
                     return jsonify({'success': True, 'redirect': url_for('dashboard')})
                 return redirect(url_for('dashboard'))
 
+            log.warning(f"Failed login attempt for: {email}")
+            error_msg = 'Invalid email or password'
             if request.is_json:
-                return jsonify({'error': 'Invalid email or password'}), 401
-            return render_template('login.html', error='Invalid email or password')
-        except Exception:
-            log.exception("Login failed")
+                return jsonify({'error': error_msg}), 401
+            return render_template('login.html', error=error_msg)
+            
+        except Exception as e:
+            log.exception(f"Login failed: {e}")
+            error_msg = 'An error occurred. Please try again.'
             if request.is_json:
-                return jsonify({'error': 'An error occurred. Please try again.'}), 500
-            return render_template('login.html', error='An error occurred. Please try again.')
+                return jsonify({'error': error_msg}), 500
+            return render_template('login.html', error=error_msg)
 
     return render_template('login.html')
 
@@ -1052,35 +1094,150 @@ def stripe_webhook():
 
     return '', 200
 
-# ============ API ENDPOINTS ============
+# ============ API & DEBUG ENDPOINTS ============
 @app.route('/api/models', methods=['GET'])
 def get_models():
     return jsonify({'free': FREE_MODELS, 'premium': PREMIUM_MODELS})
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
+    db_connected = test_database_connection()
+    tables = get_table_names()
+    
     return jsonify({
-        'status': 'healthy',
+        'status': 'healthy' if db_connected else 'degraded',
         'timestamp': datetime.utcnow().isoformat(),
+        'database_connected': db_connected,
+        'database_tables': tables,
         'google_ai_configured': bool(google_api_key),
         'openrouter_configured': bool(openrouter_api_key),
         'stripe_configured': bool(stripe.api_key),
         'upload_folder': app.config['UPLOAD_FOLDER']
     })
 
-# ============ DB INIT ============
-def init_database():
-    """Create tables and run migrations"""
+@app.route('/api/init-db', methods=['GET'])
+def init_db_route():
+    """Manually initialize database tables - run once after deployment"""
     try:
+        log.info("🔄 Initializing database tables...")
+        
+        # Test connection first
+        if not test_database_connection():
+            return jsonify({
+                'success': False,
+                'error': 'Database connection failed'
+            }), 500
+        
+        # Create tables
         with app.app_context():
-            migrate_database_sqlite()
             db.create_all()
-            log.info("✅ Database initialized successfully")
-    except Exception:
+            log.info("✅ Database tables created")
+        
+        # Verify tables
+        tables = get_table_names()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Database initialized successfully',
+            'tables': tables
+        })
+    except Exception as e:
         log.exception("Database initialization failed")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
 
+@app.route('/api/debug-db', methods=['GET'])
+def debug_db():
+    """Debug database status"""
+    try:
+        # Test connection
+        db_connected = test_database_connection()
+        
+        # Get tables
+        tables = get_table_names()
+        
+        # Count users
+        try:
+            user_count = User.query.count() if db_connected else 'N/A'
+        except:
+            user_count = 'Table not exists'
+        
+        # Get database type
+        db_uri = app.config['SQLALCHEMY_DATABASE_URI']
+        db_type = 'postgresql' if 'postgres' in db_uri else 'sqlite'
+        
+        return jsonify({
+            'connected': db_connected,
+            'database_type': db_type,
+            'tables': tables,
+            'user_count': user_count,
+            'expected_tables': ['user', 'chat', 'message']
+        })
+    except Exception as e:
+        log.exception("Database debug failed")
+        return jsonify({
+            'connected': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
+# ============ DB INIT WITH RETRY ============
+def init_database():
+    """Create tables and run migrations with retry logic"""
+    max_retries = 5
+    retry_delay = 3
+    
+    for attempt in range(1, max_retries + 1):
+        try:
+            log.info(f"🔄 Database initialization attempt {attempt}/{max_retries}...")
+            
+            with app.app_context():
+                # Wait for database to be ready
+                time.sleep(retry_delay)
+                
+                # Test connection
+                if not test_database_connection():
+                    raise Exception("Database connection failed")
+                
+                log.info("✅ Database connected")
+                
+                # Run SQLite migrations if applicable
+                migrate_database_sqlite()
+                
+                # Create all tables
+                db.create_all()
+                log.info("✅ Database tables created")
+                
+                # Verify tables
+                tables = get_table_names()
+                log.info(f"📊 Tables in database: {tables}")
+                
+                if 'user' in tables and 'chat' in tables and 'message' in tables:
+                    log.info("🎉 Database initialization successful!")
+                    return True
+                else:
+                    log.warning(f"⚠️ Expected tables not found. Found: {tables}")
+                
+        except Exception as e:
+            log.error(f"❌ Database init attempt {attempt}/{max_retries} failed: {e}")
+            if attempt < max_retries:
+                log.info(f"⏳ Retrying in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+            else:
+                log.exception("💥 Database initialization failed after all retries")
+                log.warning("⚠️ App will start but database may not be initialized")
+                log.warning("🔧 Visit /api/init-db to manually initialize the database")
+    
+    return False
+
+# Initialize database on startup
 init_database()
 
 # ============ RUN ============
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
+    port = int(os.getenv('PORT', 5000))
+    log.info(f"🚀 Starting NexaAI on port {port}")
+    app.run(debug=True, host='0.0.0.0', port=port)
