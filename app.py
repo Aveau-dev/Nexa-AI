@@ -78,14 +78,20 @@ if google_api_key:
 else:
     log.warning("⚠️ GOOGLE_API_KEY not found")
 
-# OpenRouter client
+# OpenRouter client - FIXED for newer OpenAI versions
 openrouter_api_key = os.getenv('OPENROUTER_API_KEY')
 if openrouter_api_key:
-    openrouter_client = openai.OpenAI(
-        base_url="https://openrouter.ai/api/v1",
-        api_key=openrouter_api_key,
-    )
-    log.info("✅ OpenRouter configured")
+    try:
+        openrouter_client = openai.OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=openrouter_api_key,
+            timeout=60.0,
+            max_retries=2
+        )
+        log.info("✅ OpenRouter configured")
+    except Exception as e:
+        log.error(f"OpenRouter initialization failed: {e}")
+        openrouter_client = None
 else:
     openrouter_client = None
     log.warning("⚠️ OPENROUTER_API_KEY not found")
@@ -1024,4 +1030,5 @@ init_database()
 # ============ RUN ============
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
+
 
