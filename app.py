@@ -167,7 +167,7 @@ init_database()
 # ============ AI MODELS CONFIG ============
 FREE_MODELS = {
     "gemini-flash": {
-        "name": "Gemini 2.0 Flash ⚡",
+        "name": "Gemini 2.5 Flash ⚡",
         "model": "gemini-2.5-flash-lite",
         "provider": "google",
         "vision": True,
@@ -1068,5 +1068,6 @@ if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
     log.info(f"🚀 Starting NexaAI on port {port}")
     app.run(debug=False, host='0.0.0.0', port=port)
+
 
 
