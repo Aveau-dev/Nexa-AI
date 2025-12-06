@@ -1151,31 +1151,68 @@ def init_db_route():
 
 @app.route('/api/debug-db', methods=['GET'])
 def debug_db():
-    """Debug database status"""
+    """Debug database status and schema"""
     try:
         # Test connection
         db_connected = test_database_connection()
-        
-        # Get tables
-        tables = get_table_names()
-        
-        # Count users
-        try:
-            user_count = User.query.count() if db_connected else 'N/A'
-        except:
-            user_count = 'Table not exists'
         
         # Get database type
         db_uri = app.config['SQLALCHEMY_DATABASE_URI']
         db_type = 'postgresql' if 'postgres' in db_uri else 'sqlite'
         
-        return jsonify({
+        # Get tables
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        tables = inspector.get_table_names()
+        
+        # Get detailed column information
+        schema_info = {}
+        for table in tables:
+            try:
+                columns = inspector.get_columns(table)
+                schema_info[table] = [col['name'] for col in columns]
+            except:
+                schema_info[table] = 'Error reading columns'
+        
+        # Count users
+        try:
+            user_count = User.query.count() if db_connected and 'user' in tables else 'N/A'
+        except Exception as e:
+            user_count = f'Error: {str(e)}'
+        
+        # Check for missing columns
+        missing_columns = []
+        if 'user' in tables:
+            user_cols = schema_info.get('user', [])
+            expected_user_cols = ['id', 'email', 'password', 'name', 'is_premium', 'subscription_id', 'deepseek_count', 'deepseek_date', 'created_at']
+            missing_user_cols = [col for col in expected_user_cols if col not in user_cols]
+            if missing_user_cols:
+                missing_columns.append({'table': 'user', 'columns': missing_user_cols})
+        
+        if 'message' in tables:
+            message_cols = schema_info.get('message', [])
+            expected_message_cols = ['id', 'chat_id', 'role', 'content', 'model', 'has_image', 'image_path', 'image_url', 'created_at']
+            missing_message_cols = [col for col in expected_message_cols if col not in message_cols]
+            if missing_message_cols:
+                missing_columns.append({'table': 'message', 'columns': missing_message_cols})
+        
+        response = {
             'connected': db_connected,
             'database_type': db_type,
             'tables': tables,
+            'schema': schema_info,
             'user_count': user_count,
-            'expected_tables': ['user', 'chat', 'message']
-        })
+            'expected_tables': ['user', 'chat', 'message'],
+            'missing_columns': missing_columns,
+            'needs_migration': len(missing_columns) > 0
+        }
+        
+        if missing_columns:
+            response['migration_url'] = '/api/migrate-db'
+            response['warning'] = 'Database schema is incomplete. Visit /api/migrate-db to fix.'
+        
+        return jsonify(response)
+        
     except Exception as e:
         log.exception("Database debug failed")
         return jsonify({
@@ -1183,6 +1220,148 @@ def debug_db():
             'error': str(e),
             'traceback': traceback.format_exc()
         }), 500
+
+
+@app.route('/api/migrate-db', methods=['GET', 'POST'])
+def migrate_db():
+    """Migrate database schema - add missing columns to existing tables"""
+    try:
+        log.info("🔄 Starting database migration...")
+        
+        # Check if we're using PostgreSQL
+        db_uri = app.config['SQLALCHEMY_DATABASE_URI']
+        is_postgres = 'postgres' in db_uri
+        
+        if not is_postgres:
+            return jsonify({
+                'success': False,
+                'error': 'This migration is only for PostgreSQL. SQLite uses migrate_database_sqlite().'
+            }), 400
+        
+        migrations_applied = []
+        errors = []
+        
+        # Get current table structure
+        from sqlalchemy import inspect, text
+        inspector = inspect(db.engine)
+        
+        # Check and add missing columns to user table
+        if 'user' in inspector.get_table_names():
+            user_columns = [col['name'] for col in inspector.get_columns('user')]
+            log.info(f"Current user table columns: {user_columns}")
+            
+            # Add deepseek_count if missing
+            if 'deepseek_count' not in user_columns:
+                try:
+                    db.session.execute(text('ALTER TABLE "user" ADD COLUMN deepseek_count INTEGER DEFAULT 0'))
+                    db.session.commit()
+                    migrations_applied.append('Added user.deepseek_count')
+                    log.info("✅ Added user.deepseek_count")
+                except Exception as e:
+                    errors.append(f"Failed to add deepseek_count: {str(e)}")
+                    log.error(f"❌ Failed to add deepseek_count: {e}")
+                    db.session.rollback()
+            
+            # Add deepseek_date if missing
+            if 'deepseek_date' not in user_columns:
+                try:
+                    db.session.execute(text('ALTER TABLE "user" ADD COLUMN deepseek_date VARCHAR(10)'))
+                    db.session.commit()
+                    migrations_applied.append('Added user.deepseek_date')
+                    log.info("✅ Added user.deepseek_date")
+                except Exception as e:
+                    errors.append(f"Failed to add deepseek_date: {str(e)}")
+                    log.error(f"❌ Failed to add deepseek_date: {e}")
+                    db.session.rollback()
+            
+            # Add subscription_id if missing
+            if 'subscription_id' not in user_columns:
+                try:
+                    db.session.execute(text('ALTER TABLE "user" ADD COLUMN subscription_id VARCHAR(100)'))
+                    db.session.commit()
+                    migrations_applied.append('Added user.subscription_id')
+                    log.info("✅ Added user.subscription_id")
+                except Exception as e:
+                    errors.append(f"Failed to add subscription_id: {str(e)}")
+                    log.error(f"❌ Failed to add subscription_id: {e}")
+                    db.session.rollback()
+            
+            # Add is_premium if missing
+            if 'is_premium' not in user_columns:
+                try:
+                    db.session.execute(text('ALTER TABLE "user" ADD COLUMN is_premium BOOLEAN DEFAULT FALSE'))
+                    db.session.commit()
+                    migrations_applied.append('Added user.is_premium')
+                    log.info("✅ Added user.is_premium")
+                except Exception as e:
+                    errors.append(f"Failed to add is_premium: {str(e)}")
+                    log.error(f"❌ Failed to add is_premium: {e}")
+                    db.session.rollback()
+        
+        # Check and add missing columns to message table
+        if 'message' in inspector.get_table_names():
+            message_columns = [col['name'] for col in inspector.get_columns('message')]
+            log.info(f"Current message table columns: {message_columns}")
+            
+            # Add has_image if missing
+            if 'has_image' not in message_columns:
+                try:
+                    db.session.execute(text('ALTER TABLE message ADD COLUMN has_image BOOLEAN DEFAULT FALSE'))
+                    db.session.commit()
+                    migrations_applied.append('Added message.has_image')
+                    log.info("✅ Added message.has_image")
+                except Exception as e:
+                    errors.append(f"Failed to add has_image: {str(e)}")
+                    log.error(f"❌ Failed to add has_image: {e}")
+                    db.session.rollback()
+            
+            # Add image_path if missing
+            if 'image_path' not in message_columns:
+                try:
+                    db.session.execute(text('ALTER TABLE message ADD COLUMN image_path VARCHAR(1000)'))
+                    db.session.commit()
+                    migrations_applied.append('Added message.image_path')
+                    log.info("✅ Added message.image_path")
+                except Exception as e:
+                    errors.append(f"Failed to add image_path: {str(e)}")
+                    log.error(f"❌ Failed to add image_path: {e}")
+                    db.session.rollback()
+            
+            # Add image_url if missing
+            if 'image_url' not in message_columns:
+                try:
+                    db.session.execute(text('ALTER TABLE message ADD COLUMN image_url VARCHAR(1000)'))
+                    db.session.commit()
+                    migrations_applied.append('Added message.image_url')
+                    log.info("✅ Added message.image_url")
+                except Exception as e:
+                    errors.append(f"Failed to add image_url: {str(e)}")
+                    log.error(f"❌ Failed to add image_url: {e}")
+                    db.session.rollback()
+        
+        # Get updated column info
+        user_columns_after = [col['name'] for col in inspector.get_columns('user')] if 'user' in inspector.get_table_names() else []
+        message_columns_after = [col['name'] for col in inspector.get_columns('message')] if 'message' in inspector.get_table_names() else []
+        
+        log.info("🎉 Database migration completed!")
+        
+        return jsonify({
+            'success': True,
+            'migrations_applied': migrations_applied,
+            'errors': errors,
+            'user_columns': user_columns_after,
+            'message_columns': message_columns_after
+        })
+        
+    except Exception as e:
+        log.exception("Database migration failed")
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
 
 # ============ DB INIT WITH RETRY ============
 def init_database():
@@ -1241,3 +1420,4 @@ if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
     log.info(f"🚀 Starting NexaAI on port {port}")
     app.run(debug=True, host='0.0.0.0', port=port)
+
