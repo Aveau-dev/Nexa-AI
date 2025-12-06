@@ -21,7 +21,6 @@ import base64
 from PIL import Image
 import traceback
 import logging
-import time
 
 # Google Generative AI for Gemini
 import google.generativeai as genai
@@ -43,24 +42,24 @@ log = logging.getLogger(__name__)
 # ============ CONFIGURATION ============
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production-2025')
 
-# Database - Handle Render's DATABASE_URL or SQLite locally
+# Database Configuration
 database_url = os.getenv('DATABASE_URL')
 if database_url:
-    # Fix Render's postgres:// to postgresql://
+    # Fix postgres:// to postgresql://
     if database_url.startswith('postgres://'):
         database_url = database_url.replace('postgres://', 'postgresql://', 1)
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     log.info("🐘 Using PostgreSQL database")
 else:
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URI', 'sqlite:///database.db')
+    # Use SQLite for local development
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
     log.info("📁 Using SQLite database")
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_pre_ping': True,
     'pool_recycle': 300,
-    'pool_timeout': 30,
-    'max_overflow': 10,
+    'connect_args': {'connect_timeout': 10}
 }
 app.config['UPLOAD_FOLDER'] = os.getenv('UPLOAD_FOLDER', 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB
@@ -89,10 +88,10 @@ if google_api_key:
 else:
     log.warning("⚠️ GOOGLE_API_KEY not set")
 
-# OpenRouter API Key (using requests library - no OpenAI SDK needed)
+# OpenRouter API Key
 openrouter_api_key = os.getenv('OPENROUTER_API_KEY')
 if openrouter_api_key:
-    log.info("✅ OpenRouter API key configured")
+    log.info("✅ OpenRouter configured")
 else:
     log.warning("⚠️ OPENROUTER_API_KEY not set")
 
@@ -106,7 +105,7 @@ class User(UserMixin, db.Model):
     is_premium = db.Column(db.Boolean, default=False)
     subscription_id = db.Column(db.String(100), nullable=True)
     deepseek_count = db.Column(db.Integer, default=0)
-    deepseek_date = db.Column(db.String(10))
+    deepseek_date = db.Column(db.String(10), default='')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     chats = db.relationship('Chat', backref='user', lazy=True, cascade='all, delete-orphan')
 
@@ -149,86 +148,22 @@ def load_user(user_id):
         log.exception("Error loading user")
         return None
 
-# ============ DATABASE UTILITIES ============
-def test_database_connection():
-    """Test if database is accessible"""
-    try:
-        db.session.execute(db.text('SELECT 1'))
-        db.session.commit()
-        return True
-    except Exception as e:
-        log.error(f"Database connection test failed: {e}")
-        return False
-
-def get_table_names():
-    """Get list of existing tables"""
-    try:
-        from sqlalchemy import inspect
-        inspector = inspect(db.engine)
-        return inspector.get_table_names()
-    except Exception as e:
-        log.error(f"Failed to get table names: {e}")
-        return []
-
-# ============ DATABASE MIGRATION (sqlite only; safe checks) ============
-def migrate_database_sqlite():
-    """Attempt to add missing columns for older sqlite DBs (best-effort)."""
-    try:
-        uri = app.config['SQLALCHEMY_DATABASE_URI']
-        if not uri.startswith('sqlite:///'):
-            log.info("Skipping sqlite-specific migration (not sqlite).")
-            return
-
-        db_path = uri.replace('sqlite:///', '', 1)
-        if not os.path.exists(db_path):
-            log.info("Database file does not exist yet; create_all will handle creation.")
-            return
-
-        conn = sqlite3.connect(db_path)
-        cur = conn.cursor()
-
-        def table_columns(table_name):
-            cur.execute(f"PRAGMA table_info({table_name})")
-            return [row[1] for row in cur.fetchall()]
-
-        # Message table
+# ============ DATABASE INITIALIZATION ============
+def init_database():
+    """Initialize database with proper error handling"""
+    with app.app_context():
         try:
-            cols = table_columns('message')
-            if 'has_image' not in cols:
-                cur.execute("ALTER TABLE message ADD COLUMN has_image BOOLEAN DEFAULT 0")
-                log.info("Added message.has_image")
-            if 'image_path' not in cols:
-                cur.execute("ALTER TABLE message ADD COLUMN image_path TEXT")
-                log.info("Added message.image_path")
-            if 'image_url' not in cols:
-                cur.execute("ALTER TABLE message ADD COLUMN image_url TEXT")
-                log.info("Added message.image_url")
-        except sqlite3.OperationalError:
-            log.info("Message table not present yet (will be created).")
+            # Create all tables
+            db.create_all()
+            log.info("✅ Database tables created/verified")
+            return True
+        except Exception as e:
+            log.error(f"❌ Database initialization failed: {e}")
+            log.exception("Database error details:")
+            return False
 
-        # User table
-        try:
-            cols = table_columns('user')
-            if 'subscription_id' not in cols:
-                cur.execute("ALTER TABLE user ADD COLUMN subscription_id TEXT")
-                log.info("Added user.subscription_id")
-            if 'is_premium' not in cols:
-                cur.execute("ALTER TABLE user ADD COLUMN is_premium BOOLEAN DEFAULT 0")
-                log.info("Added user.is_premium")
-            if 'deepseek_count' not in cols:
-                cur.execute("ALTER TABLE user ADD COLUMN deepseek_count INTEGER DEFAULT 0")
-                log.info("Added user.deepseek_count")
-            if 'deepseek_date' not in cols:
-                cur.execute("ALTER TABLE user ADD COLUMN deepseek_date TEXT")
-                log.info("Added user.deepseek_date")
-        except sqlite3.OperationalError:
-            log.info("User table not present yet (will be created).")
-
-        conn.commit()
-        conn.close()
-        log.info("✅ SQLite migration (best-effort) completed.")
-    except Exception:
-        log.exception("SQLite migration failed (best-effort).")
+# Initialize database
+init_database()
 
 # ============ AI MODELS CONFIG ============
 FREE_MODELS = {
@@ -314,7 +249,6 @@ PREMIUM_MODELS = {
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
 # ============ AI API CALLING FUNCTIONS ============
-
 def call_google_gemini(model_path, messages, timeout=60):
     """Call Google Generative AI for Gemini models"""
     try:
@@ -331,23 +265,18 @@ def call_google_gemini(model_path, messages, timeout=60):
             role = msg.get('role', 'user')
             content = msg.get('content', '')
             
-            # Skip system messages (Gemini doesn't use them explicitly)
             if role == 'system':
                 continue
             
-            # Convert role
             gemini_role = 'user' if role == 'user' else 'model'
             
-            # Store last message separately (will be sent via send_message)
             if msg == messages[-1]:
                 last_message = {'role': gemini_role, 'parts': [content]}
             else:
                 gemini_history.append({'role': gemini_role, 'parts': [content]})
         
-        # Start chat with history
         chat = model.start_chat(history=gemini_history)
         
-        # Send last message
         if last_message:
             response = chat.send_message(last_message['parts'][0])
         else:
@@ -359,17 +288,12 @@ def call_google_gemini(model_path, messages, timeout=60):
         log.exception("Google Gemini API error")
         raise Exception(f"Google Gemini API error: {str(e)}")
 
-
 def call_openrouter(model_path, messages, timeout=60):
-    """
-    Call OpenRouter API using requests library - No OpenAI SDK needed!
-    This avoids all dependency conflicts with Python 3.13.4
-    """
+    """Call OpenRouter API using requests library"""
     try:
         if not openrouter_api_key:
             raise Exception("OpenRouter API key not configured")
         
-        # OpenRouter API headers
         headers = {
             "Authorization": f"Bearer {openrouter_api_key}",
             "Content-Type": "application/json",
@@ -377,7 +301,6 @@ def call_openrouter(model_path, messages, timeout=60):
             "X-Title": "NexaAI"
         }
         
-        # Request payload
         payload = {
             "model": model_path,
             "messages": messages,
@@ -385,7 +308,6 @@ def call_openrouter(model_path, messages, timeout=60):
             "max_tokens": 2000
         }
         
-        # Make HTTP POST request
         response = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
             headers=headers,
@@ -393,58 +315,30 @@ def call_openrouter(model_path, messages, timeout=60):
             timeout=timeout
         )
         
-        # Check for HTTP errors
         response.raise_for_status()
-        
-        # Parse JSON response
         data = response.json()
         
-        # Validate response structure
         if 'choices' not in data or len(data['choices']) == 0:
             raise Exception("No response from model")
         
-        # Extract and return the content
         return data['choices'][0]['message']['content']
     
     except requests.exceptions.Timeout:
-        log.error("OpenRouter request timed out")
         raise Exception("Request timed out. Please try again.")
-    
     except requests.exceptions.HTTPError as e:
-        log.error(f"OpenRouter HTTP error: {e}")
         status_code = response.status_code if 'response' in locals() else 0
-        
         if status_code == 429:
             raise Exception("Rate limit reached. Please try again later.")
         elif status_code == 401:
-            raise Exception("Invalid API key. Please check your configuration.")
-        elif status_code == 402:
-            raise Exception("Insufficient credits. Please check your OpenRouter account.")
-        elif status_code == 500:
-            raise Exception("OpenRouter server error. Please try again later.")
+            raise Exception("Invalid API key.")
         else:
             raise Exception(f"API error (Status {status_code})")
-    
-    except requests.exceptions.ConnectionError:
-        log.error("OpenRouter connection failed")
-        raise Exception("Network connection error. Please check your internet.")
-    
-    except requests.exceptions.RequestException as e:
-        log.error(f"OpenRouter request failed: {e}")
-        raise Exception(f"Network error: {str(e)}")
-    
-    except (KeyError, IndexError, ValueError) as e:
-        log.error(f"Invalid response format: {e}")
-        raise Exception("Invalid response from API")
-    
     except Exception as e:
         log.exception("OpenRouter API call failed")
         raise Exception(f"API error: {str(e)}")
 
-
 def call_ai_model(model_key, messages, uploaded_file=None):
-    """Universal function to call any AI model - routes to correct provider"""
-    # Get model config
+    """Universal function to call any AI model"""
     if model_key in FREE_MODELS:
         model_config = FREE_MODELS[model_key]
     elif model_key in PREMIUM_MODELS:
@@ -455,16 +349,13 @@ def call_ai_model(model_key, messages, uploaded_file=None):
     provider = model_config['provider']
     model_path = model_config['model']
     
-    # Handle image uploads for vision models
     if uploaded_file and model_config.get('vision'):
         try:
             if os.path.exists(uploaded_file):
-                # Add image context to the last user message
                 messages[-1]['content'] = f"{messages[-1]['content']}\n[Image attached: {uploaded_file}]"
         except Exception as e:
             log.exception("Error processing image")
     
-    # Route to appropriate provider
     if provider == 'google':
         return call_google_gemini(model_path, messages)
     elif provider == 'openrouter':
@@ -472,18 +363,9 @@ def call_ai_model(model_key, messages, uploaded_file=None):
     else:
         raise Exception(f"Unknown provider: {provider}")
 
-
 # ============ HELPER FUNCTIONS ============
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-def encode_image(image_path):
-    try:
-        with open(image_path, 'rb') as f:
-            return base64.b64encode(f.read()).decode('utf-8')
-    except Exception:
-        log.exception("Failed to encode image")
-        return None
 
 def compress_image(image_path, max_size=(1024, 1024), quality=85):
     try:
@@ -521,7 +403,7 @@ def check_deepseek_limit(user):
     return user.deepseek_count < 50
 
 def get_chat_history(chat_id, limit=10):
-    """Return last `limit` messages as list for API"""
+    """Return last messages as list for API"""
     try:
         messages = Message.query.filter_by(chat_id=chat_id).order_by(Message.created_at.desc()).limit(limit).all()
         messages = list(reversed(messages))
@@ -530,7 +412,6 @@ def get_chat_history(chat_id, limit=10):
         for msg in messages:
             content = msg.content
             
-            # Add image reference if exists
             if msg.has_image and (msg.image_path or msg.image_url):
                 img_ref = msg.image_url or msg.image_path
                 content = f"{content}\n[Image: {img_ref}]"
@@ -593,15 +474,16 @@ def demo_chat():
             return jsonify({'error': 'Message is required'}), 400
 
         # Image generation check
-        image_keywords = ['generate image', 'create image', 'draw', 'picture of', 'image of', 'make an image']
+        image_keywords = ['generate image', 'create image', 'draw', 'picture of', 'image of', 'make an image', 'show me']
         if any(k in message.lower() for k in image_keywords):
             try:
                 url = generate_image(message)
                 return jsonify({
-                    'response': 'Image generated successfully!',
+                    'response': "Here's your generated image!",
                     'image_url': url,
+                    'has_image': True,
                     'demo': True,
-                    'model': 'Pollinations'
+                    'model': 'Pollinations AI'
                 })
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
@@ -616,7 +498,8 @@ def demo_chat():
             return jsonify({
                 'response': response_text,
                 'demo': True,
-                'model': 'Gemini 2.5 Flash lite'
+                'model': 'Gemini 2.5 Flash lite',
+                'has_image': False
             })
         except Exception as e:
             log.exception("Demo chat failed")
@@ -636,18 +519,30 @@ def signup():
             name = (data.get('name') or '').strip()
             password = data.get('password') or ''
 
+            # Validation
             if not email or not name or not password:
-                log.warning(f"Signup attempt with missing fields")
-                return jsonify({'error': 'All fields are required'}), 400
+                error_msg = 'All fields are required'
+                log.warning(f"Signup validation failed: missing fields")
+                if request.is_json:
+                    return jsonify({'error': error_msg}), 400
+                return render_template('signup.html', error=error_msg)
+            
             if len(password) < 6:
-                return jsonify({'error': 'Password must be at least 6 characters'}), 400
+                error_msg = 'Password must be at least 6 characters'
+                if request.is_json:
+                    return jsonify({'error': error_msg}), 400
+                return render_template('signup.html', error=error_msg)
             
             # Check existing user
             existing_user = User.query.filter_by(email=email).first()
             if existing_user:
+                error_msg = 'Email already exists'
                 log.warning(f"Signup attempt with existing email: {email}")
-                return jsonify({'error': 'Email already exists'}), 400
+                if request.is_json:
+                    return jsonify({'error': error_msg}), 400
+                return render_template('signup.html', error=error_msg)
 
+            # Create new user
             hashed = generate_password_hash(password)
             new_user = User(
                 email=email,
@@ -655,6 +550,7 @@ def signup():
                 password=hashed,
                 deepseek_date=datetime.utcnow().strftime('%Y-%m-%d')
             )
+            
             db.session.add(new_user)
             db.session.commit()
             log.info(f"✅ New user registered: {email}")
@@ -666,7 +562,7 @@ def signup():
         except Exception as e:
             db.session.rollback()
             log.exception(f"Signup failed: {e}")
-            error_msg = 'Database error. Please try again or contact support.'
+            error_msg = 'Signup failed. Please try again.'
             if request.is_json:
                 return jsonify({'error': error_msg}), 500
             return render_template('signup.html', error=error_msg)
@@ -682,9 +578,13 @@ def login():
             password = data.get('password') or ''
             
             if not email or not password:
-                return jsonify({'error': 'Email and password are required'}), 400
+                error_msg = 'Email and password are required'
+                if request.is_json:
+                    return jsonify({'error': error_msg}), 400
+                return render_template('login.html', error=error_msg)
 
             user = User.query.filter_by(email=email).first()
+            
             if user and check_password_hash(user.password, password):
                 login_user(user, remember=True)
                 log.info(f"✅ User logged in: {email}")
@@ -700,7 +600,7 @@ def login():
             
         except Exception as e:
             log.exception(f"Login failed: {e}")
-            error_msg = 'An error occurred. Please try again.'
+            error_msg = 'Login failed. Please try again.'
             if request.is_json:
                 return jsonify({'error': error_msg}), 500
             return render_template('login.html', error=error_msg)
@@ -1070,7 +970,6 @@ def stripe_webhook():
         log.exception("Webhook signature verification failed")
         return '', 400
 
-    # Handle events
     if event['type'] == 'checkout.session.completed':
         sess = event['data']['object']
         customer_email = sess.get('customer_email')
@@ -1094,330 +993,30 @@ def stripe_webhook():
 
     return '', 200
 
-# ============ API & DEBUG ENDPOINTS ============
+# ============ API ENDPOINTS ============
 @app.route('/api/models', methods=['GET'])
 def get_models():
     return jsonify({'free': FREE_MODELS, 'premium': PREMIUM_MODELS})
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
-    db_connected = test_database_connection()
-    tables = get_table_names()
+    try:
+        db.session.execute(db.text('SELECT 1'))
+        db_status = True
+    except:
+        db_status = False
     
     return jsonify({
-        'status': 'healthy' if db_connected else 'degraded',
+        'status': 'healthy' if db_status else 'degraded',
         'timestamp': datetime.utcnow().isoformat(),
-        'database_connected': db_connected,
-        'database_tables': tables,
+        'database_connected': db_status,
         'google_ai_configured': bool(google_api_key),
         'openrouter_configured': bool(openrouter_api_key),
-        'stripe_configured': bool(stripe.api_key),
-        'upload_folder': app.config['UPLOAD_FOLDER']
+        'stripe_configured': bool(stripe.api_key)
     })
-
-@app.route('/api/init-db', methods=['GET'])
-def init_db_route():
-    """Manually initialize database tables - run once after deployment"""
-    try:
-        log.info("🔄 Initializing database tables...")
-        
-        # Test connection first
-        if not test_database_connection():
-            return jsonify({
-                'success': False,
-                'error': 'Database connection failed'
-            }), 500
-        
-        # Create tables
-        with app.app_context():
-            db.create_all()
-            log.info("✅ Database tables created")
-        
-        # Verify tables
-        tables = get_table_names()
-        
-        return jsonify({
-            'success': True,
-            'message': 'Database initialized successfully',
-            'tables': tables
-        })
-    except Exception as e:
-        log.exception("Database initialization failed")
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'traceback': traceback.format_exc()
-        }), 500
-
-@app.route('/api/debug-db', methods=['GET'])
-def debug_db():
-    """Debug database status and schema"""
-    try:
-        # Test connection
-        db_connected = test_database_connection()
-        
-        # Get database type
-        db_uri = app.config['SQLALCHEMY_DATABASE_URI']
-        db_type = 'postgresql' if 'postgres' in db_uri else 'sqlite'
-        
-        # Get tables
-        from sqlalchemy import inspect
-        inspector = inspect(db.engine)
-        tables = inspector.get_table_names()
-        
-        # Get detailed column information
-        schema_info = {}
-        for table in tables:
-            try:
-                columns = inspector.get_columns(table)
-                schema_info[table] = [col['name'] for col in columns]
-            except:
-                schema_info[table] = 'Error reading columns'
-        
-        # Count users
-        try:
-            user_count = User.query.count() if db_connected and 'user' in tables else 'N/A'
-        except Exception as e:
-            user_count = f'Error: {str(e)}'
-        
-        # Check for missing columns
-        missing_columns = []
-        if 'user' in tables:
-            user_cols = schema_info.get('user', [])
-            expected_user_cols = ['id', 'email', 'password', 'name', 'is_premium', 'subscription_id', 'deepseek_count', 'deepseek_date', 'created_at']
-            missing_user_cols = [col for col in expected_user_cols if col not in user_cols]
-            if missing_user_cols:
-                missing_columns.append({'table': 'user', 'columns': missing_user_cols})
-        
-        if 'message' in tables:
-            message_cols = schema_info.get('message', [])
-            expected_message_cols = ['id', 'chat_id', 'role', 'content', 'model', 'has_image', 'image_path', 'image_url', 'created_at']
-            missing_message_cols = [col for col in expected_message_cols if col not in message_cols]
-            if missing_message_cols:
-                missing_columns.append({'table': 'message', 'columns': missing_message_cols})
-        
-        response = {
-            'connected': db_connected,
-            'database_type': db_type,
-            'tables': tables,
-            'schema': schema_info,
-            'user_count': user_count,
-            'expected_tables': ['user', 'chat', 'message'],
-            'missing_columns': missing_columns,
-            'needs_migration': len(missing_columns) > 0
-        }
-        
-        if missing_columns:
-            response['migration_url'] = '/api/migrate-db'
-            response['warning'] = 'Database schema is incomplete. Visit /api/migrate-db to fix.'
-        
-        return jsonify(response)
-        
-    except Exception as e:
-        log.exception("Database debug failed")
-        return jsonify({
-            'connected': False,
-            'error': str(e),
-            'traceback': traceback.format_exc()
-        }), 500
-
-
-@app.route('/api/migrate-db', methods=['GET', 'POST'])
-def migrate_db():
-    """Migrate database schema - add missing columns to existing tables"""
-    try:
-        log.info("🔄 Starting database migration...")
-        
-        # Check if we're using PostgreSQL
-        db_uri = app.config['SQLALCHEMY_DATABASE_URI']
-        is_postgres = 'postgres' in db_uri
-        
-        if not is_postgres:
-            return jsonify({
-                'success': False,
-                'error': 'This migration is only for PostgreSQL. SQLite uses migrate_database_sqlite().'
-            }), 400
-        
-        migrations_applied = []
-        errors = []
-        
-        # Get current table structure
-        from sqlalchemy import inspect, text
-        inspector = inspect(db.engine)
-        
-        # Check and add missing columns to user table
-        if 'user' in inspector.get_table_names():
-            user_columns = [col['name'] for col in inspector.get_columns('user')]
-            log.info(f"Current user table columns: {user_columns}")
-            
-            # Add deepseek_count if missing
-            if 'deepseek_count' not in user_columns:
-                try:
-                    db.session.execute(text('ALTER TABLE "user" ADD COLUMN deepseek_count INTEGER DEFAULT 0'))
-                    db.session.commit()
-                    migrations_applied.append('Added user.deepseek_count')
-                    log.info("✅ Added user.deepseek_count")
-                except Exception as e:
-                    errors.append(f"Failed to add deepseek_count: {str(e)}")
-                    log.error(f"❌ Failed to add deepseek_count: {e}")
-                    db.session.rollback()
-            
-            # Add deepseek_date if missing
-            if 'deepseek_date' not in user_columns:
-                try:
-                    db.session.execute(text('ALTER TABLE "user" ADD COLUMN deepseek_date VARCHAR(10)'))
-                    db.session.commit()
-                    migrations_applied.append('Added user.deepseek_date')
-                    log.info("✅ Added user.deepseek_date")
-                except Exception as e:
-                    errors.append(f"Failed to add deepseek_date: {str(e)}")
-                    log.error(f"❌ Failed to add deepseek_date: {e}")
-                    db.session.rollback()
-            
-            # Add subscription_id if missing
-            if 'subscription_id' not in user_columns:
-                try:
-                    db.session.execute(text('ALTER TABLE "user" ADD COLUMN subscription_id VARCHAR(100)'))
-                    db.session.commit()
-                    migrations_applied.append('Added user.subscription_id')
-                    log.info("✅ Added user.subscription_id")
-                except Exception as e:
-                    errors.append(f"Failed to add subscription_id: {str(e)}")
-                    log.error(f"❌ Failed to add subscription_id: {e}")
-                    db.session.rollback()
-            
-            # Add is_premium if missing
-            if 'is_premium' not in user_columns:
-                try:
-                    db.session.execute(text('ALTER TABLE "user" ADD COLUMN is_premium BOOLEAN DEFAULT FALSE'))
-                    db.session.commit()
-                    migrations_applied.append('Added user.is_premium')
-                    log.info("✅ Added user.is_premium")
-                except Exception as e:
-                    errors.append(f"Failed to add is_premium: {str(e)}")
-                    log.error(f"❌ Failed to add is_premium: {e}")
-                    db.session.rollback()
-        
-        # Check and add missing columns to message table
-        if 'message' in inspector.get_table_names():
-            message_columns = [col['name'] for col in inspector.get_columns('message')]
-            log.info(f"Current message table columns: {message_columns}")
-            
-            # Add has_image if missing
-            if 'has_image' not in message_columns:
-                try:
-                    db.session.execute(text('ALTER TABLE message ADD COLUMN has_image BOOLEAN DEFAULT FALSE'))
-                    db.session.commit()
-                    migrations_applied.append('Added message.has_image')
-                    log.info("✅ Added message.has_image")
-                except Exception as e:
-                    errors.append(f"Failed to add has_image: {str(e)}")
-                    log.error(f"❌ Failed to add has_image: {e}")
-                    db.session.rollback()
-            
-            # Add image_path if missing
-            if 'image_path' not in message_columns:
-                try:
-                    db.session.execute(text('ALTER TABLE message ADD COLUMN image_path VARCHAR(1000)'))
-                    db.session.commit()
-                    migrations_applied.append('Added message.image_path')
-                    log.info("✅ Added message.image_path")
-                except Exception as e:
-                    errors.append(f"Failed to add image_path: {str(e)}")
-                    log.error(f"❌ Failed to add image_path: {e}")
-                    db.session.rollback()
-            
-            # Add image_url if missing
-            if 'image_url' not in message_columns:
-                try:
-                    db.session.execute(text('ALTER TABLE message ADD COLUMN image_url VARCHAR(1000)'))
-                    db.session.commit()
-                    migrations_applied.append('Added message.image_url')
-                    log.info("✅ Added message.image_url")
-                except Exception as e:
-                    errors.append(f"Failed to add image_url: {str(e)}")
-                    log.error(f"❌ Failed to add image_url: {e}")
-                    db.session.rollback()
-        
-        # Get updated column info
-        user_columns_after = [col['name'] for col in inspector.get_columns('user')] if 'user' in inspector.get_table_names() else []
-        message_columns_after = [col['name'] for col in inspector.get_columns('message')] if 'message' in inspector.get_table_names() else []
-        
-        log.info("🎉 Database migration completed!")
-        
-        return jsonify({
-            'success': True,
-            'migrations_applied': migrations_applied,
-            'errors': errors,
-            'user_columns': user_columns_after,
-            'message_columns': message_columns_after
-        })
-        
-    except Exception as e:
-        log.exception("Database migration failed")
-        db.session.rollback()
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'traceback': traceback.format_exc()
-        }), 500
-
-
-# ============ DB INIT WITH RETRY ============
-def init_database():
-    """Create tables and run migrations with retry logic"""
-    max_retries = 5
-    retry_delay = 3
-    
-    for attempt in range(1, max_retries + 1):
-        try:
-            log.info(f"🔄 Database initialization attempt {attempt}/{max_retries}...")
-            
-            with app.app_context():
-                # Wait for database to be ready
-                time.sleep(retry_delay)
-                
-                # Test connection
-                if not test_database_connection():
-                    raise Exception("Database connection failed")
-                
-                log.info("✅ Database connected")
-                
-                # Run SQLite migrations if applicable
-                migrate_database_sqlite()
-                
-                # Create all tables
-                db.create_all()
-                log.info("✅ Database tables created")
-                
-                # Verify tables
-                tables = get_table_names()
-                log.info(f"📊 Tables in database: {tables}")
-                
-                if 'user' in tables and 'chat' in tables and 'message' in tables:
-                    log.info("🎉 Database initialization successful!")
-                    return True
-                else:
-                    log.warning(f"⚠️ Expected tables not found. Found: {tables}")
-                
-        except Exception as e:
-            log.error(f"❌ Database init attempt {attempt}/{max_retries} failed: {e}")
-            if attempt < max_retries:
-                log.info(f"⏳ Retrying in {retry_delay} seconds...")
-                time.sleep(retry_delay)
-            else:
-                log.exception("💥 Database initialization failed after all retries")
-                log.warning("⚠️ App will start but database may not be initialized")
-                log.warning("🔧 Visit /api/init-db to manually initialize the database")
-    
-    return False
-
-# Initialize database on startup
-init_database()
 
 # ============ RUN ============
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
     log.info(f"🚀 Starting NexaAI on port {port}")
-    app.run(debug=True, host='0.0.0.0', port=port)
-
+    app.run(debug=False, host='0.0.0.0', port=port)
