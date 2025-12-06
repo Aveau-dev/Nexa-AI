@@ -1015,8 +1015,58 @@ def health_check():
         'stripe_configured': bool(stripe.api_key)
     })
 
+# ============ DATABASE MIGRATION ENDPOINT ============
+@app.route('/api/migrate', methods=['GET', 'POST'])
+def migrate_columns():
+    """One-time migration to add missing columns"""
+    try:
+        from sqlalchemy import text
+        
+        migrations = []
+        errors = []
+        
+        # Add missing columns
+        column_migrations = [
+            'ALTER TABLE "user" ADD COLUMN IF NOT EXISTS deepseek_count INTEGER DEFAULT 0',
+            'ALTER TABLE "user" ADD COLUMN IF NOT EXISTS deepseek_date VARCHAR(10) DEFAULT \'\'',
+            'ALTER TABLE "user" ADD COLUMN IF NOT EXISTS subscription_id VARCHAR(100)',
+            'ALTER TABLE "user" ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT FALSE',
+            'ALTER TABLE message ADD COLUMN IF NOT EXISTS has_image BOOLEAN DEFAULT FALSE',
+            'ALTER TABLE message ADD COLUMN IF NOT EXISTS image_path VARCHAR(1000)',
+            'ALTER TABLE message ADD COLUMN IF NOT EXISTS image_url VARCHAR(1000)'
+        ]
+        
+        for sql in column_migrations:
+            try:
+                db.session.execute(text(sql))
+                db.session.commit()
+                migrations.append(sql.split('ADD COLUMN IF NOT EXISTS')[1].split()[0] if 'ADD COLUMN' in sql else sql[:50])
+                log.info(f"✅ Executed: {sql[:80]}")
+            except Exception as e:
+                db.session.rollback()
+                error_msg = f"Failed: {sql[:50]}... Error: {str(e)}"
+                errors.append(error_msg)
+                log.error(f"❌ {error_msg}")
+        
+        return jsonify({
+            'success': len(errors) == 0,
+            'migrations_applied': migrations,
+            'errors': errors,
+            'message': 'Migration completed!' if len(errors) == 0 else 'Migration completed with errors'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        log.exception("Migration failed")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 # ============ RUN ============
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
     log.info(f"🚀 Starting NexaAI on port {port}")
     app.run(debug=False, host='0.0.0.0', port=port)
+
