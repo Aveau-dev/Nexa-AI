@@ -298,63 +298,16 @@ def get_chat_history(chat_id, limit=10):
         return []
 
 def call_openrouter(model_path, messages, timeout=60):
-    """
-    Call the OpenRouter chat API (best-effort). Will try to extract text content from common response shapes.
-    Expects messages = [{'role': 'user'|'assistant', 'content': '...'}, ...]
-    """
+    """Call OpenRouter API - WORKING VERSION"""
     try:
-        api_key = os.getenv('OPENROUTER_API_KEY')
-        if not api_key:
-            raise RuntimeError("OpenRouter API key not configured")
-
-        payload = {
-            "model": model_path,
-            "messages": messages
-        }
-        resp = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            },
-            json=payload,
+        response = openrouter_client.chat.completions.create(
+            model=model_path,
+            messages=messages,
             timeout=timeout
         )
-
-        # Handle common error statuses
-        if resp.status_code == 401:
-            raise RuntimeError("OpenRouter authentication failed")
-        if resp.status_code == 429:
-            raise RuntimeError("OpenRouter rate limit exceeded")
-        if resp.status_code >= 500:
-            raise RuntimeError("OpenRouter service error (server side)")
-
-        data = resp.json()
-        # Extract text content from a couple of possible shapes
-        # 1) choices[0].message.content
-        # 2) choices[0].text
-        if 'choices' in data and isinstance(data['choices'], list) and len(data['choices']) > 0:
-            choice = data['choices'][0]
-            content = None
-            if isinstance(choice, dict):
-                # Try nested structures
-                content = (choice.get('message') or {}).get('content') if choice.get('message') else None
-                if not content:
-                    content = choice.get('text')
-            if content is None:
-                # As a fallback, return the whole json as string
-                return str(data)
-            return content
-        # fallback whole json
-        return str(data)
-
-    except requests.Timeout:
-        raise RuntimeError("AI request timed out")
-    except requests.ConnectionError:
-        raise RuntimeError("Network connection error when contacting AI provider")
+        return response.choices[0].message.content
     except Exception as e:
-        log.exception("call_openrouter failed")
-        raise
+        raise Exception(f"OpenRouter API error: {str(e)}")
 
 def generate_image(prompt):
     """
@@ -860,3 +813,4 @@ init_database()
 # ============ RUN ============
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
+
