@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: nexaai
+    runtime: python
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.4
+      - key: SECRET_KEY
+        generateValue: true
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: UPLOAD_FOLDER
+        value: uploads
+
+databases:
+  - name: nexaai-db
+    databaseName: nexaai
+    user: nexaai
+    plan: free
