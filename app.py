@@ -59,7 +59,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_pre_ping': True,
     'pool_recycle': 300,
-    'connect_args': {'connect_timeout': 10}
 }
 app.config['UPLOAD_FOLDER'] = os.getenv('UPLOAD_FOLDER', 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB
@@ -1069,4 +1068,5 @@ if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
     log.info(f"🚀 Starting NexaAI on port {port}")
     app.run(debug=False, host='0.0.0.0', port=port)
+
 
