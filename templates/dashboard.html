@@ -9,6 +9,283 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    
+    <style>
+        /* Model Selector Dropdown - FIXED VISIBILITY */
+        .model-selector-dropdown {
+            position: fixed;
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 700px;
+            max-height: 80vh;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            z-index: 9999;
+            overflow: hidden;
+            display: none;
+        }
+
+        .model-selector-dropdown.show {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .model-selector-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-primary);
+        }
+
+        .model-selector-header h3 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0;
+        }
+
+        .close-selector {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .close-selector:hover {
+            background: var(--hover-bg);
+            color: var(--text-primary);
+        }
+
+        .model-selector-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .model-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .model-group-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            padding: 0 0.5rem;
+        }
+
+        .group-badge {
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.375rem 0.75rem;
+            border-radius: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .group-badge.free {
+            background: #1a472a;
+            color: #4ade80;
+        }
+
+        .group-badge.premium {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            color: #000;
+        }
+
+        .group-title {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .model-card {
+            background: var(--bg-tertiary);
+            border: 2px solid transparent;
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .model-card:hover {
+            border-color: var(--accent-color);
+            background: var(--hover-bg);
+            transform: translateY(-2px);
+        }
+
+        .model-card.active {
+            border-color: var(--accent-color);
+            background: var(--hover-bg);
+            box-shadow: 0 0 0 3px rgba(25, 195, 125, 0.1);
+        }
+
+        .model-card-header {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .model-icon {
+            font-size: 2rem;
+            flex-shrink: 0;
+        }
+
+        .model-info {
+            flex: 1;
+        }
+
+        .model-name {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0 0 0.5rem 0;
+        }
+
+        .model-features {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .feature-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+            font-weight: 500;
+        }
+
+        .feature-badge.vision {
+            background: #1e3a8a;
+            color: #93c5fd;
+        }
+
+        .feature-badge.limit {
+            background: #7c2d12;
+            color: #fdba74;
+        }
+
+        .feature-badge.speed {
+            background: #1a472a;
+            color: #4ade80;
+        }
+
+        .feature-badge.unlimited {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            color: #000;
+            font-weight: 600;
+        }
+
+        .model-description {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        /* MESSAGE ACTIONS - BEAUTIFUL STYLING */
+        .message-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border-color);
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+
+        .message-row:hover .message-actions {
+            opacity: 1;
+        }
+
+        .action-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 0.5rem 0.875rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .action-btn:hover {
+            background: var(--accent-color);
+            color: #000;
+            border-color: var(--accent-color);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(25, 195, 125, 0.3);
+        }
+
+        .action-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .action-btn.copied {
+            background: #1a472a;
+            color: #4ade80;
+            border-color: #4ade80;
+        }
+
+        /* IMAGE POSITIONING - ABOVE TEXT LIKE CHATGPT */
+        .message-image {
+            margin-bottom: 1rem;
+            order: -1; /* Put image first */
+        }
+
+        .message-image img {
+            max-width: 100%;
+            max-height: 400px;
+            border-radius: 12px;
+            display: block;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .message-content {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* USER MESSAGE IMAGE */
+        .user-message .message-image {
+            margin-bottom: 0.75rem;
+        }
+
+        .user-message .message-image img {
+            max-width: 300px;
+            max-height: 300px;
+            margin-left: auto;
+        }
+
+        /* ASSISTANT MESSAGE STYLING */
+        .assistant-message .message-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .model-badge {
+            font-size: 0.75rem;
+            color: var(--accent-color);
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+    </style>
 </head>
 <body>
     <!-- Top Navigation -->
@@ -26,7 +303,7 @@
                 <span>New chat</span>
             </button>
             <button class="model-selector-btn" onclick="toggleModelSelector()">
-                <span id="selected-model-name">{{ models[session.get('selected_model', 'gpt-3.5-turbo')].name }}</span>
+                <span id="selected-model-name">{{ models[session.get('selected_model', 'gemini-flash')].name }}</span>
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                     <path d="M7 10l5 5 5-5z"/>
                 </svg>
@@ -34,8 +311,8 @@
         </div>
         <div class="nav-right">
             {% if not user.is_premium %}
-            <button class="nav-button upgrade-btn" onclick="location.href='/pricing'">
-                <span>⭐ Upgrade to Premium</span>
+            <button class="nav-button upgrade-btn" onclick="location.href='/checkout'">
+                <span>⭐ Upgrade</span>
             </button>
             {% else %}
             <div class="premium-badge-nav">⭐ Premium</div>
@@ -65,49 +342,27 @@
                     <span class="group-title">Available for Everyone</span>
                 </div>
                 
-                {% for model_key, model_data in models.items() if model_key in ['gpt-3.5-turbo', 'claude-3-haiku', 'gemini-flash', 'deepseek-chat'] %}
-                <div class="model-card {% if model_key == session.get('selected_model', 'gpt-3.5-turbo') %}active{% endif %}" 
+                {% for model_key, model_data in models.items() if model_key in ['gemini-flash', 'gpt-3.5-turbo', 'claude-3-haiku', 'deepseek-chat'] %}
+                <div class="model-card {% if model_key == session.get('selected_model', 'gemini-flash') %}active{% endif %}" 
                      onclick="selectModel('{{ model_key }}', '{{ model_data.name }}', {{ 'true' if model_data.vision else 'false' }})">
                     <div class="model-card-header">
                         <div class="model-icon">
-                            {% if 'gpt' in model_key %}
-                                🤖
-                            {% elif 'claude' in model_key %}
-                                🎭
-                            {% elif 'gemini' in model_key %}
-                                ✨
-                            {% elif 'deepseek' in model_key %}
-                                🧠
-                            {% else %}
-                                💬
-                            {% endif %}
+                            {% if 'gemini' in model_key %}⚡
+                            {% elif 'gpt' in model_key %}🤖
+                            {% elif 'claude' in model_key %}🎭
+                            {% elif 'deepseek' in model_key %}🧠
+                            {% else %}💬{% endif %}
                         </div>
                         <div class="model-info">
-                            <div class="model-name">{{ model_data.name }}</div>
+                            <h4 class="model-name">{{ model_data.name }}</h4>
                             <div class="model-features">
-                                {% if model_data.vision %}
-                                <span class="feature-badge vision">📷 Vision</span>
-                                {% endif %}
-                                {% if model_data.limit %}
-                                <span class="feature-badge limit">{{ model_data.limit }}/day</span>
-                                {% endif %}
+                                {% if model_data.vision %}<span class="feature-badge vision">📷 Vision</span>{% endif %}
+                                {% if model_data.limit %}<span class="feature-badge limit">{{ model_data.limit }}/day</span>{% endif %}
                                 <span class="feature-badge speed">⚡ Fast</span>
                             </div>
                         </div>
                     </div>
-                    <div class="model-description">
-                        {% if 'gpt-3.5' in model_key %}
-                            Fast and efficient for everyday tasks
-                        {% elif 'claude-3-haiku' in model_key %}
-                            Fast Claude model, great for quick responses
-                        {% elif 'gemini-flash' in model_key %}
-                            Google's fast and efficient model
-                        {% elif 'deepseek' in model_key %}
-                            Advanced reasoning with daily limit
-                        {% else %}
-                            Versatile AI model
-                        {% endif %}
-                    </div>
+                    <div class="model-description">{{ model_data.description }}</div>
                 </div>
                 {% endfor %}
             </div>
@@ -125,69 +380,43 @@
                      onclick="selectModel('{{ model_key }}', '{{ model_data.name }}', {{ 'true' if model_data.vision else 'false' }})">
                     <div class="model-card-header">
                         <div class="model-icon premium">
-                            {% if 'gpt-4' in model_key %}
-                                🤖
-                            {% elif 'claude' in model_key %}
-                                🎭
-                            {% elif 'gemini' in model_key %}
-                                ✨
-                            {% elif 'deepseek-r1' in model_key %}
-                                🧠
-                            {% else %}
-                                ⭐
-                            {% endif %}
+                            {% if 'gpt-4' in model_key %}🧠
+                            {% elif 'claude' in model_key %}🎭
+                            {% elif 'gemini' in model_key %}💎
+                            {% elif 'deepseek-r1' in model_key %}🚀
+                            {% else %}⭐{% endif %}
                         </div>
                         <div class="model-info">
-                            <div class="model-name">{{ model_data.name }}</div>
+                            <h4 class="model-name">{{ model_data.name }}</h4>
                             <div class="model-features">
-                                {% if model_data.vision %}
-                                <span class="feature-badge vision">📷 Vision</span>
-                                {% endif %}
+                                {% if model_data.vision %}<span class="feature-badge vision">📷 Vision</span>{% endif %}
                                 <span class="feature-badge unlimited">∞ Unlimited</span>
                             </div>
                         </div>
                     </div>
-                    <div class="model-description">
-                        {% if 'gpt-4o-mini' in model_key %}
-                            Fast and cost-effective GPT-4 variant
-                        {% elif 'gpt-4o' in model_key %}
-                            Most advanced GPT with vision & reasoning
-                        {% elif 'claude-3.5' in model_key %}
-                            Best for coding, writing & analysis
-                        {% elif 'claude-3-opus' in model_key %}
-                            Most capable Claude model
-                        {% elif 'gemini-pro' in model_key %}
-                            Google's most capable AI
-                        {% elif 'deepseek-r1' in model_key %}
-                            Advanced reasoning & problem solving
-                        {% else %}
-                            High-performance AI model
-                        {% endif %}
-                    </div>
+                    <div class="model-description">{{ model_data.description }}</div>
                 </div>
                 {% endfor %}
             </div>
             {% else %}
-            <!-- Upgrade Card for Non-Premium Users -->
+            <!-- Upgrade Card -->
             <div class="model-group">
                 <div class="model-group-header">
                     <span class="group-badge premium">⭐ Premium</span>
                     <span class="group-title">Unlock Advanced Models</span>
                 </div>
                 
-                <div class="upgrade-card" onclick="location.href='/pricing'">
-                    <div class="upgrade-icon">🚀</div>
-                    <div class="upgrade-content">
-                        <h3>Upgrade to Premium</h3>
-                        <p>Get unlimited access to GPT-4, Claude 3.5, Gemini Pro & more</p>
-                        <ul class="upgrade-features">
-                            <li>✓ GPT-4o & GPT-4o Mini</li>
-                            <li>✓ Claude 3.5 Sonnet (Best for coding)</li>
-                            <li>✓ Unlimited messages</li>
-                            <li>✓ Priority support</li>
-                        </ul>
-                        <button class="upgrade-button">Upgrade Now - $19.99/mo</button>
-                    </div>
+                <div class="upgrade-card" onclick="location.href='/checkout'" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 2rem; border-radius: 12px; text-align: center; cursor: pointer;">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">🚀</div>
+                    <h3 style="margin-bottom: 0.5rem;">Upgrade to Premium</h3>
+                    <p style="opacity: 0.9; margin-bottom: 1.5rem;">Get unlimited access to GPT-4, Claude 3.5, Gemini Pro & more</p>
+                    <ul style="text-align: left; margin-bottom: 1.5rem; list-style: none; padding: 0;">
+                        <li style="padding: 0.5rem 0;">✓ GPT-4o & GPT-4o Mini</li>
+                        <li style="padding: 0.5rem 0;">✓ Claude 3.5 Sonnet (Best for coding)</li>
+                        <li style="padding: 0.5rem 0;">✓ Unlimited messages</li>
+                        <li style="padding: 0.5rem 0;">✓ Priority support</li>
+                    </ul>
+                    <button style="background: white; color: #667eea; border: none; padding: 1rem 2rem; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 1rem;">Upgrade Now - $19.99/mo</button>
                 </div>
             </div>
             {% endif %}
@@ -210,7 +439,7 @@
         </div>
         <div class="menu-divider"></div>
         {% if not user.is_premium %}
-        <a href="/pricing" class="menu-item">
+        <a href="/checkout" class="menu-item">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
                 <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
             </svg>
@@ -243,7 +472,7 @@
                 </div>
                 {% if not user.is_premium %}
                 <div class="upgrade-cta-small">
-                    <a href="/pricing">Upgrade for unlimited access →</a>
+                    <a href="/checkout">Upgrade for unlimited access →</a>
                 </div>
                 {% else %}
                 <div class="premium-info">✨ Unlimited Messages</div>
@@ -317,7 +546,7 @@
                     </button>
                 </div>
                 <div class="input-footer">
-                    <span class="footer-text"><span id="model-info">{{ models[session.get('selected_model', 'gpt-3.5-turbo')].name }}</span> · NexaAI can make mistakes. Check important info.</span>
+                    <span class="footer-text"><span id="model-info">{{ models[session.get('selected_model', 'gemini-flash')].name }}</span> · NexaAI can make mistakes. Check important info.</span>
                 </div>
             </div>
         </div>
@@ -326,8 +555,8 @@
     <script>
         // Global variables
         let currentChatId = null;
-        let selectedModel = '{{ session.get("selected_model", "gpt-3.5-turbo") }}';
-        let modelSupportsVision = {{ 'true' if models[session.get('selected_model', 'gpt-3.5-turbo')].vision else 'false' }};
+        let selectedModel = '{{ session.get("selected_model", "gemini-flash") }}';
+        let modelSupportsVision = {{ 'true' if models[session.get('selected_model', 'gemini-flash')].vision else 'false' }};
         let uploadedImage = null;
         let isGenerating = false;
         let currentAbortController = null;
@@ -442,7 +671,7 @@
 
         function toggleModelSelector() {
             const selector = document.getElementById('model-selector');
-            selector.style.display = selector.style.display === 'block' ? 'none' : 'block';
+            selector.classList.toggle('show');
         }
 
         function toggleUserMenu() {
@@ -456,7 +685,7 @@
             const userMenu = document.getElementById('user-menu');
             
             if (!event.target.closest('.model-selector-btn') && !event.target.closest('.model-selector-dropdown')) {
-                modelSelector.style.display = 'none';
+                modelSelector.classList.remove('show');
             }
             
             if (!event.target.closest('.nav-button.icon-only') && !event.target.closest('.dropdown-menu')) {
@@ -603,7 +832,7 @@
                 const data = await response.json();
                 
                 if (data.response) {
-                    addMessage(data.response, 'assistant');
+                    addMessage(data.response, 'assistant', null, data.image_url);
                     currentChatId = data.chat_id;
                     loadChatHistory();
                 }
@@ -631,7 +860,7 @@
             }
         }
 
-        function addMessage(text, role, imageUrl = null) {
+        function addMessage(text, role, userImageUrl = null, aiImageUrl = null) {
             const container = document.getElementById('messages-container');
             const messageDiv = document.createElement('div');
             messageDiv.className = `message-row ${role}-row`;
@@ -639,11 +868,14 @@
             if (role === 'user') {
                 messageDiv.innerHTML = `
                     <div class="message user-message">
-                        ${imageUrl ? `<div class="message-image"><img src="${imageUrl}" alt="Uploaded"></div>` : ''}
-                        <div class="message-content">${escapeHtml(text)}</div>
+                        <div class="message-content">
+                            ${userImageUrl ? `<div class="message-image"><img src="${userImageUrl}" alt="Uploaded"></div>` : ''}
+                            <div class="message-text">${escapeHtml(text)}</div>
+                        </div>
                     </div>
                 `;
             } else if (role === 'assistant') {
+                const cleanText = text.replace(/`/g, '\\`').replace(/\$/g, '\\$');
                 messageDiv.innerHTML = `
                     <div class="message assistant-message">
                         <div class="avatar">
@@ -651,11 +883,28 @@
                                 <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
                             </svg>
                         </div>
-                        <div class="message-content markdown-content"></div>
+                        <div class="message-content markdown-content">
+                            ${aiImageUrl ? `<div class="message-image"><img src="${aiImageUrl}" alt="Generated"></div>` : ''}
+                            <div class="message-text"></div>
+                            <div class="message-actions">
+                                <button class="action-btn" onclick="copyMessage(this, \`${cleanText}\`)">
+                                    <svg viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                                    </svg>
+                                    Copy
+                                </button>
+                                <button class="action-btn" onclick="speakText(\`${cleanText}\`)">
+                                    <svg viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
+                                    </svg>
+                                    Speak
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 `;
                 
-                const contentDiv = messageDiv.querySelector('.markdown-content');
+                const contentDiv = messageDiv.querySelector('.message-text');
                 contentDiv.innerHTML = formatMarkdown(text);
                 
                 // Highlight code blocks
@@ -664,7 +913,6 @@
                 });
                 
                 addCopyButtons(contentDiv);
-                addMessageActions(contentDiv, text);
                 
             } else if (role === 'error') {
                 messageDiv.innerHTML = `
@@ -678,29 +926,19 @@
             container.scrollTop = container.scrollHeight;
         }
 
-        function addMessageActions(contentDiv, text) {
-            const actionsDiv = document.createElement('div');
-            actionsDiv.style.marginTop = '8px';
-            actionsDiv.style.display = 'flex';
-            actionsDiv.style.gap = '8px';
-            
-            actionsDiv.innerHTML = `
-                <button class="action-btn" onclick="speakText(\`${text.replace(/`/g, '\\`').replace(/\n/g, ' ')}\`)">
-                    🔊 Speak
-                </button>
-                <button class="action-btn" onclick="copyMessage(this, \`${text.replace(/`/g, '\\`')}\`)">
-                    📋 Copy
-                </button>
-            `;
-            
-            contentDiv.appendChild(actionsDiv);
-        }
-
         function copyMessage(button, text) {
             navigator.clipboard.writeText(text);
-            button.textContent = '✅ Copied!';
+            const originalHTML = button.innerHTML;
+            button.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                </svg>
+                Copied!
+            `;
+            button.classList.add('copied');
             setTimeout(() => {
-                button.textContent = '📋 Copy';
+                button.innerHTML = originalHTML;
+                button.classList.remove('copied');
             }, 2000);
         }
 
