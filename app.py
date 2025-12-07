@@ -162,8 +162,8 @@ init_database()
 # ============ AI MODELS CONFIG ============
 FREE_MODELS = {
     "gemini-flash": {
-        "name": "Gemini 2.0 Flash",
-        "model": "gemini-2.0-flash-exp",
+        "name": "Gemini 2.5 Flash",
+        "model": "gemini-2.5-flash-lite",
         "provider": "google",
         "vision": True,
         "limit": None,
@@ -520,7 +520,7 @@ def demo_chat():
             return jsonify({
                 'response': response_text,
                 'demo': True,
-                'model': 'Gemini 2.0 Flash',
+                'model': 'Gemini 2.5 Flash lite',
                 'has_image': False
             })
         except Exception as e:
@@ -1039,3 +1039,4 @@ if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
     log.info(f"🚀 Starting NexaAI on port {port}")
     app.run(debug=False, host='0.0.0.0', port=port)
+
