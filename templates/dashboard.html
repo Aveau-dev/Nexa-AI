@@ -1,77 +1,241 @@
-<!-- templates/dashboard.html -->
+{# templates/dashboard.html - SPA master shell for NexaAI (Option B) #}
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>NexaAI — Dashboard</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>NexaAI — Dashboard</title>
+
+    {# Your CSS file (you provided) should be at static/css/style.css #}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+    <!-- Markdown renderer & highlight.js (used by chat view & preview) -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Tiny helper: Font or icons (optional) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <meta name="robots" content="noindex">
 </head>
 <body>
-  <nav class="top-nav">
-    <div class="nav-left">
-      <button onclick="UI.toggleSidebar()" title="Toggle sidebar">☰</button>
-      <button onclick="UI.createNewChat()">New chat</button>
-      <div class="model-selector">
-        <button id="model-btn" onclick="Models.toggleSelector()">
-          <span id="selected-model">{{ models[session.get('selected_model','gemini-flash')].name }}</span> ▾
-        </button>
-        <div id="model-list" class="hidden model-list"></div>
-      </div>
+    <!-- Top Navigation -->
+    <nav class="top-nav" role="navigation" aria-label="Top Navigation">
+        <div class="nav-left">
+            <div class="logo-container" style="cursor:pointer" onclick="Router.load('chat')">
+                <div class="logo-icon" aria-hidden="true">N</div>
+                <div class="logo-text">NexaAI</div>
+            </div>
+
+            <button class="nav-button icon-only" onclick="UI.toggleSidebar()" title="Toggle sidebar" aria-label="Toggle sidebar">
+                <!-- hamburger -->
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                    <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+                </svg>
+            </button>
+
+            <button class="nav-button" onclick="Router.load('chat')" title="New chat">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
+                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                </svg>
+                <span>New chat</span>
+            </button>
+
+            <button id="model-selector-btn" class="model-selector-btn" onclick="Models.toggleSelector()" aria-haspopup="true" aria-expanded="false">
+                <span id="selected-model-name">{{ models[session.get('selected_model', 'gemini-flash')].name }}</span>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
+                    <path d="M7 10l5 5 5-5z"/>
+                </svg>
+            </button>
+        </div>
+
+        <div class="nav-right">
+            {% if not user.is_premium %}
+                <button class="nav-button upgrade-btn" onclick="location.href='/checkout'">
+                    <span>⭐ Upgrade</span>
+                </button>
+            {% else %}
+                <div class="premium-badge-nav">⭐ Premium</div>
+            {% endif %}
+
+            <button class="nav-button icon-only" onclick="UI.toggleUserMenu()" aria-haspopup="true" aria-expanded="false" title="Account menu">
+                <div class="user-avatar" aria-hidden="true">{{ user.name[0].upper() }}</div>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Model Selector Dropdown (fullscreen modal-like, styled in your CSS) -->
+    <div id="model-selector-dropdown" class="model-selector-dropdown" role="dialog" aria-modal="true" aria-hidden="true">
+        <div class="model-selector-header">
+            <h3>Select AI Model</h3>
+            <button class="close-selector" onclick="Models.toggleSelector()" aria-label="Close model selector">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+            </button>
+        </div>
+
+        <div id="model-selector-content" class="model-selector-content">
+            <!-- Groups will be injected by Models.render() -->
+            <div class="model-group">
+                <div class="model-group-header">
+                    <span class="group-badge free">Free</span>
+                    <span class="group-title">Available for Everyone</span>
+                </div>
+                <div id="models-free-list"></div>
+            </div>
+
+            <div class="model-group" id="models-premium-group" style="display:none;">
+                <div class="model-group-header">
+                    <span class="group-badge premium">⭐ Premium</span>
+                    <span class="group-title">Premium Models</span>
+                </div>
+                <div id="models-premium-list"></div>
+            </div>
+
+            <div id="model-upgrade-cta" style="margin-top:1rem;"></div>
+        </div>
     </div>
-    <div class="nav-right">
-      {% if not user.is_premium %}
-        <button class="upgrade" onclick="location.href='/checkout'">Upgrade ★</button>
-      {% else %}
-        <span class="premium">★ Premium</span>
-      {% endif %}
-      <button onclick="UI.toggleUserMenu()">
-        <span class="avatar">{{ user.name[0].upper() }}</span>
-      </button>
+
+    <!-- User Menu Dropdown -->
+    <div id="user-menu" class="dropdown-menu" role="menu" aria-hidden="true">
+        <div class="menu-header">
+            <div class="user-avatar-large">{{ user.name[0].upper() }}</div>
+            <div class="user-info">
+                <div class="user-name">{{ user.name }}</div>
+                <div class="user-email">{{ user.email }}</div>
+                {% if user.is_premium %}
+                    <div class="premium-badge-small">⭐ Premium Member</div>
+                {% else %}
+                    <div class="free-badge-small">Free Account</div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="menu-divider"></div>
+        {% if not user.is_premium %}
+            <a href="/checkout" class="menu-item">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                Upgrade to Premium
+            </a>
+        {% endif %}
+        <a href="/logout" class="menu-item">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+            Log out
+        </a>
     </div>
-  </nav>
 
-  <aside id="sidebar" class="sidebar">
-    <div class="sidebar-top">
-      <h3>Chats</h3>
-      <div id="chat-history"></div>
+    <!-- Sidebar -->
+    <aside id="sidebar" class="sidebar" aria-label="Sidebar">
+        <div class="sidebar-content">
+            <div class="sidebar-section">
+                <div class="section-title">Recent Chats</div>
+                <div id="chat-history" class="chat-history" role="list">
+                    <div class="empty-state">Loading chats…</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="sidebar-footer">
+            <div class="usage-info">
+                <div class="usage-item">
+                    <span class="usage-label">Messages Today</span>
+                    <span id="messages-today" class="usage-value">{{ current_user.message_count or 0 }}</span>
+                </div>
+
+                {% if not user.is_premium %}
+                    <div class="upgrade-cta-small">
+                        <a href="/checkout">Upgrade for unlimited access →</a>
+                    </div>
+                {% else %}
+                    <div class="premium-info">✨ Unlimited Messages</div>
+                {% endif %}
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Container -->
+    <div id="main-container" class="main-container with-sidebar">
+        <div id="view-container" class="center-content" role="main" tabindex="-1">
+            <!-- Router will inject view partials here -->
+            <div class="loading">Loading interface…</div>
+        </div>
     </div>
-    <div class="sidebar-bottom">
-      <button onclick="Router.load('projects')">Projects</button>
-      <button onclick="Router.load('canvas')">Canvas</button>
-      <button onclick="Router.load('files')">Files</button>
-      <button onclick="Router.load('memory')">Memory</button>
-      <button onclick="Router.load('voice')">Voice</button>
-      <button onclick="Router.load('settings')">Settings</button>
-      <button id="export-btn" onclick="Export.exportChats()">Export</button>
+
+    <!-- Floating Input area (chat view will reuse / override) -->
+    <div id="global-input-wrapper" class="input-wrapper" aria-hidden="true" style="display:none;">
+        <div class="input-box">
+            <div class="input-inner">
+                <button class="icon-button" id="voice-btn" title="Voice input" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+                </button>
+
+                <button class="attach-button" id="attach-btn" title="Attach image" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+                </button>
+
+                <textarea id="global-chat-input" placeholder="Message NexaAI..." rows="1" onkeydown="UI.globalHandleKey(event)" oninput="UI.autoResize(this)"></textarea>
+
+                <button class="send-button" id="global-send" title="Send message" aria-hidden="true" onclick="UI.globalSend()">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                </button>
+            </div>
+            <div class="input-footer">
+                <span id="global-model-info" class="footer-text"><span id="model-info">{{ models[session.get('selected_model', 'gemini-flash')].name }}</span> · NexaAI can make mistakes — verify important info.</span>
+            </div>
+        </div>
     </div>
-  </aside>
 
-  <main id="main" class="main">
-    <!-- main content area: subviews are loaded here -->
-    <div id="view-container"></div>
-  </main>
+    <!-- Loading template (used by router) -->
+    <template id="loading-tpl">
+        <div class="loading">Loading…</div>
+    </template>
 
-  <!-- Hidden templates / placeholders -->
-  <template id="loading-tpl">
-    <div class="loading">Loading…</div>
-  </template>
+    <!-- expose server side to client -->
+    <script>
+        window.NEXA = {
+            currentUser: {{ {'id': user.id, 'name': user.name, 'is_premium': user.is_premium} | tojson }},
+            models: {{ (models | tojson) }},
+            selectedModel: "{{ session.get('selected_model','gemini-flash') }}"
+        };
+    </script>
 
-  <script>
-    // Pass server-side models to client
-    window.NEXA = {
-      currentUser: {{ {'id': user.id, 'name': user.name, 'is_premium': user.is_premium} | tojson }},
-      models: {{ models | tojson }},
-      selectedModel: "{{ session.get('selected_model','gemini-flash') }}"
-    };
-  </script>
+    <!-- Core JS modules (these files will be created in subsequent parts) -->
+    <script src="{{ url_for('static', filename='js/router.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/ui.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/model-selector.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/canvas.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/files.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/projects.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/memory.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/voice.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
 
-  <script src="{{ url_for('static', filename='js/ai_models.js') }}"></script>
-  <script src="{{ url_for('static', filename='js/file_tools.js') }}"></script>
-  <script src="{{ url_for('static', filename='js/canvas.js') }}"></script>
-  <script src="{{ url_for('static', filename='js/voice.js') }}"></script>
-  <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    <script>
+        // Basic startup: when DOM ready, initialize router and models
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                // initialize minimal UI utilities
+                if (typeof UI !== 'undefined' && UI.init) UI.init();
+                // initialize models selector
+                if (typeof Models !== 'undefined' && Models.init) Models.init(window.NEXA.models, window.NEXA.selectedModel);
+                // start SPA at chat view
+                if (typeof Router !== 'undefined' && Router.load) Router.load('chat');
+            } catch (e) {
+                console.error('Startup error', e);
+            }
+        });
+
+        // close dropdowns if click outside
+        document.addEventListener('click', function (ev) {
+            if (!ev.target.closest('.model-selector-btn') && !ev.target.closest('.model-selector-dropdown')) {
+                const dd = document.getElementById('model-selector-dropdown');
+                if (dd && dd.classList.contains('show')) Models.toggleSelector(false);
+            }
+
+            if (!ev.target.closest('.user-avatar') && !ev.target.closest('#user-menu') && document.getElementById('user-menu')) {
+                document.getElementById('user-menu').style.display = 'none';
+            }
+        });
+    </script>
 </body>
 </html>
