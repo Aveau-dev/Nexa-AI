@@ -1,0 +1,27 @@
+<!-- templates/views/voice.html -->
+<div class="voice-view">
+
+    <div class="view-header">
+        <h2>Voice Mode</h2>
+    </div>
+
+    <div class="voice-controls">
+        <select id="voice-device" class="input-select"></select>
+
+        <button onclick="Voice.start()" class="btn-primary">🎤 Start Listening</button>
+        <button onclick="Voice.stop()" class="btn-outline">⏹ Stop</button>
+    </div>
+
+    <h3>Live Transcript</h3>
+    <div id="voice-transcript" class="voice-transcript">
+        Waiting for input…
+    </div>
+
+    <h3>Logs</h3>
+    <div id="voice-logs" class="log-box"></div>
+
+</div>
+
+<script>
+    UI.enableGlobalInput(false);
+</script>
