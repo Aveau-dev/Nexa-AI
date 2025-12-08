@@ -160,7 +160,7 @@ init_database()
 FREE_MODELS = {
     "gemini-flash": {
         "name": "Gemini 2.5 Flash",
-        "model": "gemini-2.0-flash-exp",
+        "model": "gemini-2.5-flash-lite",
         "provider": "google",
         "vision": True,
         "limit": None,
@@ -506,7 +506,7 @@ def demo_chat():
         return jsonify({
             'response': resp,
             'demo': True,
-            'model': 'Gemini 2.5 Flash',
+            'model': 'Gemini 2.5 Flash lite',
             'has_image': False
         })
     except Exception as e:
@@ -988,3 +988,4 @@ if __name__ == '__main__':
     log.info(f"🚀 Starting NexaAI on port {port}")
     log.info(f"📊 Database: {'PostgreSQL' if 'postgresql' in app.config['SQLALCHEMY_DATABASE_URI'] else 'SQLite'}")
     app.run(debug=True, host='0.0.0.0', port=port)
+
