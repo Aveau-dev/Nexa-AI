@@ -395,6 +395,34 @@ def call_ai_model(model_key, messages, image_data=None, image_path=None):
         return call_openrouter(cfg['model'], messages, image_data, image_path)
     raise Exception(f"Unknown provider: {cfg['provider']}")
 
+
+# Web Search Route
+@app.route('/web-search', methods=['POST'])
+@login_required
+def web_search():
+    data = request.get_json()
+    query = data.get('query')
+    # Implement web search using SerpAPI or similar
+    return jsonify({'results': []})
+
+# Code Execution Route
+@app.route('/execute-code', methods=['POST'])
+@login_required
+def execute_code():
+    data = request.get_json()
+    code = data.get('code')
+    # Implement code execution in sandbox
+    try:
+        # Use exec() with restricted globals
+        output = io.StringIO()
+        sys.stdout = output
+        exec(code, {'__builtins__': {}})
+        sys.stdout = sys.__stdout__
+        return jsonify({'output': output.getvalue()})
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+
 # ============ HELPER FUNCTIONS ============
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -988,4 +1016,5 @@ if __name__ == '__main__':
     log.info(f"🚀 Starting NexaAI on port {port}")
     log.info(f"📊 Database: {'PostgreSQL' if 'postgresql' in app.config['SQLALCHEMY_DATABASE_URI'] else 'SQLite'}")
     app.run(debug=True, host='0.0.0.0', port=port)
+
 
