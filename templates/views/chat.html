@@ -1,1 +1,38 @@
 
+<!-- templates/views/chat.html -->
+<div class="chat-view">
+
+    <!-- Centered Chat Container -->
+    <div id="chat-messages" class="chat-messages">
+        <div class="initial-greeting">
+            <h1>Hello {{ current_user.name }} 👋</h1>
+            <p class="subtext">How can I help you today?</p>
+
+            <!-- Suggested prompts -->
+            <div class="suggestions-grid">
+                <div class="suggestion-card" onclick="Chat.useSuggestion('Explain this code with examples:')">
+                    <div class="icon">💡</div>
+                    <div class="text">Explain this code with examples</div>
+                </div>
+                <div class="suggestion-card" onclick="Chat.useSuggestion('Summarize this text:')">
+                    <div class="icon">📘</div>
+                    <div class="text">Summarize this text</div>
+                </div>
+                <div class="suggestion-card" onclick="Chat.useSuggestion('Generate modern landing page HTML + CSS')">
+                    <div class="icon">🎨</div>
+                    <div class="text">Generate modern landing page</div>
+                </div>
+                <div class="suggestion-card" onclick="Chat.useSuggestion('Write optimized Python code for:')">
+                    <div class="icon">⚙️</div>
+                    <div class="text">Write optimized Python code</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Input reserved in dashboard.html -->
+    <script>
+        UI.enableGlobalInput(true);
+    </script>
+
+</div>
