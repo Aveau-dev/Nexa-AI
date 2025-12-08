@@ -1,0 +1,34 @@
+<!-- templates/views/settings.html -->
+<div class="settings-view">
+
+    <div class="view-header">
+        <h2>Settings</h2>
+    </div>
+
+    <div class="settings-grid">
+
+        <div class="settings-card">
+            <h3>Account</h3>
+            <label>Name</label>
+            <input id="settings-name" class="input-text" value="{{ current_user.name }}">
+
+            <label>Email</label>
+            <input id="settings-email" class="input-text" value="{{ current_user.email }}" disabled>
+
+            <button onclick="Settings.saveAccount()" class="btn-primary">Save</button>
+        </div>
+
+        <div class="settings-card">
+            <h3>Connected Services</h3>
+            <button onclick="Settings.connectGoogle()" class="btn-outline">Connect Google</button>
+            <button onclick="Settings.connectDrive()" class="btn-outline">Connect Drive</button>
+            <button onclick="Settings.connectNotion()" class="btn-outline">Connect Notion</button>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    UI.enableGlobalInput(false);
+</script>
