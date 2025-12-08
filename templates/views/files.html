@@ -1,0 +1,36 @@
+<!-- templates/views/files.html -->
+<div class="files-view">
+
+    <div class="view-header">
+        <h2>Files</h2>
+        <button onclick="Files.uploadDialog()" class="btn-primary">Upload File</button>
+    </div>
+
+    <input type="file" id="file-upload-input" style="display:none" onchange="Files.upload(event)" />
+
+    <div class="files-layout">
+        <!-- Left: list -->
+        <div id="files-list" class="files-list">
+            <div class="loading">Loading files…</div>
+        </div>
+
+        <!-- Right: viewer -->
+        <div id="file-viewer" class="file-viewer hidden">
+            <h3 id="file-name"></h3>
+            <div id="file-preview" class="file-preview"></div>
+
+            <h3>AI Analysis</h3>
+            <div id="file-analysis" class="analysis-box">Select "Analyze" to process file…</div>
+
+            <div class="file-actions">
+                <button onclick="Files.analyze()" class="btn-outline">Analyze</button>
+                <button onclick="Files.download()" class="btn-outline">Download</button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    UI.enableGlobalInput(false);
+</script>
