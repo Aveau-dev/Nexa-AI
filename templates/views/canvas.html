@@ -1,0 +1,31 @@
+<!-- templates/views/canvas.html -->
+<div class="canvas-view">
+
+    <div class="canvas-header">
+        <h2>Canvas / Code Workspace</h2>
+        <div class="canvas-actions">
+            <button onclick="Canvas.run()" class="btn-run">▶ Run</button>
+            <button onclick="Canvas.exportArtifact()" class="btn-outline">Export</button>
+            <button onclick="Canvas.clear()" class="btn-outline">Clear</button>
+        </div>
+    </div>
+
+    <div class="canvas-split">
+        <div class="canvas-editor">
+            <div id="monaco-editor" class="monaco-container"></div>
+        </div>
+
+        <div class="canvas-preview">
+            <h3>Output</h3>
+            <div id="canvas-output" class="output-box">Run code to see output...</div>
+
+            <h3>Rendered Markdown</h3>
+            <div id="canvas-markdown" class="markdown-preview"></div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    UI.enableGlobalInput(false); /* hide chat input */
+</script>
