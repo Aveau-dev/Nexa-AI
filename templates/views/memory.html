@@ -1,0 +1,42 @@
+<!-- templates/views/memory.html -->
+<div class="memory-view">
+
+    <div class="view-header">
+        <h2>Memory & Custom Instructions</h2>
+        <button onclick="Memory.save()" class="btn-primary">Save</button>
+    </div>
+
+    <div class="memory-grid">
+
+        <div class="memory-card">
+            <label class="label">Preferred Tone</label>
+            <select id="memory-tone" class="input-select">
+                <option value="default">Default</option>
+                <option value="casual">Casual</option>
+                <option value="formal">Formal</option>
+                <option value="friendly">Friendly</option>
+                <option value="technical">Technical</option>
+            </select>
+        </div>
+
+        <div class="memory-card">
+            <label class="label">Personal Notes</label>
+            <textarea id="memory-notes" class="input-textarea"
+                placeholder="Anything the assistant should remember…"></textarea>
+        </div>
+
+        <div class="memory-card">
+            <label class="label">Custom Instructions</label>
+            <textarea id="memory-instructions" class="input-textarea"
+                placeholder="How should NexaAI respond? Tone, style, personality, etc."></textarea>
+        </div>
+
+    </div>
+
+    <div id="memory-status" class="status-text"></div>
+
+</div>
+
+<script>
+    UI.enableGlobalInput(false);
+</script>
