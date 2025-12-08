@@ -1,0 +1,37 @@
+<!-- templates/views/projects.html -->
+<div class="projects-view">
+
+    <div class="view-header">
+        <h2>Projects</h2>
+        <button class="btn-primary" onclick="Projects.create()">+ New Project</button>
+    </div>
+
+    <div id="projects-list" class="projects-grid">
+        <div class="loading">Loading projects…</div>
+    </div>
+
+    <!-- Project Detail Drawer -->
+    <div id="project-detail" class="project-detail hidden">
+        <div class="project-detail-header">
+            <h3 id="project-title"></h3>
+            <button onclick="Projects.closeDetail()" class="btn-outline">Close</button>
+        </div>
+
+        <div class="project-section">
+            <h4>Reference Files</h4>
+            <button class="btn-outline" onclick="Projects.triggerFileUpload()">Upload File</button>
+            <input type="file" id="project-file-input" style="display:none" onchange="Projects.uploadFile(event)">
+            <div id="project-files"></div>
+        </div>
+
+        <div class="project-section">
+            <h4>Project Chats</h4>
+            <div id="project-chats" class="project-chats"></div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    UI.enableGlobalInput(false);
+</script>
