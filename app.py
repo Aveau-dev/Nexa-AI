@@ -1,7 +1,7 @@
-# app.py - COMPLETE FIXED VERSION
+# app.py - FULL UPDATED VERSION
 from flask import (
     Flask, render_template, request, redirect, url_for, jsonify,
-    session, send_from_directory
+    session, send_from_directory, abort
 )
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
@@ -18,6 +18,8 @@ import os
 import base64
 from PIL import Image
 import logging
+import io
+import sys
 
 # Google Generative AI for Gemini
 import google.generativeai as genai
@@ -101,6 +103,7 @@ class User(UserMixin, db.Model):
     deepseek_date = db.Column(db.String(10), default='')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     chats = db.relationship('Chat', backref='user', lazy=True, cascade='all, delete-orphan')
+    projects = db.relationship('Project', backref='user', lazy=True, cascade='all, delete-orphan')
 
     def __repr__(self):
         return f'<User {self.email}>'
@@ -132,6 +135,57 @@ class Message(db.Model):
 
     def __repr__(self):
         return f'<Message {self.id} in Chat {self.chat_id}>'
+
+# Projects models
+class Project(db.Model):
+    __tablename__ = 'project'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, default='')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    files = db.relationship('ProjectFile', backref='project', lazy=True, cascade='all, delete-orphan')
+    chats = db.relationship('ProjectChat', backref='project', lazy=True, cascade='all, delete-orphan')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'title': self.title,
+            'description': self.description,
+            'created_at': self.created_at.isoformat(),
+            'files': [f.to_dict() for f in self.files],
+            'chats': [c.to_dict() for c in self.chats]
+        }
+
+class ProjectFile(db.Model):
+    __tablename__ = 'project_file'
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False, index=True)
+    filename = db.Column(db.String(300), nullable=False)
+    filepath = db.Column(db.String(500), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'filename': self.filename,
+            'filepath': self.filepath,
+            'created_at': self.created_at.isoformat()
+        }
+
+class ProjectChat(db.Model):
+    __tablename__ = 'project_chat'
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False, index=True)
+    title = db.Column(db.String(200), default='Project Chat')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'title': self.title,
+            'created_at': self.created_at.isoformat()
+        }
 
 # -------- login loader --------
 @login_manager.user_loader
@@ -274,7 +328,6 @@ def call_google_gemini(model_path, messages, image_data=None, image_path=None, t
         if image_data or image_path:
             try:
                 if image_data:
-                    import io
                     raw = image_data.split(',')[1] if ',' in image_data else image_data
                     image_bytes = base64.b64decode(raw)
                     img = Image.open(io.BytesIO(image_bytes))
@@ -409,17 +462,36 @@ def web_search():
 @app.route('/execute-code', methods=['POST'])
 @login_required
 def execute_code():
-    data = request.get_json()
-    code = data.get('code')
-    # Implement code execution in sandbox
+    data = request.get_json() or {}
+    code = data.get('code', '')
+    # Implement code execution in sandbox - restricted builtins
     try:
-        # Use exec() with restricted globals
-        output = io.StringIO()
-        sys.stdout = output
-        exec(code, {'__builtins__': {}})
-        sys.stdout = sys.__stdout__
-        return jsonify({'output': output.getvalue()})
+        allowed_builtins = {
+            'print': print,
+            'len': len,
+            'range': range,
+            'str': str,
+            'int': int,
+            'float': float,
+            'bool': bool,
+            'list': list,
+            'dict': dict,
+            'set': set,
+            'min': min,
+            'max': max,
+            'sum': sum,
+        }
+        stdout = io.StringIO()
+        sys_stdout_old = sys.stdout
+        sys.stdout = stdout
+        exec(code, {'__builtins__': allowed_builtins}, {})
+        sys.stdout = sys_stdout_old
+        return jsonify({'output': stdout.getvalue()})
     except Exception as e:
+        try:
+            sys.stdout = sys.__stdout__
+        except Exception:
+            pass
         return jsonify({'error': str(e)})
 
 
@@ -1010,11 +1082,159 @@ def health_check():
         'stripe_configured': bool(stripe.api_key)
     })
 
+# ============ SPA & EXTRA API ROUTES ============
+@app.route('/load-view/<view>')
+@login_required
+def load_view(view):
+    allowed = ['chat','files','projects','canvas','voice','memory','settings']
+    if view not in allowed:
+        abort(404)
+    try:
+        return render_template(f'views/{view}.html')
+    except Exception:
+        log.exception("Failed to load view")
+        return f"<h3>Failed to load view {view}</h3>", 500
+
+# Files listing for Files.js
+@app.route('/api/files', methods=['GET'])
+@login_required
+def list_files():
+    try:
+        files_list = []
+        folder = app.config['UPLOAD_FOLDER']
+        for fname in os.listdir(folder):
+            path = os.path.join(folder, fname)
+            if os.path.isfile(path):
+                size = os.path.getsize(path)
+                created = datetime.utcfromtimestamp(os.path.getctime(path)).isoformat()
+                files_list.append({
+                    'filename': fname,
+                    'size': size,
+                    'created_at': created
+                })
+        return jsonify(files_list)
+    except Exception as e:
+        log.exception("File listing failed")
+        return jsonify({'error': str(e)}), 500
+
+# Analyze file endpoint
+@app.route('/analyze-file')
+@login_required
+def analyze_file():
+    filename = request.args.get('file')
+    if not filename:
+        return jsonify({'error': 'File name missing'}), 400
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    if not os.path.exists(filepath):
+        return jsonify({'error': 'File not found'}), 404
+    try:
+        # Simple text extraction for small files; for PDFs use pdfminer or PyPDF2
+        text_preview = None
+        if filename.lower().endswith('.pdf'):
+            text_preview = 'PDF preview not implemented server-side.'
+        else:
+            with open(filepath, 'r', errors='ignore') as f:
+                text_preview = f.read(4000)
+
+        prompt = f"Provide a concise analysis and summary of the following file named {filename}. If it's code, explain structure; if it's text, summarize key points. Preview:
+
+{text_preview[:2000]}"
+        msgs = [
+            {'role':'system','content':'You are a helpful assistant that summarizes files.'},
+            {'role':'user','content':prompt}
+        ]
+        analysis = call_ai_model('gemini-flash', msgs)
+        return jsonify({'filename': filename, 'analysis': analysis})
+    except Exception as e:
+        log.exception('File analysis failed')
+        return jsonify({'error': str(e)}), 500
+
+# Memory endpoints
+@app.route('/api/memory', methods=['GET'])
+@login_required
+def get_memory():
+    return jsonify({
+        'tone': session.get('memory_tone', 'default'),
+        'notes': session.get('memory_notes', ''),
+        'instructions': session.get('memory_instructions', '')
+    })
+
+@app.route('/api/memory', methods=['POST'])
+@login_required
+def save_memory():
+    data = request.get_json() or {}
+    session['memory_tone'] = data.get('tone', 'default')
+    session['memory_notes'] = data.get('notes', '')
+    session['memory_instructions'] = data.get('instructions', '')
+    return jsonify({'success': True})
+
+# Projects endpoints (DB-backed)
+@app.route('/api/projects', methods=['GET'])
+@login_required
+def get_projects_api():
+    projects = Project.query.filter_by(user_id=current_user.id).order_by(Project.created_at.desc()).all()
+    return jsonify([p.to_dict() for p in projects])
+
+@app.route('/api/projects', methods=['POST'])
+@login_required
+def create_project_api():
+    data = request.get_json() or {}
+    title = (data.get('title') or '').strip()
+    if not title:
+        return jsonify({'error':'Title required'}), 400
+    p = Project(user_id=current_user.id, title=title, description=data.get('description',''))
+    db.session.add(p)
+    db.session.commit()
+    return jsonify({'success': True, 'id': p.id})
+
+@app.route('/api/projects/<int:pid>', methods=['GET'])
+@login_required
+def get_project_detail(pid):
+    p = Project.query.filter_by(id=pid, user_id=current_user.id).first()
+    if not p:
+        return jsonify({'error':'Not found'}), 404
+    return jsonify(p.to_dict())
+
+@app.route('/api/projects/<int:pid>/upload', methods=['POST'])
+@login_required
+def upload_project_file(pid):
+    p = Project.query.filter_by(id=pid, user_id=current_user.id).first()
+    if not p:
+        return jsonify({'error':'Project not found'}), 404
+    if 'file' not in request.files:
+        return jsonify({'error':'No file provided'}), 400
+    file = request.files['file']
+    if not file or file.filename == '':
+        return jsonify({'error':'No file selected'}), 400
+    if not allowed_file(file.filename):
+        return jsonify({'error':'File type not allowed'}), 400
+    filename = secure_filename(file.filename)
+    timestamp = datetime.utcnow().strftime('%Y%m%d%H%M%S')
+    final_name = f"proj_{p.id}_{timestamp}_{filename}"
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], final_name)
+    file.save(filepath)
+    if filepath.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
+        compress_image(filepath)
+    pf = ProjectFile(project_id=p.id, filename=final_name, filepath=filepath)
+    db.session.add(pf)
+    db.session.commit()
+    return jsonify({'success':True, 'file': pf.to_dict()})
+
+# Settings account save
+@app.route('/api/settings/account', methods=['POST'])
+@login_required
+def save_account_settings():
+    data = request.get_json() or {}
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify({'error':'Name required'}), 400
+    current_user.name = name
+    db.session.commit()
+    return jsonify({'success': True})
+
 # ============ RUN ============
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
     log.info(f"🚀 Starting NexaAI on port {port}")
     log.info(f"📊 Database: {'PostgreSQL' if 'postgresql' in app.config['SQLALCHEMY_DATABASE_URI'] else 'SQLite'}")
     app.run(debug=True, host='0.0.0.0', port=port)
-
-
