@@ -1,7 +1,7 @@
 # app.py - COMPLETE FIXED VERSION (Render-safe, requests-based)
 from flask import (
     Flask, render_template, request, redirect, url_for, jsonify,
-    session, send_from_directory
+    session, send_from_directory, abort
 )
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
@@ -142,9 +142,9 @@ class Message(db.Model):
     model = db.Column(db.String(200), nullable=True)
 
     has_image = db.Column(db.Boolean, default=False)
-    image_data = db.Column(db.Text, nullable=True)  # Base64 for vision models (optional)
+    image_data = db.Column(db.Text, nullable=True)   # Base64 for vision models (optional)
     image_path = db.Column(db.String(1000), nullable=True)  # file path from /upload (optional)
-    image_url = db.Column(db.String(1000), nullable=True)   # for generated images (Pollinations)
+    image_url = db.Column(db.String(1000), nullable=True)   # generated images (Pollinations)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
 
@@ -260,14 +260,12 @@ PREMIUM_MODELS = {
 
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp", "pdf"}
 
-
 # ============ AI API CALLING FUNCTIONS ============
 def _extract_text_content(content):
     # content can be string OR OpenAI-style list; return plain text for Gemini history
     if isinstance(content, str):
         return content
     if isinstance(content, list):
-        # find first {"type":"text"} if present
         for item in content:
             if isinstance(item, dict) and item.get("type") == "text":
                 return item.get("text", "")
@@ -303,7 +301,10 @@ def call_google_gemini(model_path, messages, image_data=None, image_path=None, t
             if msg.get("role") == "system":
                 continue
             gemini_role = "user" if msg.get("role") == "user" else "model"
-            gemini_history.append({"role": gemini_role, "parts": [_extract_text_content(msg.get("content", ""))]})
+            gemini_history.append({
+                "role": gemini_role,
+                "parts": [_extract_text_content(msg.get("content", ""))]
+            })
 
         chat = model.start_chat(history=gemini_history)
 
@@ -349,12 +350,14 @@ def call_openrouter(model_path, messages, image_data=None, image_path=None, time
         formatted_messages = []
         for i, msg in enumerate(messages):
             if msg.get("role") == "system":
-                formatted_messages.append({"role": "system", "content": _extract_text_content(msg.get("content", ""))})
+                formatted_messages.append({
+                    "role": "system",
+                    "content": _extract_text_content(msg.get("content", ""))
+                })
                 continue
 
             content = msg.get("content", "")
             if isinstance(content, list):
-                # already formatted; keep as-is
                 formatted_messages.append({"role": msg.get("role", "user"), "content": content})
                 continue
 
@@ -514,15 +517,12 @@ def _resolve_uploaded_path(image_path_or_url):
     if not p:
         return None
 
-    # URL-ish path from frontend
     if p.startswith("/uploads/"):
         p = p.replace("/uploads/", "", 1)
 
-    # absolute path
     if os.path.isabs(p) and os.path.exists(p):
         return p
 
-    # inside upload folder
     candidate = os.path.join(app.config["UPLOAD_FOLDER"], os.path.basename(p))
     return candidate if os.path.exists(candidate) else None
 
@@ -558,6 +558,16 @@ def index():
 @app.route("/uploads/<path:filename>")
 def uploaded_file(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+
+
+# ----- SPA partial loader (Option-B router support) -----
+@app.route("/load-view/<view>")
+@login_required
+def load_view(view):
+    allowed = {"chat"}
+    if view not in allowed:
+        abort(404)
+    return render_template(f"views/{view}.html", user=current_user)
 
 
 @app.route("/demo-chat", methods=["POST"])
@@ -678,7 +688,6 @@ def logout():
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    # IMPORTANT: your dashboard.html sidebar uses `chats` server-side. [file:351]
     chats = (
         Chat.query.filter_by(user_id=current_user.id)
         .order_by(Chat.updated_at.desc())
@@ -744,7 +753,7 @@ def new_chat():
         chat = Chat(user_id=current_user.id, title="New Chat")
         db.session.add(chat)
         db.session.commit()
-        # dashboard.js expects "chatid" [file:351]
+        # dashboard.js expects "chatid"
         return jsonify({"success": True, "chatid": chat.id, "chat_id": chat.id, "title": chat.title})
     except Exception:
         db.session.rollback()
@@ -806,14 +815,6 @@ def rename_chat(chat_id):
 @app.route("/chat/<int:chat_id>/delete", methods=["DELETE"])
 @login_required
 def delete_chat_chatpath(chat_id):
-    # dashboard.js calls /chat/<id>/delete [file:351]
-    return _delete_chat_impl(chat_id)
-
-
-@app.route("/delete-chat/<int:chat_id>", methods=["DELETE"])
-@login_required
-def delete_chat_alt(chat_id):
-    # optional alternate endpoint
     return _delete_chat_impl(chat_id)
 
 
@@ -842,54 +843,19 @@ def _delete_chat_impl(chat_id):
         return jsonify({"error": "Failed to delete chat"}), 500
 
 
-# Optional APIs (not required by current dashboard.js, but useful)
-@app.route("/get-chats", methods=["GET"])
+# Optional (useful)
+@app.route("/api/chats", methods=["GET"])
 @login_required
-def get_chats():
-    try:
-        chats = (
-            Chat.query.filter_by(user_id=current_user.id)
-            .order_by(Chat.updated_at.desc())
-            .limit(50)
-            .all()
-        )
-        return jsonify([{
-            "id": c.id,
-            "title": c.title,
-            "updated_at": c.updated_at.isoformat()
-        } for c in chats])
-    except Exception as e:
-        log.exception("Get chats failed")
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/get-chat/<int:chat_id>", methods=["GET"])
-@login_required
-def get_chat(chat_id):
-    try:
-        chat = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first()
-        if not chat:
-            return jsonify({"error": "Chat not found"}), 404
-        messages = (
-            Message.query.filter_by(chat_id=chat_id)
-            .order_by(Message.created_at.asc())
-            .all()
-        )
-        return jsonify({
-            "title": chat.title,
-            "messages": [{
-                "role": m.role,
-                "content": m.content,
-                "model": m.model,
-                "has_image": m.has_image,
-                "image_data": m.image_data,
-                "image_url": m.image_url,
-                "created_at": m.created_at.isoformat()
-            } for m in messages]
-        })
-    except Exception as e:
-        log.exception("Get chat failed")
-        return jsonify({"error": str(e)}), 500
+def api_chats():
+    chats = (
+        Chat.query.filter_by(user_id=current_user.id)
+        .order_by(Chat.updated_at.desc())
+        .limit(50)
+        .all()
+    )
+    return jsonify({
+        "chats": [{"id": c.id, "title": c.title, "updated_at": c.updated_at.isoformat()} for c in chats]
+    })
 
 
 # -------- Main chat endpoint --------
@@ -902,7 +868,7 @@ def chat_route():
         user_message = (data.get("message") or "").strip()
         selected_model = data.get("model") or session.get("selected_model", "gpt-3.5-turbo")
 
-        # dashboard.js sends "chatid" not "chat_id" [file:351]
+        # dashboard.js sends "chatid" not "chat_id"
         chat_id = data.get("chat_id") or data.get("chatid")
 
         # Optional: support both "image" and "uploaded_file"
@@ -991,7 +957,7 @@ def chat_route():
         if chat_obj.title == "New Chat":
             chat_obj.title = generate_chat_title(user_message or "Image analysis")
 
-        # Build history properly: system first (OpenRouter), then last N messages, then current prompt
+        # Build history
         history = [{"role": "system", "content": "You are a helpful AI assistant."}]
         history.extend(get_chat_history(chat_id, limit=10))
         history.append({"role": "user", "content": user_message or "What is in this image?"})
@@ -1020,7 +986,7 @@ def chat_route():
         if selected_model == "deepseek-chat" and not current_user.is_premium:
             deepseek_remaining = max(0, 50 - current_user.deepseek_count)
 
-        # dashboard.js expects these keys: response, model, chatid, chattitle, deepseekremaining [file:351]
+        # dashboard.js expects: response, model, chatid, chattitle, deepseekremaining
         return jsonify({
             "success": True,
             "response": bot_response,
