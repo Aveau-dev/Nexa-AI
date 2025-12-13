@@ -1,82 +1,67 @@
-/* ============================================================
-   NexaAI UI Module
-   Controls global input, loaders, scrolling, toasts
-   ============================================================ */
-
-const UI = {
-    inputWrapper: null,
-    input: null,
-    sendBtn: null,
-    viewLoader: null,
-
+/* global window, document */
+(function () {
+  const UI = {
     init() {
-        this.inputWrapper = document.getElementById("global-input-wrapper");
-        this.input = document.getElementById("global-input");
-        this.sendBtn = document.getElementById("global-input-send");
-        this.viewLoader = document.getElementById("view-loader");
-
-        console.log("UI initialized");
+      // cache nothing mandatory; just ensure required elements exist
+      this.sidebar = document.getElementById('sidebar');
+      this.userMenu = document.getElementById('user-menu');
+      this.modelDropdown = document.getElementById('model-selector-dropdown');
     },
 
-    /* ============================================================
-       Enable / Disable global input
-       (Chat uses input, other views hide it)
-       ============================================================ */
-    enableGlobalInput(state) {
-        if (!this.inputWrapper) return;
-        this.inputWrapper.style.display = state ? "flex" : "none";
+    toggleSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      const main = document.getElementById('main-container');
+      if (!sidebar || !main) return;
+
+      // mobile vs desktop
+      if (window.innerWidth <= 1024) sidebar.classList.toggle('show');
+      else {
+        sidebar.classList.toggle('collapsed');
+        main.classList.toggle('sidebar-collapsed');
+      }
     },
 
-    /* ============================================================
-       Loader for router view changes
-       ============================================================ */
-    showViewLoader(state) {
-        if (!this.viewLoader) return;
-        this.viewLoader.style.display = state ? "block" : "none";
+    toggleUserMenu(force) {
+      const menu = document.getElementById('user-menu');
+      if (!menu) return;
+
+      const shouldShow = (typeof force === 'boolean')
+        ? force
+        : (menu.style.display !== 'block');
+
+      menu.style.display = shouldShow ? 'block' : 'none';
     },
 
-    /* ============================================================
-       Input utilities
-       ============================================================ */
-    clearInput() {
-        if (this.input) this.input.value = "";
+    autoResize(textarea) {
+      if (!textarea) return;
+      textarea.style.height = 'auto';
+      textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
     },
 
-    setInput(text) {
-        this.input.value = text;
-        this.input.focus();
-    },
+    handleGlobalOutsideClick(ev) {
+      // close user menu
+      const menu = document.getElementById('user-menu');
+      if (menu && !ev.target.closest('.user-avatar') && !ev.target.closest('#user-menu')) {
+        menu.style.display = 'none';
+      }
 
-    /* ============================================================
-       Scrolling
-       ============================================================ */
-    scrollToBottom() {
-        setTimeout(() => {
-            window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
-        }, 100);
-    },
+      // close model selector
+      const dd = document.getElementById('model-selector-dropdown');
+      if (dd && dd.classList.contains('show')
+          && !ev.target.closest('#model-selector-btn')
+          && !ev.target.closest('#model-selector-dropdown')) {
+        if (window.Models) window.Models.toggleSelector(false);
+      }
 
-    /* ============================================================
-       Escape HTML (safe text)
-       ============================================================ */
-    escape(text) {
-        return text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    },
-
-    /* ============================================================
-       Toast Notifications
-       ============================================================ */
-    toast(msg) {
-        const el = document.createElement("div");
-        el.className = "toast";
-        el.innerText = msg;
-
-        document.body.appendChild(el);
-
-        setTimeout(() => el.classList.add("show"), 10);
-        setTimeout(() => el.classList.remove("show"), 2500);
-        setTimeout(() => el.remove(), 3000);
+      // close sidebar on mobile if clicking outside
+      const sidebar = document.getElementById('sidebar');
+      if (sidebar && window.innerWidth <= 1024 && sidebar.classList.contains('show')) {
+        if (!ev.target.closest('#sidebar') && !ev.target.closest('[onclick*="toggleSidebar"]')) {
+          sidebar.classList.remove('show');
+        }
+      }
     }
-};
+  };
 
-window.UI = UI;
+  window.UI = UI;
+})();
