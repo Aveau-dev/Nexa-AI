@@ -1,106 +1,41 @@
-/* ============================================================
-   SPA ROUTER — NexaAI
-   Loads views dynamically from /load-view/<view>
-   ============================================================ */
+/* global window, document, fetch */
+(function () {
+  const Router = {
+    async load(viewName) {
+      const container = document.getElementById('view-container');
+      if (!container) return;
 
-const Router = {
-    currentView: null,
-    viewContainer: null,
+      container.innerHTML = `<div class="loading">Loading…</div>`;
 
-    init() {
-        this.viewContainer = document.getElementById("view-container");
-
-        // Load initial view
-        const initialView = window.location.pathname.replace("/dashboard/", "") || "chat";
-        this.load(initialView, false);
-
-        // Handle browser back/forward buttons
-        window.onpopstate = (event) => {
-            const view = event.state?.view || "chat";
-            this.load(view, false);
-        };
-
-        console.log("Router initialized");
-    },
-
-    /* ============================================================
-       LOAD VIEW
-       ------------------------------------------------------------ */
-    async load(view, pushState = true) {
-        try {
-            UI.showViewLoader(true);
-
-            const response = await fetch(`/load-view/${view}`);
-            const html = await response.text();
-
-            this.viewContainer.style.opacity = "0";
-
-            setTimeout(() => {
-                // Replace content
-                this.viewContainer.innerHTML = html;
-                this.viewContainer.style.opacity = "1";
-            }, 150);
-
-            this.currentView = view;
-
-            // Set URL
-            if (pushState) {
-                history.pushState({ view }, "", `/dashboard/${view}`);
-            }
-
-            // Activate sidebar item
-            this.highlightActive(view);
-
-            // Re-run scripts inside loaded view if needed
-            this.executeInlineScripts();
-
-        } catch (err) {
-            console.error("View load error:", err);
-            this.showError("Failed to load view.");
-        } finally {
-            UI.showViewLoader(false);
-        }
-    },
-
-    /* ============================================================
-       HIGHLIGHT ACTIVE SIDEBAR ITEM
-       ------------------------------------------------------------ */
-    highlightActive(view) {
-        const items = document.querySelectorAll(".sidebar-item");
-        items.forEach(i => i.classList.remove("active"));
-
-        const activeItem = document.querySelector(`[data-view="${view}"]`);
-        if (activeItem) activeItem.classList.add("active");
-    },
-
-    /* ============================================================
-       EXECUTE INLINE SCRIPTS IN LOADED HTML
-       ------------------------------------------------------------ */
-    executeInlineScripts() {
-        const scripts = this.viewContainer.querySelectorAll("script");
-        scripts.forEach(oldScript => {
-            const newScript = document.createElement("script");
-            if (oldScript.src) newScript.src = oldScript.src;
-            else newScript.innerHTML = oldScript.innerHTML;
-            document.body.appendChild(newScript);
-            oldScript.remove();
+      try {
+        const res = await fetch(`/load-view/${encodeURIComponent(viewName)}`, {
+          headers: { "X-Requested-With": "fetch" }
         });
-    },
 
-    /* ============================================================
-       ERROR VIEW
-       ------------------------------------------------------------ */
-    showError(message) {
-        this.viewContainer.innerHTML = `
-            <div class="error-screen">
-                <h2>Error</h2>
-                <p>${message}</p>
-                <button class="btn-primary" onclick="Router.load('chat')">
-                    Go Back to Chat
-                </button>
-            </div>
-        `;
+        if (!res.ok) {
+          container.innerHTML = `<div class="message error-message"><div class="message-content">
+            View load failed (${res.status}). Check /load-view/${viewName}.
+          </div></div>`;
+          return;
+        }
+
+        const html = await res.text();
+        container.innerHTML = html;
+
+        // hook per-view
+        if (window.Chat && viewName === 'chat' && typeof window.Chat.onViewMounted === 'function') {
+          window.Chat.onViewMounted();
+        }
+
+        container.focus();
+      } catch (e) {
+        console.error("Router.load error", e);
+        container.innerHTML = `<div class="message error-message"><div class="message-content">
+          Network error while loading view.
+        </div></div>`;
+      }
     }
-};
+  };
 
-window.Router = Router;
+  window.Router = Router;
+})();
