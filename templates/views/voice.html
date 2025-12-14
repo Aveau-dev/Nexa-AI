@@ -1,27 +1,50 @@
-<!-- templates/views/voice.html -->
-<div class="voice-view">
+<!-- VOICE VIEW -->
+<section class="view" data-view="voice">
+  <div class="welcome-section">
+    <h1 class="main-heading">Voice</h1>
+    <p class="footer-text">Record speech and send transcript to chat (UI scaffold).</p>
 
-    <div class="view-header">
-        <h2>Voice Mode</h2>
+    <div class="suggestion-cards" style="margin-top: 1rem;">
+      <div class="suggestion-card" onclick="Voice.start()">
+        <div class="suggestion-text">Start recording</div>
+      </div>
+      <div class="suggestion-card" onclick="Voice.stop()">
+        <div class="suggestion-text">Stop recording</div>
+      </div>
+      <div class="suggestion-card" onclick="Voice.sendToChat()">
+        <div class="suggestion-text">Send to chat</div>
+      </div>
+      <div class="suggestion-card" onclick="Router.go('chat')">
+        <div class="suggestion-text">Back to chat</div>
+      </div>
     </div>
+  </div>
 
-    <div class="voice-controls">
-        <select id="voice-device" class="input-select"></select>
-
-        <button onclick="Voice.start()" class="btn-primary">🎤 Start Listening</button>
-        <button onclick="Voice.stop()" class="btn-outline">⏹ Stop</button>
+  <div class="message-row assistant-row">
+    <div class="message assistant-message">
+      <div class="avatar">N</div>
+      <div class="message-content">
+        <div class="model-badge">Voice status</div>
+        <div class="message-text markdown-content" id="voice-status">
+          Microphone: not started.
+        </div>
+      </div>
     </div>
+  </div>
 
-    <h3>Live Transcript</h3>
-    <div id="voice-transcript" class="voice-transcript">
-        Waiting for input…
+  <div class="message-row assistant-row">
+    <div class="message assistant-message">
+      <div class="avatar">N</div>
+      <div class="message-content">
+        <div class="model-badge">Transcript</div>
+        <div class="message-text markdown-content">
+          <textarea id="voice-transcript" class="form-input" rows="8" placeholder="Transcript will appear here..."></textarea>
+          <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.75rem;">
+            <button class="nav-button primary" type="button" onclick="Voice.sendToChat()">Send to chat</button>
+            <button class="nav-button secondary" type="button" onclick="document.getElementById('voice-transcript').value=''">Clear</button>
+          </div>
+        </div>
+      </div>
     </div>
-
-    <h3>Logs</h3>
-    <div id="voice-logs" class="log-box"></div>
-
-</div>
-
-<script>
-    UI.enableGlobalInput(false);
-</script>
+  </div>
+</section>
