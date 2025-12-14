@@ -1,120 +1,82 @@
-/* static/js/projects.js
-   Projects lightweight manager
-   - list projects, create, open detail
-   - upload reference files to a project
-*/
+window.Projects = (function () {
+  const projects = [];
 
-const Projects = (function () {
-  const listElId = "projects-list";
-  const detailId = "project-detail";
-  const projectFilesId = "project-files";
-  const projectChatsId = "project-chats";
-
-  async function init() {
-    await loadProjects();
+  function onViewLoaded() {
+    render();
   }
 
-  async function loadProjects() {
-    const el = document.getElementById(listElId);
-    if (!el) return;
-    el.innerHTML = "<div class='loading'>Loading projects…</div>";
-    try {
-      const resp = await fetch("/api/projects");
-      if (!resp.ok) {
-        el.innerHTML = "<div class='muted'>No projects found</div>";
-        return;
-      }
-      const projects = await resp.json();
-      if (!projects.length) {
-        el.innerHTML = "<div class='muted'>No projects yet</div>";
-        return;
-      }
-      el.innerHTML = projects.map(p => `
-        <div class="project-card" data-id="${p.id}" onclick="Projects.open(${p.id})">
-          <h4>${p.title}</h4>
-          <div class="muted">${p.description || ""}</div>
+  function openCreate() {
+    const el = document.getElementById("projects-create");
+    if (el) el.style.display = "block";
+  }
+
+  function closeCreate() {
+    const el = document.getElementById("projects-create");
+    if (el) el.style.display = "none";
+  }
+
+  function create() {
+    const name = (document.getElementById("project-name")?.value || "").trim();
+    const desc = (document.getElementById("project-desc")?.value || "").trim();
+    if (!name) return alert("Project name required.");
+
+    projects.unshift({ id: Date.now(), name, desc });
+    closeCreate();
+
+    const n = document.getElementById("project-name");
+    const d = document.getElementById("project-desc");
+    if (n) n.value = "";
+    if (d) d.value = "";
+
+    render();
+  }
+
+  function remove(id) {
+    const idx = projects.findIndex((p) => p.id === id);
+    if (idx >= 0) projects.splice(idx, 1);
+    render();
+  }
+
+  function render() {
+    const list = document.getElementById("projects-list");
+    if (!list) return;
+
+    if (projects.length === 0) {
+      list.innerHTML = `
+        <div class="message assistant-message" style="width:100%; max-width:48rem;">
+          <div class="avatar">N</div>
+          <div class="message-content">
+            <div class="model-badge">Projects</div>
+            <div class="message-text markdown-content">No projects yet.</div>
+          </div>
         </div>
-      `).join("");
-    } catch (e) {
-      console.error("Projects.load error:", e);
-      el.innerHTML = "<div class='muted'>Failed to load</div>";
+      `;
+      return;
     }
+
+    list.innerHTML = projects
+      .map(
+        (p) => `
+        <div class="message assistant-message" style="width:100%; max-width:48rem; margin-bottom:0.75rem;">
+          <div class="avatar">N</div>
+          <div class="message-content">
+            <div class="model-badge">${UI.escapeHtml(p.name)}</div>
+            <div class="message-text markdown-content">
+              <div>${UI.escapeHtml(p.desc || "No description")}</div>
+              <div style="margin-top:0.75rem; display:flex; gap:0.5rem;">
+                <button class="nav-button secondary" onclick="Projects.remove(${p.id})">Delete</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `
+      )
+      .join("");
   }
 
-  async function create() {
-    const title = prompt("Project name:");
-    if (!title) return;
-    try {
-      const resp = await fetch("/api/projects", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title })
-      });
-      const data = await resp.json();
-      if (data.error) {
-        UI.toast("Create failed");
-      } else {
-        UI.toast("Project created");
-        await loadProjects();
-      }
-    } catch (e) {
-      console.error("Projects.create error", e);
-      UI.toast("Create error");
-    }
+  function refresh() {
+    render();
   }
 
-  async function open(projectId) {
-    const detail = document.getElementById(detailId);
-    if (!detail) return;
-    detail.classList.remove("hidden");
-    try {
-      const resp = await fetch(`/api/projects/${projectId}`);
-      if (!resp.ok) {
-        detail.innerHTML = "<div class='muted'>Failed to load project</div>";
-        return;
-      }
-      const project = await resp.json();
-      document.getElementById("project-title").textContent = project.title;
-      // render files & chats
-      const filesEl = document.getElementById(projectFilesId);
-      filesEl.innerHTML = (project.files || []).map(f => `<div>${f.filename}</div>`).join("") || "<div class='muted'>No files</div>";
-
-      const chatsEl = document.getElementById(projectChatsId);
-      chatsEl.innerHTML = (project.chats || []).map(c => `<div>${c.title}</div>`).join("") || "<div class='muted'>No chats</div>";
-    } catch (e) {
-      console.error("Projects.open error:", e);
-    }
-  }
-
-  function closeDetail() {
-    const detail = document.getElementById(detailId);
-    if (!detail) return;
-    detail.classList.add("hidden");
-  }
-
-  function triggerFileUpload() {
-    document.getElementById("project-file-input")?.click();
-  }
-
-  async function uploadFile(ev) {
-    const files = ev.target.files;
-    if (!files || !files.length) return;
-    // You need to supply which project to upload to; for now assume last opened project title element contains id (extend as needed)
-    const projectTitle = document.getElementById("project-title").textContent;
-    if (!projectTitle) return UI.toast("Open a project first");
-    // Implement the correct project id mapping in the real app
-    UI.toast("Uploading file to project (backend endpoint required)");
-  }
-
-  return {
-    init: init,
-    loadProjects,
-    create,
-    open,
-    closeDetail,
-    triggerFileUpload,
-    uploadFile
-  };
+  return { onViewLoaded, openCreate, closeCreate, create, remove, refresh };
 })();
-
-window.Projects = Projects;
