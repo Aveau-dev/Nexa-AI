@@ -1,18 +1,16 @@
 document.addEventListener("DOMContentLoaded", () => {
-  // Boot router
   if (window.Router && Router.boot) Router.boot();
 
-  // Auto-resize chat textarea (exists in dashboard shell)
   const input = document.getElementById("chat-input");
   if (input) {
+    // auto-resize
     input.addEventListener("input", function () {
       this.style.height = "auto";
       this.style.height = Math.min(this.scrollHeight, 200) + "px";
     });
 
-    // Enter to send (Shift+Enter newline)
+    // Enter-to-send based on Settings
     input.addEventListener("keydown", function (e) {
-      // respect Settings enter-to-send if present
       let enterToSend = true;
       try {
         const s = JSON.parse(localStorage.getItem("nexa_settings") || "{}");
