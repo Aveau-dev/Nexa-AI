@@ -1,27 +1,42 @@
-<!-- CHAT VIEW -->
-<section class="view" data-view="chat">
-  <div class="welcome-section" id="welcome-section">
-    <h1 class="main-heading">What can I help with?</h1>
+<div class="welcome-section" id="welcome-section">
+  <h1 class="main-heading">What can I help with?</h1>
 
-    <div class="suggestion-cards">
-      <div class="suggestion-card" onclick="Chat.useSuggestion('Explain this code with examples')">
-        <div class="suggestion-text">Explain this code with examples</div>
-      </div>
-
-      <div class="suggestion-card" onclick="Chat.useSuggestion('Summarize this text')">
-        <div class="suggestion-text">Summarize this text</div>
-      </div>
-
-      <div class="suggestion-card" onclick="Chat.useSuggestion('Generate a modern landing page')">
-        <div class="suggestion-text">Generate modern landing page</div>
-      </div>
-
-      <div class="suggestion-card" onclick="Chat.useSuggestion('Write optimized Python code')">
-        <div class="suggestion-text">Write optimized Python code</div>
-      </div>
+  <div class="suggestion-cards">
+    <div class="suggestion-card" onclick="useSuggestion('Create a weekly schedule for studying programming')">
+      <div class="suggestion-icon"></div>
+      <div class="suggestion-text">Create a schedule</div>
+    </div>
+    <div class="suggestion-card" onclick="useSuggestion('Write Python code to sort a list')">
+      <div class="suggestion-icon"></div>
+      <div class="suggestion-text">Write code</div>
+    </div>
+    <div class="suggestion-card" onclick="useSuggestion('Explain machine learning concepts in simple terms')">
+      <div class="suggestion-icon"></div>
+      <div class="suggestion-text">Learn AI concepts</div>
+    </div>
+    <div class="suggestion-card" onclick="useSuggestion('Help me write a creative story')">
+      <div class="suggestion-icon"></div>
+      <div class="suggestion-text">Write a story</div>
     </div>
   </div>
+</div>
 
-  <!-- IMPORTANT: chat.js expects this -->
-  <div id="messages-container"></div>
-</section>
+<div id="messages-container"></div>
+
+<div class="input-wrapper">
+  <div class="input-box">
+    <div class="input-inner">
+      <textarea id="chat-input" placeholder="Ask anything..." rows="1"></textarea>
+      <button class="send-button" id="send-btn" onclick="sendMessage()" aria-label="Send">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
+        </svg>
+      </button>
+    </div>
+    <div class="input-footer">
+      <span class="footer-text">
+        <span id="model-info">GPT-3.5 Turbo</span> · NexaAI can make mistakes. Check important info.
+      </span>
+    </div>
+  </div>
+</div>
