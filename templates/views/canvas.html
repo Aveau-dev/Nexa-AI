@@ -1,31 +1,57 @@
-<!-- templates/views/canvas.html -->
-<div class="canvas-view">
+<!-- CANVAS VIEW -->
+<section class="view" data-view="canvas">
+  <div class="welcome-section">
+    <h1 class="main-heading">Canvas</h1>
+    <p class="footer-text">Draw diagrams and export them (UI scaffold).</p>
 
-    <div class="canvas-header">
-        <h2>Canvas / Code Workspace</h2>
-        <div class="canvas-actions">
-            <button onclick="Canvas.run()" class="btn-run">▶ Run</button>
-            <button onclick="Canvas.exportArtifact()" class="btn-outline">Export</button>
-            <button onclick="Canvas.clear()" class="btn-outline">Clear</button>
-        </div>
+    <div class="suggestion-cards" style="margin-top: 1rem;">
+      <div class="suggestion-card" onclick="Canvas.clear()">
+        <div class="suggestion-text">Clear</div>
+      </div>
+      <div class="suggestion-card" onclick="Canvas.undo()">
+        <div class="suggestion-text">Undo</div>
+      </div>
+      <div class="suggestion-card" onclick="Canvas.exportPng()">
+        <div class="suggestion-text">Export PNG</div>
+      </div>
+      <div class="suggestion-card" onclick="Router.go('chat')">
+        <div class="suggestion-text">Back to chat</div>
+      </div>
     </div>
+  </div>
 
-    <div class="canvas-split">
-        <div class="canvas-editor">
-            <div id="monaco-editor" class="monaco-container"></div>
+  <div class="message-row assistant-row">
+    <div class="message assistant-message">
+      <div class="avatar">N</div>
+      <div class="message-content">
+        <div class="model-badge">Canvas</div>
+        <div class="message-text markdown-content" id="canvas-status">
+          Use mouse / touch to draw. (Implement logic in static/js/canvas.js)
         </div>
-
-        <div class="canvas-preview">
-            <h3>Output</h3>
-            <div id="canvas-output" class="output-box">Run code to see output...</div>
-
-            <h3>Rendered Markdown</h3>
-            <div id="canvas-markdown" class="markdown-preview"></div>
-        </div>
+      </div>
     </div>
+  </div>
 
-</div>
+  <div class="message-row assistant-row">
+    <div class="message assistant-message">
+      <div class="avatar">N</div>
+      <div class="message-content">
+        <div class="message-text markdown-content">
+          <div style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items:center; margin-bottom:0.75rem;">
+            <label style="display:flex; align-items:center; gap:0.5rem;">
+              Brush
+              <input id="canvas-brush" type="range" min="1" max="30" value="6" onchange="Canvas.setBrush(this.value)" />
+            </label>
 
-<script>
-    UI.enableGlobalInput(false); /* hide chat input */
-</script>
+            <label style="display:flex; align-items:center; gap:0.5rem;">
+              Color
+              <input id="canvas-color" type="color" value="#19c37d" onchange="Canvas.setColor(this.value)" />
+            </label>
+          </div>
+
+          <canvas id="main-canvas" width="900" height="500" style="width:100%; max-width: 100%; background:#111; border:1px solid var(--border-color); border-radius:12px;"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
