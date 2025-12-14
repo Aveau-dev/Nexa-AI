@@ -1,36 +1,38 @@
 window.Files = (function () {
-  let selectedUploadPath = null; // server filepath returned by /upload
+  let selectedUploadPath = null;
   let selectedUploadName = null;
 
   function onViewLoaded() {
     const input = document.getElementById("file-input");
     if (input) {
       input.onchange = async (e) => {
-        const file = e.target.files && e.target.files[0];
-        if (file) await upload(file);
+        const f = e.target.files && e.target.files[0];
+        if (f) await upload(f);
       };
     }
     renderStatus();
   }
 
-  function renderStatus(text) {
-    const el = document.getElementById("files-status");
-    if (!el) return;
-    if (text) {
-      el.textContent = text;
-      return;
-    }
-    if (selectedUploadPath) {
-      el.textContent = `Selected: ${selectedUploadName} (will be attached to next chat message)`;
-    } else {
-      el.textContent = "Select a file to upload. After upload, it can be attached to your next chat message.";
-    }
-  }
-
   function openPicker() {
     const input = document.getElementById("file-input");
-    if (!input) return alert("File input not found in Files view.");
+    if (!input) return alert("Open Files view first.");
     input.click();
+  }
+
+  function renderStatus(msg) {
+    const el = document.getElementById("files-status");
+    if (!el) return;
+
+    if (msg) {
+      el.textContent = msg;
+      return;
+    }
+
+    if (selectedUploadPath) {
+      el.textContent = `Selected: ${selectedUploadName} (will attach to next chat message)`;
+    } else {
+      el.textContent = "No file selected. Upload a file to attach it to your next message.";
+    }
   }
 
   async function upload(file) {
@@ -48,9 +50,8 @@ window.Files = (function () {
         return;
       }
 
-      selectedUploadPath = data.filepath || data.path || null;
+      selectedUploadPath = data.filepath || null; // app.py returns filepath [file:349]
       selectedUploadName = data.filename || file.name;
-
       renderStatus();
     } catch (e) {
       renderStatus("Upload failed. Please try again.");
@@ -59,7 +60,7 @@ window.Files = (function () {
 
   function refresh() {
     renderStatus();
-    alert("Files list API not implemented in this template yet.");
+    alert("Listing files is not implemented (needs an API).");
   }
 
   function getSelectedUploadPath() {
