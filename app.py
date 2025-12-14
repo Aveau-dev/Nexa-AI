@@ -168,25 +168,25 @@ def migrate_database():
     with app.app_context():
         db.create_all()
 
-        # USER (add missing columns if upgrading from older schema)
+        # USER
         db.session.execute(text('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT FALSE'))
         db.session.execute(text('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS subscription_id VARCHAR(100)'))
         db.session.execute(text('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS deepseek_count INTEGER DEFAULT 0'))
         db.session.execute(text('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS deepseek_date VARCHAR(10) DEFAULT \'\''))
         db.session.execute(text('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS created_at TIMESTAMP'))
 
-        # CHAT (older schema used userid/createdat/updatedat)
-        db.session.execute(text("ALTER TABLE chat ADD COLUMN IF NOT EXISTS user_id INTEGER"))
-        db.session.execute(text("ALTER TABLE chat ADD COLUMN IF NOT EXISTS created_at TIMESTAMP"))
-        db.session.execute(text("ALTER TABLE chat ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP"))
+        # CHAT
+        db.session.execute(text('ALTER TABLE "chat" ADD COLUMN IF NOT EXISTS user_id INTEGER'))
+        db.session.execute(text('ALTER TABLE "chat" ADD COLUMN IF NOT EXISTS created_at TIMESTAMP'))
+        db.session.execute(text('ALTER TABLE "chat" ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP'))
 
-        # MESSAGE (this is what fixed your Render error)
-        db.session.execute(text("ALTER TABLE message ADD COLUMN IF NOT EXISTS has_image BOOLEAN DEFAULT FALSE"))
-        db.session.execute(text("ALTER TABLE message ADD COLUMN IF NOT EXISTS image_data TEXT"))
-        db.session.execute(text("ALTER TABLE message ADD COLUMN IF NOT EXISTS image_path TEXT"))
-        db.session.execute(text("ALTER TABLE message ADD COLUMN IF NOT EXISTS image_url TEXT"))
-        db.session.execute(text("ALTER TABLE message ADD COLUMN IF NOT EXISTS created_at TIMESTAMP"))
-        db.session.execute(text("ALTER TABLE message ADD COLUMN IF NOT EXISTS model VARCHAR(200)"))
+        # MESSAGE
+        db.session.execute(text('ALTER TABLE "message" ADD COLUMN IF NOT EXISTS has_image BOOLEAN DEFAULT FALSE'))
+        db.session.execute(text('ALTER TABLE "message" ADD COLUMN IF NOT EXISTS image_data TEXT'))
+        db.session.execute(text('ALTER TABLE "message" ADD COLUMN IF NOT EXISTS image_path TEXT'))
+        db.session.execute(text('ALTER TABLE "message" ADD COLUMN IF NOT EXISTS image_url TEXT'))
+        db.session.execute(text('ALTER TABLE "message" ADD COLUMN IF NOT EXISTS created_at TIMESTAMP'))
+        db.session.execute(text('ALTER TABLE "message" ADD COLUMN IF NOT EXISTS model VARCHAR(200)'))
 
         db.session.commit()
         log.info("Database migrated/verified OK")
@@ -195,6 +195,9 @@ def migrate_database():
 migrate_database()
 
 # ============ AI MODELS CONFIG ============
+# Primary default model:
+DEFAULT_MODEL_KEY = "gemini-flash"
+
 FREE_MODELS = {
     "gemini-flash": {
         "name": "Gemini 2.5 Flash",
@@ -345,7 +348,7 @@ def call_google_gemini(model_path, messages, image_data=None, image_path=None):
     return resp.text
 
 
-def call_openrouter(model_path, messages, image_data=None, image_path=None, timeout=60):
+def call_openrouter(model_path, messages, image_data=None, image_path=None, timeout=60, temperature=0.7):
     if not openrouter_api_key:
         raise Exception("OpenRouter API key not configured")
 
@@ -361,12 +364,10 @@ def call_openrouter(model_path, messages, image_data=None, image_path=None, time
         role = msg.get("role", "user")
         content = msg.get("content", "")
 
-        # system always text
         if role == "system":
             formatted_messages.append({"role": "system", "content": _extract_text_content(content)})
             continue
 
-        # if already OpenAI-style list
         if isinstance(content, list):
             formatted_messages.append({"role": role, "content": content})
             continue
@@ -403,7 +404,7 @@ def call_openrouter(model_path, messages, image_data=None, image_path=None, time
     payload = {
         "model": model_path,
         "messages": formatted_messages,
-        "temperature": 0.7,
+        "temperature": temperature,
         "max_tokens": 2000
     }
 
@@ -426,7 +427,7 @@ def call_openrouter(model_path, messages, image_data=None, image_path=None, time
     return data["choices"][0]["message"]["content"]
 
 
-def call_ai_model(model_key, messages, image_data=None, image_path=None):
+def call_ai_model(model_key, messages, image_data=None, image_path=None, temperature=0.7):
     if model_key in FREE_MODELS:
         cfg = FREE_MODELS[model_key]
     elif model_key in PREMIUM_MODELS:
@@ -437,7 +438,7 @@ def call_ai_model(model_key, messages, image_data=None, image_path=None):
     if cfg["provider"] == "google":
         return call_google_gemini(cfg["model"], messages, image_data, image_path)
     if cfg["provider"] == "openrouter":
-        return call_openrouter(cfg["model"], messages, image_data, image_path)
+        return call_openrouter(cfg["model"], messages, image_data, image_path, temperature=temperature)
 
     raise Exception(f"Unknown provider: {cfg['provider']}")
 
@@ -488,6 +489,7 @@ def get_chat_history(chat_id, limit=10):
         .all()
     )
     msgs = list(reversed(msgs))
+    # return only text history (vision handled on last message by providers)
     return [{"role": m.role, "content": m.content} for m in msgs]
 
 
@@ -509,6 +511,42 @@ def _resolve_uploaded_path(image_path_or_url):
         return p
     candidate = os.path.join(app.config["UPLOAD_FOLDER"], os.path.basename(p))
     return candidate if os.path.exists(candidate) else None
+
+
+def web_search_snippet(query, timeout=8):
+    """
+    Very lightweight web search helper (no API key).
+    Returns a short bullet list of top results.
+    """
+    try:
+        q = (query or "").strip()
+        if not q:
+            return ""
+
+        r = requests.get(
+            "https://duckduckgo.com/html/",
+            params={"q": q},
+            timeout=timeout,
+            headers={"User-Agent": "Mozilla/5.0"},
+        )
+        if r.status_code != 200:
+            return ""
+
+        html = r.text
+        lines = []
+        for part in html.split('class="result__a"'):
+            if 'href="' in part:
+                href = part.split('href="', 1)[1].split('"', 1)[0]
+                title = part.split(">", 1)[1].split("<", 1)[0]
+                title = title.replace("&amp;", "&").replace("&quot;", '"').strip()
+                if title and href:
+                    lines.append(f"- {title} ({href})")
+            if len(lines) >= 3:
+                break
+        return "\n".join(lines)
+    except Exception:
+        log.exception("web_search_snippet failed")
+        return ""
 
 
 # ============ ERROR HANDLERS ============
@@ -540,46 +578,15 @@ def uploaded_file(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
 
-# IMPORTANT: your router.js uses /view/<name>
 @app.route("/view/<view_name>")
 @login_required
 def view_partial(view_name):
     allowed = {"chat", "files", "memory", "projects", "canvas", "voice", "settings"}
     if view_name not in allowed:
-        return "Not found", 404
+        abort(404)
     return render_template(f"views/{view_name}.html", user=current_user)
 
 
-@app.route("/demo-chat", methods=["POST"])
-def demo_chat():
-    data = request.get_json() or {}
-    message = (data.get("message") or "").strip()
-    if not message:
-        return jsonify({"error": "Message is required"}), 400
-
-    image_keywords = ["generate image", "create image", "draw", "picture of", "image of", "make an image", "show me"]
-    if any(k in message.lower() for k in image_keywords):
-        url = generate_image(message)
-        return jsonify({
-            "response": "Here's your generated image!",
-            "image_url": url,
-            "has_image": True,
-            "demo": True,
-            "model": "Pollinations AI"
-        })
-
-    msgs = [{"role": "system", "content": "You are a helpful AI assistant."},
-            {"role": "user", "content": message}]
-    resp = call_ai_model("gemini-flash", msgs)
-    return jsonify({
-        "response": resp,
-        "demo": True,
-        "model": "Gemini 2.5 Flash lite",
-        "has_image": False
-    })
-
-
-# -------- Auth routes --------
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
     if request.method == "POST":
@@ -590,10 +597,6 @@ def signup():
 
         if not email or not name or not password:
             msg = "All fields are required"
-            return (jsonify({"error": msg}), 400) if request.is_json else render_template("signup.html", error=msg)
-
-        if len(password) < 6:
-            msg = "Password must be at least 6 characters"
             return (jsonify({"error": msg}), 400) if request.is_json else render_template("signup.html", error=msg)
 
         if User.query.filter_by(email=email).first():
@@ -608,6 +611,7 @@ def signup():
         )
         db.session.add(user)
         db.session.commit()
+
         return (jsonify({"success": True, "redirect": url_for("login")})
                 if request.is_json else redirect(url_for("login")))
 
@@ -624,7 +628,10 @@ def login():
         user = User.query.filter_by(email=email).first()
         if user and check_password_hash(user.password, password):
             login_user(user, remember=True)
-            session["selected_model"] = session.get("selected_model", "gpt-3.5-turbo")
+
+            # PRIMARY DEFAULT MODEL (Gemini 2.5 Flash)
+            session["selected_model"] = session.get("selected_model", DEFAULT_MODEL_KEY)
+
             return (jsonify({"success": True, "redirect": url_for("dashboard")})
                     if request.is_json else redirect(url_for("dashboard")))
 
@@ -658,7 +665,7 @@ def dashboard():
 @login_required
 def set_model():
     data = request.get_json() or {}
-    model = data.get("model")
+    model = (data.get("model") or "").strip()
     if not model:
         return jsonify({"error": "Model not specified"}), 400
 
@@ -669,7 +676,7 @@ def set_model():
         return jsonify({"error": "Invalid model"}), 400
 
     session["selected_model"] = model
-    return jsonify({"success": True})
+    return jsonify({"success": True, "model": model})
 
 
 # -------- Upload --------
@@ -706,7 +713,8 @@ def new_chat():
     chat = Chat(user_id=current_user.id, title="New Chat")
     db.session.add(chat)
     db.session.commit()
-    return jsonify({"success": True, "chatid": chat.id, "chat_id": chat.id, "title": chat.title})
+    # IMPORTANT: return chatid (your JS uses data.chatid) [file:408]
+    return jsonify({"success": True, "chatid": chat.id, "title": chat.title})
 
 
 @app.route("/chat/<int:chat_id>/messages", methods=["GET"])
@@ -769,19 +777,7 @@ def delete_chat(chat_id):
     return jsonify({"success": True})
 
 
-@app.route("/api/chats", methods=["GET"])
-@login_required
-def api_chats():
-    chats = (
-        Chat.query.filter_by(user_id=current_user.id)
-        .order_by(Chat.updated_at.desc())
-        .limit(50)
-        .all()
-    )
-    return jsonify({"chats": [{"id": c.id, "title": c.title, "updated_at": c.updated_at.isoformat()} for c in chats]})
-
-
-# -------- Main chat endpoint --------
+# ============ MAIN CHAT ENDPOINT ============
 @app.route("/chat", methods=["POST"])
 @login_required
 def chat_route():
@@ -789,35 +785,37 @@ def chat_route():
         data = request.get_json() or {}
 
         user_message = (data.get("message") or "").strip()
-        selected_model = data.get("model") or session.get("selected_model", "gpt-3.5-turbo")
 
-        chat_id = data.get("chat_id") or data.get("chatid")
+        # IMPORTANT: use session default as Gemini 2.5 Flash
+        selected_model = data.get("model") or session.get("selected_model", DEFAULT_MODEL_KEY)
 
-        image_data = data.get("image") or data.get("image_data")
+        # JS sends chatid, not chat_id in your current code [file:408]
+        chat_id = data.get("chatid") or data.get("chat_id")
+
+        image_data = data.get("image_data") or data.get("image")
         uploaded_file = data.get("uploaded_file") or data.get("uploadedfile")
         uploaded_path = _resolve_uploaded_path(uploaded_file) if uploaded_file else None
+
+        deepthink = bool(data.get("deepthink", False))
+        web = bool(data.get("web", False))
 
         if not user_message and not image_data and not uploaded_path:
             return jsonify({"error": "Message or image required"}), 400
 
-        # Resolve model
-        if selected_model in FREE_MODELS:
-            model_info = FREE_MODELS[selected_model]
-            is_premium_model = False
-        elif selected_model in PREMIUM_MODELS:
-            model_info = PREMIUM_MODELS[selected_model]
-            is_premium_model = True
-        else:
+        # Model access checks
+        if selected_model in PREMIUM_MODELS and not current_user.is_premium:
+            return jsonify({"error": "This model requires Premium subscription", "upgrade_required": True}), 403
+        if selected_model not in FREE_MODELS and selected_model not in PREMIUM_MODELS:
             return jsonify({"error": "Invalid model selected"}), 400
 
-        if is_premium_model and not current_user.is_premium:
-            return jsonify({"error": "This model requires Premium subscription", "upgrade_required": True}), 403
+        model_info = FREE_MODELS.get(selected_model) or PREMIUM_MODELS.get(selected_model)
 
+        # DeepSeek free limit
         if selected_model == "deepseek-chat" and not current_user.is_premium:
             if not check_deepseek_limit(current_user):
                 return jsonify({"error": "Daily limit reached for DeepSeek (50/day)."}), 429
 
-        # Load/create chat
+        # Load or create chat
         if chat_id:
             chat_obj = Chat.query.filter_by(id=int(chat_id), user_id=current_user.id).first()
             if not chat_obj:
@@ -829,8 +827,8 @@ def chat_route():
             db.session.flush()
             chat_id = chat_obj.id
 
-        # Image-generation shortcut (Pollinations)
-        image_keywords = ["generate image", "create image", "draw", "picture of", "image of", "make an image"]
+        # Pollinations image generation shortcut
+        image_keywords = ["generate image", "create image", "draw", "picture of", "image of", "make an image", "show me an image"]
         if user_message and any(k in user_message.lower() for k in image_keywords):
             image_url = generate_image(user_message)
 
@@ -857,8 +855,7 @@ def chat_route():
                 "image_url": image_url,
                 "model": "Pollinations",
                 "chatid": chat_id,
-                "chat_id": chat_id,
-                "chattitle": chat_obj.title,
+                "chattitle": chat_obj.title
             })
 
         # Save user message
@@ -874,11 +871,27 @@ def chat_route():
         if chat_obj.title == "New Chat":
             chat_obj.title = generate_chat_title(user_message or "Image analysis")
 
-        history = [{"role": "system", "content": "You are a helpful AI assistant."}]
-        history.extend(get_chat_history(chat_id, limit=10))
-        history.append({"role": "user", "content": user_message or "What is in this image?"})
+        # Build prompt/history
+        system_prompt = "You are a helpful AI assistant."
+        if deepthink:
+            system_prompt += " Think step-by-step and be extra thorough, but keep the final answer concise."
 
-        bot_response = call_ai_model(selected_model, history, image_data=image_data, image_path=uploaded_path)
+        history = [{"role": "system", "content": system_prompt}]
+        history.extend(get_chat_history(chat_id, limit=10))
+
+        user_final = user_message or "What is in this image?"
+        if web and user_message:
+            snippet = web_search_snippet(user_message)
+            if snippet:
+                user_final = (
+                    f"{user_message}\n\nWeb results (top):\n{snippet}\n\n"
+                    f"Use these only as references and cite URLs when relevant."
+                )
+
+        history.append({"role": "user", "content": user_final})
+
+        temperature = 0.4 if deepthink else 0.7
+        bot_response = call_ai_model(selected_model, history, image_data=image_data, image_path=uploaded_path, temperature=temperature)
 
         db.session.add(Message(
             chat_id=chat_id,
@@ -897,14 +910,14 @@ def chat_route():
         if selected_model == "deepseek-chat" and not current_user.is_premium:
             deepseek_remaining = max(0, 50 - current_user.deepseek_count)
 
+        # Return keys your JS already expects [file:408]
         return jsonify({
             "success": True,
             "response": bot_response,
             "model": model_info.get("name"),
             "chatid": chat_id,
-            "chat_id": chat_id,
             "chattitle": chat_obj.title,
-            "deepseekremaining": deepseek_remaining,
+            "deepseekremaining": deepseek_remaining
         })
 
     except Exception as e:
@@ -921,6 +934,7 @@ def checkout():
         return "Payment system not configured", 503
     if current_user.is_premium:
         return redirect(url_for("dashboard"))
+
     try:
         session_obj = stripe.checkout.Session.create(
             payment_method_types=["card"],
@@ -950,7 +964,6 @@ def checkout():
 @app.route("/payment-success")
 @login_required
 def payment_success():
-    # simple success handler (webhook is the source of truth)
     return redirect(url_for("dashboard"))
 
 
@@ -959,6 +972,7 @@ def stripe_webhook():
     payload = request.data
     sig_header = request.headers.get("Stripe-Signature")
     webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
+
     if not webhook_secret or not stripe.api_key:
         return "", 200
 
