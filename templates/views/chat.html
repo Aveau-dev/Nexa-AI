@@ -1,68 +1,27 @@
-<!-- templates/views/chat.html -->
-<div class="chat-view" role="region" aria-label="Chat">
+<!-- CHAT VIEW -->
+<section class="view" data-view="chat">
+  <div class="welcome-section" id="welcome-section">
+    <h1 class="main-heading">What can I help with?</h1>
 
-  <!-- Message stream -->
-  <div id="chat-messages"
-       class="chat-messages"
-       role="log"
-       aria-live="polite"
-       aria-relevant="additions text">
+    <div class="suggestion-cards">
+      <div class="suggestion-card" onclick="Chat.useSuggestion('Explain this code with examples')">
+        <div class="suggestion-text">Explain this code with examples</div>
+      </div>
 
-    <!-- Greeting / empty-state (JS can hide/remove this after first message) -->
-    <div class="initial-greeting" id="chat-empty-state">
-      <h1>Hello {{ current_user.name }} 👋</h1>
-      <p class="subtext">How can I help you today?</p>
+      <div class="suggestion-card" onclick="Chat.useSuggestion('Summarize this text')">
+        <div class="suggestion-text">Summarize this text</div>
+      </div>
 
-      <!-- Suggested prompts -->
-      <div class="suggestions-grid" role="list">
-        <button type="button"
-                class="suggestion-card"
-                role="listitem"
-                onclick="window.Chat && Chat.useSuggestion && Chat.useSuggestion('Explain this code with examples:')">
-          <span class="icon" aria-hidden="true">💡</span>
-          <span class="text">Explain this code with examples</span>
-        </button>
+      <div class="suggestion-card" onclick="Chat.useSuggestion('Generate a modern landing page')">
+        <div class="suggestion-text">Generate modern landing page</div>
+      </div>
 
-        <button type="button"
-                class="suggestion-card"
-                role="listitem"
-                onclick="window.Chat && Chat.useSuggestion && Chat.useSuggestion('Summarize this text:')">
-          <span class="icon" aria-hidden="true">📘</span>
-          <span class="text">Summarize this text</span>
-        </button>
-
-        <button type="button"
-                class="suggestion-card"
-                role="listitem"
-                onclick="window.Chat && Chat.useSuggestion && Chat.useSuggestion('Generate modern landing page HTML + CSS')">
-          <span class="icon" aria-hidden="true">🎨</span>
-          <span class="text">Generate modern landing page</span>
-        </button>
-
-        <button type="button"
-                class="suggestion-card"
-                role="listitem"
-                onclick="window.Chat && Chat.useSuggestion && Chat.useSuggestion('Write optimized Python code for:')">
-          <span class="icon" aria-hidden="true">⚙️</span>
-          <span class="text">Write optimized Python code</span>
-        </button>
+      <div class="suggestion-card" onclick="Chat.useSuggestion('Write optimized Python code')">
+        <div class="suggestion-text">Write optimized Python code</div>
       </div>
     </div>
   </div>
 
-  <!-- Enable the floating/global input that lives in dashboard.html -->
-  <script>
-    (function () {
-      // If your app uses a global input (in dashboard.html), enable it here.
-      if (window.UI && typeof UI.enableGlobalInput === "function") {
-        UI.enableGlobalInput(true);
-      } else {
-        // Optional fallback: show the wrapper if your UI module isn't loaded yet.
-        const w = document.getElementById("global-input-wrapper");
-        if (w) w.style.display = "";
-      }
-    })();
-  </script>
-
-</div>
-
+  <!-- IMPORTANT: chat.js expects this -->
+  <div id="messages-container"></div>
+</section>
