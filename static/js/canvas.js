@@ -1,162 +1,115 @@
-/* static/js/canvas.js
-   Canvas / Code Workspace module
-   - Lazy-loads Monaco editor from CDN if not present
-   - Runs code via backend endpoint: POST /execute-code (expects JSON { code })
-   - Renders markdown preview using marked
-*/
+window.Canvas = (function () {
+  let ctx = null;
+  let drawing = false;
+  let brushSize = 6;
+  let brushColor = "#19c37d";
+  const history = [];
 
-const Canvas = (function () {
-  let editor = null;
-  let monacoLoaded = false;
-  const monacoUrl = "https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.41.0/min/vs/loader.min.js";
-  const editorElementId = "monaco-editor";
-  const markdownElId = "canvas-markdown";
-  const outputElId = "canvas-output";
+  function onViewLoaded() {
+    const canvas = document.getElementById("main-canvas");
+    if (!canvas) return;
 
-  async function loadMonaco() {
-    if (monacoLoaded) return;
-    if (window.require && window.monaco) {
-      monacoLoaded = true;
-      return;
-    }
+    ctx = canvas.getContext("2d");
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
 
-    // Inject loader script
-    await new Promise((resolve, reject) => {
-      const s = document.createElement("script");
-      s.src = monacoUrl;
-      s.onload = () => resolve();
-      s.onerror = () => reject(new Error("Failed to load Monaco loader"));
-      document.head.appendChild(s);
+    canvas.addEventListener("pointerdown", (e) => {
+      drawing = true;
+      ctx.beginPath();
+      const p = getPos(canvas, e);
+      ctx.moveTo(p.x, p.y);
     });
 
-    // Configure require and load editor
-    return new Promise((resolve, reject) => {
-      if (!window.require) return reject(new Error("Monaco loader not available"));
-      window.require.config({ paths: { vs: "https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.41.0/min/vs" }});
-      window.require(["vs/editor/editor.main"], () => {
-        monacoLoaded = true;
+    canvas.addEventListener("pointermove", (e) => {
+      if (!drawing) return;
+      const p = getPos(canvas, e);
+      ctx.strokeStyle = brushColor;
+      ctx.lineWidth = brushSize;
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+    });
+
+    canvas.addEventListener("pointerup", () => {
+      if (!drawing) return;
+      drawing = false;
+      saveState(canvas);
+    });
+
+    canvas.addEventListener("pointerleave", () => {
+      if (!drawing) return;
+      drawing = false;
+      saveState(canvas);
+    });
+
+    saveState(canvas);
+    setStatus("Ready.");
+  }
+
+  function getPos(canvas, e) {
+    const r = canvas.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * (canvas.width / r.width), y: (e.clientY - r.top) * (canvas.height / r.height) };
+  }
+
+  function saveState(canvas) {
+    try {
+      history.push(canvas.toDataURL("image/png"));
+      if (history.length > 30) history.shift();
+    } catch (_) {}
+  }
+
+  function restore(canvas, dataUrl) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0);
         resolve();
-      }, (err) => reject(err));
+      };
+      img.src = dataUrl;
     });
   }
 
-  async function init() {
-    try {
-      const el = document.getElementById(editorElementId);
-      if (!el) return;
-
-      // load monaco then create editor
-      await loadMonaco();
-      editor = monaco.editor.create(el, {
-        value: "# Write Python code or Markdown\n",
-        language: "python",
-        theme: "vs-dark",
-        automaticLayout: true,
-        minimap: { enabled: false },
-        fontSize: 13,
-      });
-
-      // preview markdown on change (throttled)
-      let timeout = null;
-      editor.onDidChangeModelContent(() => {
-        clearTimeout(timeout);
-        timeout = setTimeout(renderMarkdownPreview, 500);
-      });
-
-      renderMarkdownPreview();
-      console.log("Canvas: Monaco ready");
-    } catch (e) {
-      console.error("Canvas.init error:", e);
-      const container = document.getElementById(editorElementId);
-      if (container) container.innerHTML = "<pre style='padding:1rem'>Editor failed to load. Check network or include Monaco manually.</pre>";
-    }
+  function setBrush(v) {
+    brushSize = Number(v) || brushSize;
+    setStatus(`Brush: ${brushSize}px`);
   }
 
-  function getCode() {
-    if (editor) return editor.getValue();
-    // fallback to a textarea if needed
-    const ta = document.querySelector("#artifact-code") || document.querySelector("textarea#artifact-code");
-    return ta ? ta.value : "";
-  }
-
-  async function run() {
-    const code = getCode();
-    if (!code) {
-      UI.toast("No code to run");
-      return;
-    }
-
-    const out = document.getElementById(outputElId);
-    if (out) out.textContent = "Running…";
-
-    try {
-      const resp = await fetch("/execute-code", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code })
-      });
-      const data = await resp.json();
-      if (data.error) {
-        if (out) out.textContent = "Error: " + data.error;
-      } else {
-        if (out) out.textContent = data.output || JSON.stringify(data, null, 2);
-      }
-      UI.toast("Execution finished");
-    } catch (e) {
-      console.error("Canvas.run error:", e);
-      if (out) out.textContent = "Execution failed: " + e.message;
-      UI.toast("Execution failed");
-    }
-  }
-
-  function renderMarkdownPreview() {
-    const mdEl = document.getElementById(markdownElId);
-    if (!mdEl) return;
-    const code = getCode();
-    // Basic heuristic: if starts with # or contains markdown, render as markdown
-    const isLikelyMarkdown = code.trim().startsWith("#") || code.includes("```") || code.includes("- ");
-    if (!isLikelyMarkdown) {
-      mdEl.innerHTML = "<div style='opacity:.7'>No markdown detected</div>";
-      return;
-    }
-    try {
-      const rendered = marked.parse(code);
-      mdEl.innerHTML = rendered;
-      // highlight codeblocks
-      mdEl.querySelectorAll("pre code").forEach((block) => {
-        if (window.hljs) hljs.highlightElement(block);
-      });
-    } catch (e) {
-      mdEl.innerHTML = "<pre>Markdown render failed</pre>";
-    }
-  }
-
-  function exportArtifact() {
-    const code = getCode();
-    const blob = new Blob([code], { type: "text/plain" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "artifact.py";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(a.href);
-    UI.toast("Exported artifact");
+  function setColor(c) {
+    brushColor = c || brushColor;
+    setStatus(`Color: ${brushColor}`);
   }
 
   function clear() {
-    if (editor) editor.setValue("");
-    const out = document.getElementById(outputElId);
-    if (out) out.textContent = "Run code to see output...";
-    UI.toast("Canvas cleared");
+    const canvas = document.getElementById("main-canvas");
+    if (!canvas || !ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    saveState(canvas);
+    setStatus("Cleared.");
   }
 
-  return {
-    init,
-    run,
-    exportArtifact,
-    clear
-  };
-})();
+  async function undo() {
+    const canvas = document.getElementById("main-canvas");
+    if (!canvas || !ctx) return;
 
-window.Canvas = Canvas;
+    if (history.length <= 1) return setStatus("Nothing to undo.");
+    history.pop();
+    await restore(canvas, history[history.length - 1]);
+    setStatus("Undo.");
+  }
+
+  function exportPng() {
+    const canvas = document.getElementById("main-canvas");
+    if (!canvas) return;
+    const a = document.createElement("a");
+    a.href = canvas.toDataURL("image/png");
+    a.download = "canvas.png";
+    a.click();
+  }
+
+  function setStatus(msg) {
+    const el = document.getElementById("canvas-status");
+    if (el) el.textContent = msg;
+  }
+
+  return { onViewLoaded, setBrush, setColor, clear, undo, exportPng };
+})();
