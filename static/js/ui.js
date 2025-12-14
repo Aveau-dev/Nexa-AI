@@ -1,4 +1,3 @@
-// UI helpers + safe HTML
 window.UI = (function () {
   function escapeHtml(text) {
     const div = document.createElement("div");
@@ -11,15 +10,12 @@ window.UI = (function () {
     const main = document.getElementById("main-content");
     if (!sidebar || !main) return;
 
-    // mobile/tablet: show overlay style
     if (window.innerWidth <= 1024) {
       sidebar.classList.toggle("show");
-      return;
+    } else {
+      sidebar.classList.toggle("collapsed");
+      main.classList.toggle("sidebar-collapsed");
     }
-
-    // desktop: collapse
-    sidebar.classList.toggle("collapsed");
-    main.classList.toggle("sidebar-collapsed");
   }
 
   function toggleUserMenu() {
@@ -38,27 +34,27 @@ window.UI = (function () {
     if (selector) selector.style.display = "none";
   }
 
-  // close dropdowns on outside click
-  document.addEventListener("click", (e) => {
-    const userBtn = e.target.closest(".user-avatar");
+  // Close dropdowns / sidebar when clicking outside
+  document.addEventListener("click", (event) => {
     const menu = document.getElementById("user-menu");
-    if (menu && menu.style.display === "block" && !userBtn && !menu.contains(e.target)) {
+    const userBtn = event.target.closest(".user-avatar");
+
+    if (menu && menu.style.display === "block" && !userBtn && !menu.contains(event.target)) {
       closeUserMenu();
     }
 
-    const selectorBtn = e.target.closest(".model-selector-btn");
     const selector = document.getElementById("model-selector");
-    if (selector && selector.style.display === "block" && !selectorBtn && !selector.contains(e.target)) {
+    const modelBtn = event.target.closest(".model-selector-btn");
+    if (selector && selector.style.display === "block" && !modelBtn && !selector.contains(event.target)) {
       closeModelSelector();
     }
 
-    // mobile sidebar: close if clicked outside
     if (window.innerWidth <= 1024) {
       const sidebar = document.getElementById("sidebar");
-      const toggleBtn = document.getElementById("sidebar-toggle");
+      const sidebarToggle = document.getElementById("sidebar-toggle");
       if (sidebar && sidebar.classList.contains("show")) {
-        const clickedInsideSidebar = sidebar.contains(e.target);
-        const clickedToggle = toggleBtn && toggleBtn.contains(e.target);
+        const clickedInsideSidebar = sidebar.contains(event.target);
+        const clickedToggle = sidebarToggle && sidebarToggle.contains(event.target);
         if (!clickedInsideSidebar && !clickedToggle) sidebar.classList.remove("show");
       }
     }
