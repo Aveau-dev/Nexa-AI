@@ -1,4 +1,4 @@
-<!-- templates/dashboard.html - COMPLETE COMBINED FIXED VERSION (Your dashboard + chat.js wiring) -->
+<!-- templates/dashboard.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -12,11 +12,9 @@
   <link rel="canonical" href="https://nexaai.js.org/dashboard" />
   <meta name="robots" content="index, follow" />
 
-  <!-- Same favicon pattern as index.html -->
   <link rel="icon" type="image/svg+xml"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2319c37d' d='M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z'/></svg>">
 
-  <!-- Open Graph / Twitter -->
   <meta property="og:title" content="NexaAI – Dashboard" />
   <meta property="og:description" content="Your NexaAI workspace with chat history and multiple AI models." />
   <meta property="og:url" content="https://nexaai.js.org/dashboard" />
@@ -27,16 +25,13 @@
   <meta name="twitter:description" content="A modern, privacy-friendly AI dashboard with saved chat history." />
   <meta name="twitter:image" content="https://nexaai.js.org/static/og-image.png" />
 
-  <!-- Your CSS (keep your folder name if it's really Css/) -->
   <link rel="stylesheet" href="{{ url_for('static', filename='Css/style.css') }}" />
 
-  <!-- Markdown + syntax highlighting -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <link rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 
-  <!-- Polyfills (same as index.html) -->
   <script>
     if(!window.Promise){
       document.write('<script src="https://cdn.jsdelivr.net/npm/promise-polyfill@8/dist/polyfill.min.js"><\/script>');
@@ -52,20 +47,23 @@
     window.NEXAAI.initialModelKey = "{{ session.get('selected_model', 'gemini-flash') }}";
     window.NEXAAI.initialModelName = "{{ session.get('selected_model_name', 'Gemini 2.5 Flash') }}";
   </script>
+
+  <!-- Hard fix: prevent “can’t type” due to overlay / stacking -->
+  <style>
+    .input-wrapper { z-index: 5000 !important; pointer-events: auto !important; }
+    .input-wrapper * { pointer-events: auto !important; }
+  </style>
 </head>
 
 <body>
-  <!-- Top Navigation -->
   <nav class="top-nav">
     <div class="nav-left">
-      <!-- COMBINED: use global toggleSidebar() from chat.js -->
       <button class="nav-button icon-only" id="sidebar-toggle" onclick="toggleSidebar()">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
           <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"></path>
         </svg>
       </button>
 
-      <!-- COMBINED: use global newChat() from chat.js -->
       <button class="nav-button" onclick="newChat()">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
           <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path>
@@ -80,7 +78,6 @@
         <span class="logo-text">NexaAI</span>
       </div>
 
-      <!-- COMBINED: use global toggleModelSelector()/selectModel() from chat.js -->
       <button class="model-selector-btn" onclick="toggleModelSelector()">
         <span id="selected-model-name">{{ session.get('selected_model_name', 'Gemini 2.5 Flash') }}</span>
         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
@@ -98,14 +95,12 @@
         <div class="premium-badge-nav">Premium</div>
       {% endif %}
 
-      <!-- COMBINED: use global toggleUserMenu() from chat.js -->
       <button class="nav-button icon-only" onclick="toggleUserMenu()">
         <div class="user-avatar">{{ (user.name or 'U')[0].upper() }}</div>
       </button>
     </div>
   </nav>
 
-  <!-- Model Selector Dropdown -->
   <div id="model-selector" class="model-selector-dropdown" style="display:none;">
     <div class="model-selector-header">
       <h3>Select AI Model</h3>
@@ -145,7 +140,6 @@
     </div>
   </div>
 
-  <!-- User Menu -->
   <div id="user-menu" class="dropdown-menu" style="display:none;">
     <div class="menu-header">
       <div class="user-avatar-large">{{ (user.name or 'U')[0].upper() }}</div>
@@ -171,9 +165,20 @@
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-content">
       <div class="sidebar-section">
-        <div class="section-title">Chat History</div>
 
-        <!-- IMPORTANT: add id="chat-history" for chat.js upsert -->
+        <!-- FIX: Workspace ABOVE chat history -->
+        <div class="section-title">Workspace</div>
+        <div class="chat-history">
+          <div class="chat-item" onclick="Router.go('files')"><span class="chat-title">Files</span></div>
+          <div class="chat-item" onclick="Router.go('memory')"><span class="chat-title">Memory</span></div>
+          <div class="chat-item" onclick="Router.go('projects')"><span class="chat-title">Projects</span></div>
+          <div class="chat-item" onclick="Router.go('canvas')"><span class="chat-title">Canvas</span></div>
+          <div class="chat-item" onclick="Router.go('voice')"><span class="chat-title">Voice</span></div>
+          <div class="chat-item" onclick="Router.go('settings')"><span class="chat-title">Settings</span></div>
+        </div>
+
+        <div class="section-title" style="margin-top:1rem;">Chat History</div>
+
         <div class="chat-history" id="chat-history">
           {% if chats %}
             {% for chat in chats %}
@@ -191,17 +196,6 @@
           {% else %}
             <div class="empty-state">No chats yet. Start a new conversation!</div>
           {% endif %}
-        </div>
-
-        <!-- Workspace (keeps your Router.go links) -->
-        <div class="section-title" style="margin-top:1rem;">Workspace</div>
-        <div class="chat-history">
-          <div class="chat-item" onclick="Router.go('files')"><span class="chat-title">Files</span></div>
-          <div class="chat-item" onclick="Router.go('memory')"><span class="chat-title">Memory</span></div>
-          <div class="chat-item" onclick="Router.go('projects')"><span class="chat-title">Projects</span></div>
-          <div class="chat-item" onclick="Router.go('canvas')"><span class="chat-title">Canvas</span></div>
-          <div class="chat-item" onclick="Router.go('voice')"><span class="chat-title">Voice</span></div>
-          <div class="chat-item" onclick="Router.go('settings')"><span class="chat-title">Settings</span></div>
         </div>
       </div>
 
@@ -223,33 +217,31 @@
     </div>
   </aside>
 
-  <!-- Main Content -->
+  <!-- Main Content (Router injects views here) -->
   <div class="main-container with-sidebar" id="main-content">
     <div class="center-content" id="view-container">
-      <!-- Chat view (default) -->
-      <div id="welcome-section" class="welcome-section" style="display:block;">
+      <!-- router loads chat.html here -->
+      <div class="welcome-section" id="welcome-section" style="display:block;">
         <h1 class="main-heading">What can I help with?</h1>
       </div>
-
-      <!-- IMPORTANT: chat.js needs this id -->
       <div id="messages-container"></div>
     </div>
   </div>
 
-  <!-- Input (dashboard shell) -->
+  <!-- Input (ONLY here; do not duplicate inside chat.html) -->
   <div class="input-wrapper" id="chat-input-wrapper" style="display:block;">
     <div class="input-box">
       <div class="input-inner">
 
-        <!-- NEW: DeepThink + Web toggles (chat.js reads these ids) -->
-        <div class="chat-toggles">
-          <button id="btn-deepthink" class="toggle-btn" onclick="toggleDeepThink()" type="button">DeepThink: Off</button>
-          <button id="btn-web" class="toggle-btn" onclick="toggleWeb()" type="button">Web: Off</button>
+        <!-- FIX: remove onclick toggleDeepThink/toggleWeb; chat.js binds by id -->
+        <div class="chat-toggles" style="display:flex; gap:.5rem; align-items:center;">
+          <button id="btn-deepthink" class="toggle-btn" type="button">DeepThink: Off</button>
+          <button id="btn-web" class="toggle-btn" type="button">Web: Off</button>
         </div>
 
         <textarea id="chat-input" placeholder="Ask anything..." rows="1"></textarea>
 
-        <button class="send-button" onclick="sendMessage()" id="send-btn">
+        <button class="send-button" type="button" id="send-btn" onclick="sendMessage()">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
             <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
           </svg>
@@ -265,12 +257,12 @@
     </div>
   </div>
 
-  <!-- Your JS modules (kept) -->
-  <script src="{{ url_for('static', filename='js/ui.js') }}"></script>
+  <!-- IMPORTANT: remove these if they also define toggleSidebar/sendMessage/etc -->
+  <!-- If ui.js/model-selector.js overlap with chat.js, input/toggles can break -->
+  <!-- <script src="{{ url_for('static', filename='js/ui.js') }}"></script> -->
   <script src="{{ url_for('static', filename='js/router.js') }}"></script>
-  <script src="{{ url_for('static', filename='js/model-selector.js') }}"></script>
+  <!-- <script src="{{ url_for('static', filename='js/model-selector.js') }}"></script> -->
 
-  <!-- IMPORTANT: chat.js provides toggleSidebar/toggleUserMenu/toggleModelSelector/selectModel/newChat/loadChat/sendMessage -->
   <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
 
   <script src="{{ url_for('static', filename='js/files.js') }}"></script>
@@ -281,7 +273,6 @@
   <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 
-  <!-- Boot -->
   <script>
     document.addEventListener("DOMContentLoaded", function () {
       if (window.Router && Router.go) Router.go("chat");
