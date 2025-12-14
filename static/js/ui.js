@@ -1,67 +1,74 @@
-/* global window, document */
-(function () {
-  const UI = {
-    init() {
-      // cache nothing mandatory; just ensure required elements exist
-      this.sidebar = document.getElementById('sidebar');
-      this.userMenu = document.getElementById('user-menu');
-      this.modelDropdown = document.getElementById('model-selector-dropdown');
-    },
+// UI helpers + safe HTML
+window.UI = (function () {
+  function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text ?? "";
+    return div.innerHTML;
+  }
 
-    toggleSidebar() {
-      const sidebar = document.getElementById('sidebar');
-      const main = document.getElementById('main-container');
-      if (!sidebar || !main) return;
+  function toggleSidebar() {
+    const sidebar = document.getElementById("sidebar");
+    const main = document.getElementById("main-content");
+    if (!sidebar || !main) return;
 
-      // mobile vs desktop
-      if (window.innerWidth <= 1024) sidebar.classList.toggle('show');
-      else {
-        sidebar.classList.toggle('collapsed');
-        main.classList.toggle('sidebar-collapsed');
-      }
-    },
+    // mobile/tablet: show overlay style
+    if (window.innerWidth <= 1024) {
+      sidebar.classList.toggle("show");
+      return;
+    }
 
-    toggleUserMenu(force) {
-      const menu = document.getElementById('user-menu');
-      if (!menu) return;
+    // desktop: collapse
+    sidebar.classList.toggle("collapsed");
+    main.classList.toggle("sidebar-collapsed");
+  }
 
-      const shouldShow = (typeof force === 'boolean')
-        ? force
-        : (menu.style.display !== 'block');
+  function toggleUserMenu() {
+    const menu = document.getElementById("user-menu");
+    if (!menu) return;
+    menu.style.display = menu.style.display === "block" ? "none" : "block";
+  }
 
-      menu.style.display = shouldShow ? 'block' : 'none';
-    },
+  function closeUserMenu() {
+    const menu = document.getElementById("user-menu");
+    if (menu) menu.style.display = "none";
+  }
 
-    autoResize(textarea) {
-      if (!textarea) return;
-      textarea.style.height = 'auto';
-      textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
-    },
+  function closeModelSelector() {
+    const selector = document.getElementById("model-selector");
+    if (selector) selector.style.display = "none";
+  }
 
-    handleGlobalOutsideClick(ev) {
-      // close user menu
-      const menu = document.getElementById('user-menu');
-      if (menu && !ev.target.closest('.user-avatar') && !ev.target.closest('#user-menu')) {
-        menu.style.display = 'none';
-      }
+  // close dropdowns on outside click
+  document.addEventListener("click", (e) => {
+    const userBtn = e.target.closest(".user-avatar");
+    const menu = document.getElementById("user-menu");
+    if (menu && menu.style.display === "block" && !userBtn && !menu.contains(e.target)) {
+      closeUserMenu();
+    }
 
-      // close model selector
-      const dd = document.getElementById('model-selector-dropdown');
-      if (dd && dd.classList.contains('show')
-          && !ev.target.closest('#model-selector-btn')
-          && !ev.target.closest('#model-selector-dropdown')) {
-        if (window.Models) window.Models.toggleSelector(false);
-      }
+    const selectorBtn = e.target.closest(".model-selector-btn");
+    const selector = document.getElementById("model-selector");
+    if (selector && selector.style.display === "block" && !selectorBtn && !selector.contains(e.target)) {
+      closeModelSelector();
+    }
 
-      // close sidebar on mobile if clicking outside
-      const sidebar = document.getElementById('sidebar');
-      if (sidebar && window.innerWidth <= 1024 && sidebar.classList.contains('show')) {
-        if (!ev.target.closest('#sidebar') && !ev.target.closest('[onclick*="toggleSidebar"]')) {
-          sidebar.classList.remove('show');
-        }
+    // mobile sidebar: close if clicked outside
+    if (window.innerWidth <= 1024) {
+      const sidebar = document.getElementById("sidebar");
+      const toggleBtn = document.getElementById("sidebar-toggle");
+      if (sidebar && sidebar.classList.contains("show")) {
+        const clickedInsideSidebar = sidebar.contains(e.target);
+        const clickedToggle = toggleBtn && toggleBtn.contains(e.target);
+        if (!clickedInsideSidebar && !clickedToggle) sidebar.classList.remove("show");
       }
     }
-  };
+  });
 
-  window.UI = UI;
+  return {
+    escapeHtml,
+    toggleSidebar,
+    toggleUserMenu,
+    closeUserMenu,
+    closeModelSelector,
+  };
 })();
