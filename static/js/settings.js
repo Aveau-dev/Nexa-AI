@@ -1,43 +1,77 @@
-/* static/js/settings.js
-   Settings & integrations helpers
-*/
+window.Settings = (function () {
+  const KEY = "nexa_settings";
 
-const Settings = (function () {
-  async function saveAccount() {
-    const name = document.getElementById("settings-name").value;
+  function onViewLoaded() {
+    const saved = load();
+    const compact = !!saved.compact;
+    const enterSend = saved.enterToSend !== false;
+
+    const c = document.getElementById("setting-compact");
+    const e = document.getElementById("setting-enter-send");
+    if (c) c.checked = compact;
+    if (e) e.checked = enterSend;
+
+    apply(compact);
+    setStatus("Status: loaded.");
+  }
+
+  function setStatus(msg) {
+    const el = document.getElementById("settings-status");
+    if (el) el.textContent = msg;
+  }
+
+  function load() {
     try {
-      const resp = await fetch("/api/settings/account", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name })
-      });
-      const data = await resp.json();
-      if (data.error) UI.toast("Save failed");
-      else UI.toast("Account updated");
-    } catch (e) {
-      console.error("Settings.saveAccount error", e);
-      UI.toast("Save failed");
+      return JSON.parse(localStorage.getItem(KEY) || "{}");
+    } catch (_) {
+      return {};
     }
   }
 
-  function connectGoogle() {
-    window.location.href = "/integrations/google/start";
+  function saveObj(obj) {
+    localStorage.setItem(KEY, JSON.stringify(obj));
   }
 
-  function connectDrive() {
-    window.location.href = "/integrations/drive/start";
+  function apply(compact) {
+    // uses the CSS block "ULTRA COMPACT MODE" if you add a class hook
+    document.body.classList.toggle("ultra-compact", !!compact);
   }
 
-  function connectNotion() {
-    window.location.href = "/integrations/notion/start";
+  function setCompact(v) {
+    const s = load();
+    s.compact = !!v;
+    saveObj(s);
+    apply(s.compact);
+    setStatus("Status: compact updated.");
   }
 
-  return {
-    saveAccount,
-    connectGoogle,
-    connectDrive,
-    connectNotion
-  };
+  function setEnterToSend(v) {
+    const s = load();
+    s.enterToSend = !!v;
+    saveObj(s);
+    setStatus("Status: enter-to-send updated.");
+  }
+
+  function toggleCompact() {
+    const s = load();
+    setCompact(!s.compact);
+    const cb = document.getElementById("setting-compact");
+    if (cb) cb.checked = !!load().compact;
+  }
+
+  function save() {
+    setStatus("Status: saved.");
+  }
+
+  function reset() {
+    localStorage.removeItem(KEY);
+    apply(false);
+    const c = document.getElementById("setting-compact");
+    const e = document.getElementById("setting-enter-send");
+    if (c) c.checked = false;
+    if (e) e.checked = true;
+    setStatus("Status: reset.");
+  }
+
+  return { onViewLoaded, setCompact, setEnterToSend, toggleCompact, save, reset };
 })();
-
-window.Settings = Settings;
