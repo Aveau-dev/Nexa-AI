@@ -1,42 +1,74 @@
-<!-- templates/views/memory.html -->
-<div class="memory-view">
+<!-- MEMORY VIEW -->
+<section class="view" data-view="memory">
+  <div class="welcome-section">
+    <h1 class="main-heading">Memory</h1>
+    <p class="footer-text">Control what the assistant remembers across sessions.</p>
 
-    <div class="view-header">
-        <h2>Memory & Custom Instructions</h2>
-        <button onclick="Memory.save()" class="btn-primary">Save</button>
+    <div class="suggestion-cards" style="margin-top: 1rem;">
+      <div class="suggestion-card" onclick="Memory.toggle()">
+        <div class="suggestion-text">Toggle memory</div>
+      </div>
+      <div class="suggestion-card" onclick="Memory.clear()">
+        <div class="suggestion-text">Clear memory</div>
+      </div>
+      <div class="suggestion-card" onclick="Memory.refresh()">
+        <div class="suggestion-text">Refresh</div>
+      </div>
+      <div class="suggestion-card" onclick="Router.go('chat')">
+        <div class="suggestion-text">Back to chat</div>
+      </div>
     </div>
+  </div>
 
-    <div class="memory-grid">
-
-        <div class="memory-card">
-            <label class="label">Preferred Tone</label>
-            <select id="memory-tone" class="input-select">
-                <option value="default">Default</option>
-                <option value="casual">Casual</option>
-                <option value="formal">Formal</option>
-                <option value="friendly">Friendly</option>
-                <option value="technical">Technical</option>
-            </select>
+  <div class="message-row assistant-row">
+    <div class="message assistant-message">
+      <div class="avatar">N</div>
+      <div class="message-content">
+        <div class="model-badge">Memory</div>
+        <div class="message-text markdown-content" id="memory-status">
+          Memory status will appear here.
         </div>
-
-        <div class="memory-card">
-            <label class="label">Personal Notes</label>
-            <textarea id="memory-notes" class="input-textarea"
-                placeholder="Anything the assistant should remember…"></textarea>
-        </div>
-
-        <div class="memory-card">
-            <label class="label">Custom Instructions</label>
-            <textarea id="memory-instructions" class="input-textarea"
-                placeholder="How should NexaAI respond? Tone, style, personality, etc."></textarea>
-        </div>
-
+      </div>
     </div>
+  </div>
 
-    <div id="memory-status" class="status-text"></div>
+  <div class="message-row assistant-row">
+    <div class="message assistant-message">
+      <div class="avatar">N</div>
+      <div class="message-content">
+        <div class="message-text markdown-content">
+          <div style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items:center;">
+            <label style="display:flex; gap:0.5rem; align-items:center;">
+              <input type="checkbox" id="memory-enabled" onchange="Memory.setEnabled(this.checked)" />
+              Enable memory
+            </label>
 
-</div>
+            <button class="nav-button" type="button" onclick="Memory.save()">
+              Save
+            </button>
 
-<script>
-    UI.enableGlobalInput(false);
-</script>
+            <button class="nav-button secondary" type="button" onclick="Memory.clear()">
+              Clear
+            </button>
+          </div>
+
+          <div style="margin-top:0.75rem;">
+            <label style="display:block; margin-bottom:0.5rem;">What should be remembered?</label>
+            <textarea id="memory-text" class="form-input" rows="6" placeholder="Example: My name is Aarav. Prefer short answers. I am learning Flask."></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="message-row assistant-row">
+    <div class="message assistant-message">
+      <div class="avatar">N</div>
+      <div class="message-content">
+        <div class="message-text markdown-content" id="memory-items">
+          Saved memory items will appear here.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
