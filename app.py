@@ -1005,6 +1005,15 @@ def chat_route():
         return jsonify({"error": "An error occurred. Please try again."}), 500
 
 
+@app.route("/view/<view_name>")
+@login_required
+def view_partial(view_name):
+    allowed = {"chat","files","memory","projects","canvas","voice","settings"}
+    if view_name not in allowed:
+        return "Not found", 404
+    return render_template(f"views/{view_name}.html", user=current_user)
+
+
 # ============ STRIPE ROUTES ============
 @app.route("/checkout")
 @login_required
@@ -1128,4 +1137,5 @@ if __name__ == "__main__":
     log.info("🚀 Starting NexaAI on port %s", port)
     log.info("📊 Database: %s", "PostgreSQL" if "postgresql" in app.config["SQLALCHEMY_DATABASE_URI"] else "SQLite")
     app.run(debug=True, host="0.0.0.0", port=port)
+
 
