@@ -1,3 +1,4 @@
+<!-- templates/views/chat.html -->
 <div class="welcome-section" id="welcome-section">
   <h1 class="main-heading">What can I help with?</h1>
 
@@ -6,14 +7,17 @@
       <div class="suggestion-icon"></div>
       <div class="suggestion-text">Create a schedule</div>
     </div>
+
     <div class="suggestion-card" onclick="useSuggestion('Write Python code to sort a list')">
       <div class="suggestion-icon"></div>
       <div class="suggestion-text">Write code</div>
     </div>
+
     <div class="suggestion-card" onclick="useSuggestion('Explain machine learning concepts in simple terms')">
       <div class="suggestion-icon"></div>
       <div class="suggestion-text">Learn AI concepts</div>
     </div>
+
     <div class="suggestion-card" onclick="useSuggestion('Help me write a creative story')">
       <div class="suggestion-icon"></div>
       <div class="suggestion-text">Write a story</div>
@@ -22,21 +26,3 @@
 </div>
 
 <div id="messages-container"></div>
-
-<div class="input-wrapper">
-  <div class="input-box">
-    <div class="input-inner">
-      <textarea id="chat-input" placeholder="Ask anything..." rows="1"></textarea>
-      <button class="send-button" id="send-btn" onclick="sendMessage()" aria-label="Send">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
-        </svg>
-      </button>
-    </div>
-    <div class="input-footer">
-      <span class="footer-text">
-        <span id="model-info">GPT-3.5 Turbo</span> · NexaAI can make mistakes. Check important info.
-      </span>
-    </div>
-  </div>
-</div>
