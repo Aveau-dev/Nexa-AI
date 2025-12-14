@@ -21,11 +21,8 @@ window.Settings = (function () {
   }
 
   function load() {
-    try {
-      return JSON.parse(localStorage.getItem(KEY) || "{}");
-    } catch (_) {
-      return {};
-    }
+    try { return JSON.parse(localStorage.getItem(KEY) || "{}"); }
+    catch (_) { return {}; }
   }
 
   function saveObj(obj) {
@@ -33,7 +30,6 @@ window.Settings = (function () {
   }
 
   function apply(compact) {
-    // uses the CSS block "ULTRA COMPACT MODE" if you add a class hook
     document.body.classList.toggle("ultra-compact", !!compact);
   }
 
