@@ -1,37 +1,43 @@
-<!-- templates/views/projects.html -->
-<div class="projects-view">
+<!-- PROJECTS VIEW -->
+<section class="view" data-view="projects">
+  <div class="welcome-section">
+    <h1 class="main-heading">Projects</h1>
+    <p class="footer-text">Group chats and notes by project (client-side UI scaffold).</p>
 
-    <div class="view-header">
-        <h2>Projects</h2>
-        <button class="btn-primary" onclick="Projects.create()">+ New Project</button>
+    <div class="suggestion-cards" style="margin-top: 1rem;">
+      <div class="suggestion-card" onclick="Projects.openCreate()">
+        <div class="suggestion-text">Create project</div>
+      </div>
+      <div class="suggestion-card" onclick="Projects.refresh()">
+        <div class="suggestion-text">Refresh list</div>
+      </div>
+      <div class="suggestion-card" onclick="Router.go('chat')">
+        <div class="suggestion-text">Back to chat</div>
+      </div>
+      <div class="suggestion-card" onclick="alert('Connect projects to chats in DB if needed')">
+        <div class="suggestion-text">How it works</div>
+      </div>
     </div>
+  </div>
 
-    <div id="projects-list" class="projects-grid">
-        <div class="loading">Loading projects…</div>
+  <div class="message-row assistant-row" id="projects-create" style="display:none;">
+    <div class="message assistant-message">
+      <div class="avatar">N</div>
+      <div class="message-content">
+        <div class="model-badge">Create project</div>
+        <div class="message-text markdown-content">
+          <div style="display:grid; gap:0.75rem;">
+            <input id="project-name" class="form-input" placeholder="Project name" />
+            <textarea id="project-desc" class="form-input" rows="4" placeholder="Description (optional)"></textarea>
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+              <button class="nav-button primary" type="button" onclick="Projects.create()">Create</button>
+              <button class="nav-button secondary" type="button" onclick="Projects.closeCreate()">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
+  </div>
 
-    <!-- Project Detail Drawer -->
-    <div id="project-detail" class="project-detail hidden">
-        <div class="project-detail-header">
-            <h3 id="project-title"></h3>
-            <button onclick="Projects.closeDetail()" class="btn-outline">Close</button>
-        </div>
-
-        <div class="project-section">
-            <h4>Reference Files</h4>
-            <button class="btn-outline" onclick="Projects.triggerFileUpload()">Upload File</button>
-            <input type="file" id="project-file-input" style="display:none" onchange="Projects.uploadFile(event)">
-            <div id="project-files"></div>
-        </div>
-
-        <div class="project-section">
-            <h4>Project Chats</h4>
-            <div id="project-chats" class="project-chats"></div>
-        </div>
-    </div>
-
-</div>
-
-<script>
-    UI.enableGlobalInput(false);
-</script>
+  <div id="projects-list" class="message-row assistant-row"></div>
+</section>
