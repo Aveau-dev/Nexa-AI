@@ -1,20 +1,49 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <meta name="google-site-verification" content="1xRfZx8fEbwT18xMYj4l1UFl5jRckIrbs2uk4STqF6Y" />
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>NexaAI - Dashboard</title>
+
+  <title>NexaAI – Dashboard</title>
+  <meta name="description" content="NexaAI dashboard: multi-model AI chat with saved history, file uploads, and premium tools." />
+  <meta name="keywords" content="AI, NexaAI, chatbot, GPT-4, Claude, Gemini, DeepSeek, OpenRouter, AI assistant" />
+  <link rel="canonical" href="https://nexaai.js.org/dashboard" />
+  <meta name="robots" content="index, follow" />
+
+  <!-- Same favicon pattern as index.html -->
+  <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2319c37d' d='M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z'/></svg>">
+
+  <!-- Open Graph / Twitter -->
+  <meta property="og:title" content="NexaAI – Dashboard" />
+  <meta property="og:description" content="Your NexaAI workspace with chat history and multiple AI models." />
+  <meta property="og:url" content="https://nexaai.js.org/dashboard" />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="https://nexaai.js.org/static/og-image.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="NexaAI – Dashboard" />
+  <meta name="twitter:description" content="A modern, privacy-friendly AI dashboard with saved chat history." />
+  <meta name="twitter:image" content="https://nexaai.js.org/static/og-image.png" />
 
   <!-- Your CSS -->
   <link rel="stylesheet" href="{{ url_for('static', filename='Css/style.css') }}" />
 
-  <!-- Highlight.js for code -->
+  <!-- Markdown + syntax highlighting -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <link rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 
-  <!-- Marked for markdown rendering -->
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- Polyfills (same as index.html) -->
+  <script>
+    if(!window.Promise){
+      document.write('<script src="https://cdn.jsdelivr.net/npm/promise-polyfill@8/dist/polyfill.min.js"><\/script>');
+    }
+    if(!window.fetch){
+      document.write('<script src="https://cdn.jsdelivr.net/npm/whatwg-fetch@3.6.2/dist/fetch.umd.js"><\/script>');
+    }
+  </script>
 </head>
 
 <body>
@@ -43,7 +72,7 @@
 
       <!-- Model selector button -->
       <button class="model-selector-btn" onclick="ModelSelector.toggle()">
-        <span id="selected-model-name">{{ session.get('selectedmodel', 'gpt-3.5-turbo') }}</span>
+        <span id="selected-model-name">{{ session.get('selected_model', 'gpt-3.5-turbo') }}</span>
         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
           <path d="M7 10l5 5 5-5z"></path>
         </svg>
@@ -51,7 +80,7 @@
     </div>
 
     <div class="nav-right">
-      {% if not user.ispremium %}
+      {% if not user.is_premium %}
         <button class="nav-button upgrade-btn" onclick="location.href='{{ url_for('checkout') }}'">
           <span>Upgrade</span>
         </button>
@@ -60,13 +89,13 @@
       {% endif %}
 
       <button class="nav-button icon-only" onclick="UI.toggleUserMenu()">
-        <div class="user-avatar">{{ user.name[0].upper() }}</div>
+        <div class="user-avatar">{{ (user.name or 'U')[0].upper() }}</div>
       </button>
     </div>
   </nav>
 
   <!-- Model Selector Dropdown -->
-  <div id="model-selector" class="model-selector-dropdown">
+  <div id="model-selector" class="model-selector-dropdown" style="display:none;">
     <div class="model-selector-header">
       <h3>Select AI Model</h3>
       <button class="close-selector" onclick="ModelSelector.toggle()">
@@ -106,13 +135,13 @@
   </div>
 
   <!-- User Menu -->
-  <div id="user-menu" class="dropdown-menu">
+  <div id="user-menu" class="dropdown-menu" style="display:none;">
     <div class="menu-header">
-      <div class="user-avatar-large">{{ user.name[0].upper() }}</div>
+      <div class="user-avatar-large">{{ (user.name or 'U')[0].upper() }}</div>
       <div class="user-info">
         <div class="user-name">{{ user.name }}</div>
         <div class="user-email">{{ user.email }}</div>
-        {% if user.ispremium %}
+        {% if user.is_premium %}
           <div class="premium-badge-small">Premium Member</div>
         {% else %}
           <div class="free-badge-small">Free Account</div>
@@ -120,7 +149,7 @@
       </div>
     </div>
     <div class="menu-divider"></div>
-    {% if not user.ispremium %}
+    {% if not user.is_premium %}
       <a href="{{ url_for('checkout') }}" class="menu-item">Upgrade to Premium</a>
       <div class="menu-divider"></div>
     {% endif %}
@@ -164,9 +193,9 @@
         <div class="usage-info">
           <div class="usage-item">
             <span class="usage-label">DeepSeek Today</span>
-            <span class="usage-value">{{ user.deepseekcount }}/50</span>
+            <span class="usage-value" id="deepseek-usage">{{ user.deepseek_count }}/50</span>
           </div>
-          {% if not user.ispremium %}
+          {% if not user.is_premium %}
             <div class="upgrade-cta-small">
               <a href="{{ url_for('checkout') }}">Upgrade for unlimited access →</a>
             </div>
@@ -201,7 +230,7 @@
       </div>
       <div class="input-footer">
         <span class="footer-text">
-          <span id="model-info">{{ session.get('selectedmodel', 'gpt-3.5-turbo') }}</span>
+          <span id="model-info">{{ session.get('selected_model', 'gpt-3.5-turbo') }}</span>
           · NexaAI can make mistakes. Check important info.
         </span>
       </div>
@@ -209,19 +238,16 @@
   </div>
 
   <!-- JS: load your modules from static/js -->
-<script src="{{ url_for('static', filename='js/ui.js') }}"></script>
-<script src="{{ url_for('static', filename='js/router.js') }}"></script>
-<script src="{{ url_for('static', filename='js/model-selector.js') }}"></script>
-<script src="{{ url_for('static', filename='js/chat.js') }}"></script>
-<script src="{{ url_for('static', filename='js/files.js') }}"></script>
-<script src="{{ url_for('static', filename='js/memory.js') }}"></script>
-<script src="{{ url_for('static', filename='js/projects.js') }}"></script>
-<script src="{{ url_for('static', filename='js/canvas.js') }}"></script>
-<script src="{{ url_for('static', filename='js/voice.js') }}"></script>
-<script src="{{ url_for('static', filename='js/settings.js') }}"></script>
-<script src="{{ url_for('static', filename='js/main.js') }}"></script>
-
-
+  <script src="{{ url_for('static', filename='js/ui.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/router.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/model-selector.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/files.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/memory.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/projects.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/canvas.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/voice.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 
   <!-- Boot: start on chat -->
@@ -232,4 +258,3 @@
   </script>
 </body>
 </html>
-
