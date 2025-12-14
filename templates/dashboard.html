@@ -1,3 +1,4 @@
+<!-- templates/dashboard.html - COMPLETE COMBINED FIXED VERSION (Your dashboard + chat.js wiring) -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -26,7 +27,7 @@
   <meta name="twitter:description" content="A modern, privacy-friendly AI dashboard with saved chat history." />
   <meta name="twitter:image" content="https://nexaai.js.org/static/og-image.png" />
 
-  <!-- Your CSS -->
+  <!-- Your CSS (keep your folder name if it's really Css/) -->
   <link rel="stylesheet" href="{{ url_for('static', filename='Css/style.css') }}" />
 
   <!-- Markdown + syntax highlighting -->
@@ -44,35 +45,44 @@
       document.write('<script src="https://cdn.jsdelivr.net/npm/whatwg-fetch@3.6.2/dist/fetch.umd.js"><\/script>');
     }
   </script>
+
+  <!-- IMPORTANT: expose initial model for chat.js -->
+  <script>
+    window.NEXAAI = window.NEXAAI || {};
+    window.NEXAAI.initialModelKey = "{{ session.get('selected_model', 'gemini-flash') }}";
+    window.NEXAAI.initialModelName = "{{ session.get('selected_model_name', 'Gemini 2.5 Flash') }}";
+  </script>
 </head>
 
 <body>
   <!-- Top Navigation -->
   <nav class="top-nav">
     <div class="nav-left">
-      <button class="nav-button icon-only" id="sidebar-toggle" onclick="UI.toggleSidebar()">
+      <!-- COMBINED: use global toggleSidebar() from chat.js -->
+      <button class="nav-button icon-only" id="sidebar-toggle" onclick="toggleSidebar()">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
           <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"></path>
         </svg>
       </button>
 
-      <button class="nav-button" onclick="Chat.newChat()">
+      <!-- COMBINED: use global newChat() from chat.js -->
+      <button class="nav-button" onclick="newChat()">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
           <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path>
         </svg>
         <span>New chat</span>
       </button>
 
-      <div class="logo-container" style="cursor:pointer;" onclick="Router.go('chat')">
+      <div class="logo-container" style="cursor:pointer;" onclick="Router && Router.go ? Router.go('chat') : void 0">
         <svg class="logo-icon" viewBox="0 0 24 24" width="20" height="20">
           <path fill="currentColor" d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"></path>
         </svg>
         <span class="logo-text">NexaAI</span>
       </div>
 
-      <!-- Model selector button -->
-      <button class="model-selector-btn" onclick="ModelSelector.toggle()">
-        <span id="selected-model-name">{{ session.get('selected_model', 'gpt-3.5-turbo') }}</span>
+      <!-- COMBINED: use global toggleModelSelector()/selectModel() from chat.js -->
+      <button class="model-selector-btn" onclick="toggleModelSelector()">
+        <span id="selected-model-name">{{ session.get('selected_model_name', 'Gemini 2.5 Flash') }}</span>
         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
           <path d="M7 10l5 5 5-5z"></path>
         </svg>
@@ -88,7 +98,8 @@
         <div class="premium-badge-nav">Premium</div>
       {% endif %}
 
-      <button class="nav-button icon-only" onclick="UI.toggleUserMenu()">
+      <!-- COMBINED: use global toggleUserMenu() from chat.js -->
+      <button class="nav-button icon-only" onclick="toggleUserMenu()">
         <div class="user-avatar">{{ (user.name or 'U')[0].upper() }}</div>
       </button>
     </div>
@@ -98,7 +109,7 @@
   <div id="model-selector" class="model-selector-dropdown" style="display:none;">
     <div class="model-selector-header">
       <h3>Select AI Model</h3>
-      <button class="close-selector" onclick="ModelSelector.toggle()">
+      <button class="close-selector" onclick="toggleModelSelector()">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
           <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path>
         </svg>
@@ -113,9 +124,9 @@
         </div>
 
         {% for model_key, model_data in models.items() %}
-          <div class="model-card"
+          <div class="model-card {% if session.get('selected_model', 'gemini-flash') == model_key %}active{% endif %}"
                data-model="{{ model_key }}"
-               onclick="ModelSelector.select('{{ model_key }}','{{ model_data.get('name', model_key) }}', {{ 'true' if model_data.get('vision') else 'false' }})">
+               onclick="selectModel('{{ model_key }}','{{ model_data.get('name', model_key) }}')">
             <div class="model-card-header">
               <div class="model-icon"><span class="icon-text">AI</span></div>
               <div class="model-info">
@@ -162,14 +173,19 @@
       <div class="sidebar-section">
         <div class="section-title">Chat History</div>
 
-        <div class="chat-history">
+        <!-- IMPORTANT: add id="chat-history" for chat.js upsert -->
+        <div class="chat-history" id="chat-history">
           {% if chats %}
             {% for chat in chats %}
-              <div class="chat-item" data-chat-id="{{ chat.id }}" onclick="Chat.loadChat({{ chat.id }})">
+              <div class="chat-item" data-chat-id="{{ chat.id }}" onclick="loadChat({{ chat.id }})">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                   <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"></path>
                 </svg>
                 <span class="chat-title">{{ chat.title }}</span>
+                <div class="chat-actions">
+                  <button class="icon-btn" title="Rename" onclick="event.stopPropagation(); renameChat({{ chat.id }})"></button>
+                  <button class="icon-btn" title="Delete" onclick="event.stopPropagation(); deleteChat({{ chat.id }})"></button>
+                </div>
               </div>
             {% endfor %}
           {% else %}
@@ -177,7 +193,7 @@
           {% endif %}
         </div>
 
-        <!-- App sections (views) -->
+        <!-- Workspace (keeps your Router.go links) -->
         <div class="section-title" style="margin-top:1rem;">Workspace</div>
         <div class="chat-history">
           <div class="chat-item" onclick="Router.go('files')"><span class="chat-title">Files</span></div>
@@ -210,38 +226,53 @@
   <!-- Main Content -->
   <div class="main-container with-sidebar" id="main-content">
     <div class="center-content" id="view-container">
-      <!-- Router injects templates/views/*.html here -->
-      <div class="welcome-section">
-        <h1 class="main-heading">Loading...</h1>
+      <!-- Chat view (default) -->
+      <div id="welcome-section" class="welcome-section" style="display:block;">
+        <h1 class="main-heading">What can I help with?</h1>
       </div>
+
+      <!-- IMPORTANT: chat.js needs this id -->
+      <div id="messages-container"></div>
     </div>
   </div>
 
-  <!-- Input (stays in dashboard shell so it never disappears) -->
-  <div class="input-wrapper" id="chat-input-wrapper" style="display:none;">
+  <!-- Input (dashboard shell) -->
+  <div class="input-wrapper" id="chat-input-wrapper" style="display:block;">
     <div class="input-box">
       <div class="input-inner">
+
+        <!-- NEW: DeepThink + Web toggles (chat.js reads these ids) -->
+        <div class="chat-toggles">
+          <button id="btn-deepthink" class="toggle-btn" onclick="toggleDeepThink()" type="button">DeepThink: Off</button>
+          <button id="btn-web" class="toggle-btn" onclick="toggleWeb()" type="button">Web: Off</button>
+        </div>
+
         <textarea id="chat-input" placeholder="Ask anything..." rows="1"></textarea>
-        <button class="send-button" onclick="Chat.sendMessage()" id="send-btn">
+
+        <button class="send-button" onclick="sendMessage()" id="send-btn">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
             <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
           </svg>
         </button>
       </div>
+
       <div class="input-footer">
         <span class="footer-text">
-          <span id="model-info">{{ session.get('selected_model', 'gpt-3.5-turbo') }}</span>
+          <span id="model-info">{{ session.get('selected_model_name', 'Gemini 2.5 Flash') }}</span>
           · NexaAI can make mistakes. Check important info.
         </span>
       </div>
     </div>
   </div>
 
-  <!-- JS: load your modules from static/js -->
+  <!-- Your JS modules (kept) -->
   <script src="{{ url_for('static', filename='js/ui.js') }}"></script>
   <script src="{{ url_for('static', filename='js/router.js') }}"></script>
   <script src="{{ url_for('static', filename='js/model-selector.js') }}"></script>
+
+  <!-- IMPORTANT: chat.js provides toggleSidebar/toggleUserMenu/toggleModelSelector/selectModel/newChat/loadChat/sendMessage -->
   <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+
   <script src="{{ url_for('static', filename='js/files.js') }}"></script>
   <script src="{{ url_for('static', filename='js/memory.js') }}"></script>
   <script src="{{ url_for('static', filename='js/projects.js') }}"></script>
@@ -250,7 +281,7 @@
   <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 
-  <!-- Boot: start on chat -->
+  <!-- Boot -->
   <script>
     document.addEventListener("DOMContentLoaded", function () {
       if (window.Router && Router.go) Router.go("chat");
