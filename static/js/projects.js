@@ -18,16 +18,10 @@ window.Projects = (function () {
   function create() {
     const name = (document.getElementById("project-name")?.value || "").trim();
     const desc = (document.getElementById("project-desc")?.value || "").trim();
-    if (!name) return alert("Project name required.");
+    if (!name) return alert("Project name is required.");
 
     projects.unshift({ id: Date.now(), name, desc });
     closeCreate();
-
-    const n = document.getElementById("project-name");
-    const d = document.getElementById("project-desc");
-    if (n) n.value = "";
-    if (d) d.value = "";
-
     render();
   }
 
@@ -47,31 +41,27 @@ window.Projects = (function () {
           <div class="avatar">N</div>
           <div class="message-content">
             <div class="model-badge">Projects</div>
-            <div class="message-text markdown-content">No projects yet.</div>
+            <div class="message-text markdown-content">No projects yet (placeholder).</div>
           </div>
         </div>
       `;
       return;
     }
 
-    list.innerHTML = projects
-      .map(
-        (p) => `
-        <div class="message assistant-message" style="width:100%; max-width:48rem; margin-bottom:0.75rem;">
-          <div class="avatar">N</div>
-          <div class="message-content">
-            <div class="model-badge">${UI.escapeHtml(p.name)}</div>
-            <div class="message-text markdown-content">
-              <div>${UI.escapeHtml(p.desc || "No description")}</div>
-              <div style="margin-top:0.75rem; display:flex; gap:0.5rem;">
-                <button class="nav-button secondary" onclick="Projects.remove(${p.id})">Delete</button>
-              </div>
+    list.innerHTML = projects.map(p => `
+      <div class="message assistant-message" style="width:100%; max-width:48rem; margin-bottom:0.75rem;">
+        <div class="avatar">N</div>
+        <div class="message-content">
+          <div class="model-badge">${UI.escapeHtml(p.name)}</div>
+          <div class="message-text markdown-content">
+            <div>${UI.escapeHtml(p.desc || "No description")}</div>
+            <div style="margin-top:0.75rem;">
+              <button class="nav-button secondary" onclick="Projects.remove(${p.id})">Delete</button>
             </div>
           </div>
         </div>
-      `
-      )
-      .join("");
+      </div>
+    `).join("");
   }
 
   function refresh() {
