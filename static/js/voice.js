@@ -1,80 +1,51 @@
-/* static/js/voice.js
-   Voice mode using Web Speech API
-   - Starts/stops recognition
-   - Streams transcript to #voice-transcript
-*/
-
-const Voice = (function () {
+window.Voice = (function () {
   let recognition = null;
-  let running = false;
-  const transcriptElId = "voice-transcript";
-  const logElId = "voice-logs";
+  let listening = false;
 
-  function init() {
-    // populate device list (if desired)
-    if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
-      appendLog("Speech recognition not supported in this browser");
-      return;
-    }
-    const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
-    recognition = new Rec();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = "en-US";
-
-    recognition.onresult = (ev) => {
-      let interim = "";
-      let final = "";
-      for (let i = ev.resultIndex; i < ev.results.length; ++i) {
-        const r = ev.results[i];
-        if (r.isFinal) final += r[0].transcript;
-        else interim += r[0].transcript;
-      }
-      const el = document.getElementById(transcriptElId);
-      if (el) el.textContent = final + interim;
-    };
-
-    recognition.onerror = (e) => {
-      appendLog("Recognition error: " + e.error);
-    };
-
-    recognition.onend = () => {
-      running = false;
-      appendLog("Recognition stopped");
-    };
-
-    appendLog("Voice initialized");
+  function onViewLoaded() {
+    setStatus("Microphone: ready (browser support required).");
   }
 
-  function appendLog(msg) {
-    const el = document.getElementById(logElId);
-    if (!el) return;
-    const d = document.createElement("div");
-    d.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-    el.prepend(d);
+  function setStatus(msg) {
+    const el = document.getElementById("voice-status");
+    if (el) el.textContent = msg;
   }
 
   function start() {
-    if (!recognition) init();
-    try {
-      recognition.start();
-      running = true;
-      appendLog("Listening...");
-    } catch (e) {
-      appendLog("Start error: " + e.message);
-    }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return alert("SpeechRecognition not supported in this browser.");
+
+    recognition = new SR();
+    recognition.lang = "en-US";
+    recognition.interimResults = true;
+
+    recognition.onresult = (e) => {
+      let text = "";
+      for (let i = 0; i < e.results.length; i++) text += e.results[i][0].transcript;
+      const ta = document.getElementById("voice-transcript");
+      if (ta) ta.value = text;
+    };
+
+    recognition.onerror = () => setStatus("Microphone: error.");
+    recognition.onend = () => {
+      listening = false;
+      setStatus("Microphone: stopped.");
+    };
+
+    listening = true;
+    recognition.start();
+    setStatus("Microphone: listening...");
   }
 
   function stop() {
-    if (!recognition) return;
-    recognition.stop();
-    running = false;
-    appendLog("Stopped");
+    if (recognition && listening) recognition.stop();
   }
 
-  return {
-    init, start, stop
-  };
-})();
+  function sendToChat() {
+    const text = (document.getElementById("voice-transcript")?.value || "").trim();
+    if (!text) return alert("Transcript is empty.");
+    Router.go("chat").then(() => Chat.useSuggestion(text));
+  }
 
-window.Voice = Voice;
+  return { onViewLoaded, start, stop, sendToChat };
+})();
