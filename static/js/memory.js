@@ -9,8 +9,7 @@ window.Memory = (function () {
 
   function updateStatus(msg) {
     const el = document.getElementById("memory-status");
-    if (!el) return;
-    el.textContent = msg || `Memory is ${enabled ? "enabled" : "disabled"}.`;
+    if (el) el.textContent = msg || `Memory is ${enabled ? "enabled" : "disabled"} (placeholder UI).`;
   }
 
   function setEnabled(v) {
@@ -27,17 +26,17 @@ window.Memory = (function () {
 
   function save() {
     const text = document.getElementById("memory-text")?.value || "";
-    updateStatus("Saved (client-side placeholder).");
     const items = document.getElementById("memory-items");
-    if (items) items.textContent = text ? `Saved memory:\n${text}` : "No memory saved.";
+    if (items) items.textContent = text ? `Saved (placeholder):\n${text}` : "No saved memory.";
+    updateStatus("Saved (placeholder).");
   }
 
   function clear() {
     const ta = document.getElementById("memory-text");
     if (ta) ta.value = "";
     const items = document.getElementById("memory-items");
-    if (items) items.textContent = "No memory saved.";
-    updateStatus("Cleared (client-side placeholder).");
+    if (items) items.textContent = "No saved memory.";
+    updateStatus("Cleared (placeholder).");
   }
 
   function refresh() {
