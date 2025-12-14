@@ -29,17 +29,13 @@ window.Canvas = (function () {
       ctx.stroke();
     });
 
-    canvas.addEventListener("pointerup", () => {
+    const end = () => {
       if (!drawing) return;
       drawing = false;
       saveState(canvas);
-    });
-
-    canvas.addEventListener("pointerleave", () => {
-      if (!drawing) return;
-      drawing = false;
-      saveState(canvas);
-    });
+    };
+    canvas.addEventListener("pointerup", end);
+    canvas.addEventListener("pointerleave", end);
 
     saveState(canvas);
     setStatus("Ready.");
@@ -47,7 +43,10 @@ window.Canvas = (function () {
 
   function getPos(canvas, e) {
     const r = canvas.getBoundingClientRect();
-    return { x: (e.clientX - r.left) * (canvas.width / r.width), y: (e.clientY - r.top) * (canvas.height / r.height) };
+    return {
+      x: (e.clientX - r.left) * (canvas.width / r.width),
+      y: (e.clientY - r.top) * (canvas.height / r.height),
+    };
   }
 
   function saveState(canvas) {
@@ -57,25 +56,13 @@ window.Canvas = (function () {
     } catch (_) {}
   }
 
-  function restore(canvas, dataUrl) {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0);
-        resolve();
-      };
-      img.src = dataUrl;
-    });
-  }
-
   function setBrush(v) {
     brushSize = Number(v) || brushSize;
     setStatus(`Brush: ${brushSize}px`);
   }
 
-  function setColor(c) {
-    brushColor = c || brushColor;
+  function setColor(v) {
+    brushColor = v || brushColor;
     setStatus(`Color: ${brushColor}`);
   }
 
@@ -93,8 +80,14 @@ window.Canvas = (function () {
 
     if (history.length <= 1) return setStatus("Nothing to undo.");
     history.pop();
-    await restore(canvas, history[history.length - 1]);
-    setStatus("Undo.");
+
+    const img = new Image();
+    img.onload = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+      setStatus("Undo.");
+    };
+    img.src = history[history.length - 1];
   }
 
   function exportPng() {
