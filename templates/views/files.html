@@ -1,36 +1,40 @@
-<!-- templates/views/files.html -->
-<div class="files-view">
+<!-- FILES VIEW -->
+<section class="view" data-view="files">
+  <div class="welcome-section">
+    <h1 class="main-heading">Files</h1>
+    <p class="footer-text">Upload and manage your files. Attach images to vision-capable models.</p>
 
-    <div class="view-header">
-        <h2>Files</h2>
-        <button onclick="Files.uploadDialog()" class="btn-primary">Upload File</button>
+    <div class="suggestion-cards" style="margin-top: 1rem;">
+      <div class="suggestion-card" onclick="Files.openPicker()">
+        <div class="suggestion-text">Upload a file</div>
+      </div>
+      <div class="suggestion-card" onclick="Files.refresh()">
+        <div class="suggestion-text">Refresh list</div>
+      </div>
+      <div class="suggestion-card" onclick="Router.go('chat')">
+        <div class="suggestion-text">Back to chat</div>
+      </div>
+      <div class="suggestion-card" onclick="alert('Tip: Use image uploads for vision models')">
+        <div class="suggestion-text">How to use</div>
+      </div>
     </div>
+  </div>
 
-    <input type="file" id="file-upload-input" style="display:none" onchange="Files.upload(event)" />
+  <!-- Hidden file input that Files.js can use -->
+  <input id="file-input" type="file" style="display:none;" />
 
-    <div class="files-layout">
-        <!-- Left: list -->
-        <div id="files-list" class="files-list">
-            <div class="loading">Loading files…</div>
+  <div class="message-row assistant-row">
+    <div class="message assistant-message">
+      <div class="avatar">N</div>
+      <div class="message-content">
+        <div class="model-badge">Files</div>
+        <div class="message-text markdown-content" id="files-status">
+          Select a file to upload. After upload, it can be attached to your next chat message.
         </div>
-
-        <!-- Right: viewer -->
-        <div id="file-viewer" class="file-viewer hidden">
-            <h3 id="file-name"></h3>
-            <div id="file-preview" class="file-preview"></div>
-
-            <h3>AI Analysis</h3>
-            <div id="file-analysis" class="analysis-box">Select "Analyze" to process file…</div>
-
-            <div class="file-actions">
-                <button onclick="Files.analyze()" class="btn-outline">Analyze</button>
-                <button onclick="Files.download()" class="btn-outline">Download</button>
-            </div>
-        </div>
+      </div>
     </div>
+  </div>
 
-</div>
-
-<script>
-    UI.enableGlobalInput(false);
-</script>
+  <!-- Files list container -->
+  <div id="files-list" class="message-row assistant-row"></div>
+</section>
