@@ -3,199 +3,102 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>NexaAI - Dashboard</title>
+  <title>NexaAI Dashboard</title>
 
-  <!-- IMPORTANT: use Css/style.css if your folder is static/Css -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='Css/style.css') }}" />
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- Highlight.js + Marked (same libs your old dashboard used) -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css" rel="stylesheet">
+
+  <!-- App CSS -->
+  <link rel="stylesheet" href="/static/Css/style.css">
 </head>
+<body class="bg-gray-100 h-screen overflow-hidden">
 
-<body>
-  <!-- Top Navigation Bar -->
-  <nav class="top-nav">
-    <div class="nav-left">
-      <button class="nav-button icon-only" id="sidebar-toggle" onclick="UI.toggleSidebar()">
-        <!-- menu icon -->
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-          <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"></path>
-        </svg>
-      </button>
+<!-- ========== MAIN LAYOUT ========== -->
+<div class="flex h-full">
 
-      <button class="nav-button" onclick="Chat.newChat()">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-          <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path>
-        </svg>
-        <span>New chat</span>
-      </button>
+  <!-- ========== SIDEBAR ========== -->
+  <aside class="w-64 bg-white border-r flex flex-col">
+    <div class="p-4 font-bold text-xl">NexaAI</div>
 
-      <div class="logo-container" onclick="Router.go('chat')" style="cursor:pointer;">
-        <svg class="logo-icon" viewBox="0 0 24 24" width="20" height="20">
-          <path fill="currentColor" d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"></path>
-        </svg>
-        <span class="logo-text">NexaAI</span>
-      </div>
+    <nav class="flex-1 px-2 space-y-1">
+      <button data-view="chat" class="nav-btn">💬 Chat</button>
+      <button data-view="projects" class="nav-btn">📁 Projects</button>
+      <button data-view="files" class="nav-btn">📎 Files</button>
+      <button data-view="memory" class="nav-btn">🧠 Memory</button>
+      <button data-view="canvas" class="nav-btn">📝 Canvas</button>
+      <button data-view="voice" class="nav-btn">🎤 Voice</button>
+      <button data-view="settings" class="nav-btn">⚙️ Settings</button>
+    </nav>
 
-      <button class="model-selector-btn" onclick="ModelSelector.toggle()">
-        <span id="selected-model-name">{{ session.get('selectedmodel', 'gpt-3.5-turbo') }}</span>
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-          <path d="M7 10l5 5 5-5z"></path>
-        </svg>
-      </button>
-    </div>
-
-    <div class="nav-right">
-      {% if not user.ispremium %}
-        <button class="nav-button upgrade-btn" onclick="location.href='{{ url_for('checkout') }}'">
-          <span>Upgrade</span>
-        </button>
-      {% else %}
-        <div class="premium-badge-nav">Premium</div>
-      {% endif %}
-
-      <button class="nav-button icon-only" onclick="UI.toggleUserMenu()">
-        <div class="user-avatar">{{ user.name[0].upper() }}</div>
-      </button>
-    </div>
-  </nav>
-
-  <!-- Model Selector Dropdown -->
-  <div id="model-selector" class="model-selector-dropdown">
-    <div class="model-selector-header">
-      <h3>Select AI Model</h3>
-      <button class="close-selector" onclick="ModelSelector.toggle()">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-          <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path>
-        </svg>
-      </button>
-    </div>
-
-    <div class="model-selector-content">
-      <div class="model-group">
-        <div class="model-group-header">
-          <span class="group-badge free">Free</span>
-          <span class="group-title">Available</span>
-        </div>
-
-        {% for model_key, model_data in models.items() %}
-          <div class="model-card"
-               data-model="{{ model_key }}"
-               onclick="ModelSelector.select('{{ model_key }}','{{ model_data.get('name','') }}', {{ 'true' if model_data.get('vision') else 'false' }})">
-            <div class="model-card-header">
-              <div class="model-icon"><span class="icon-text">AI</span></div>
-              <div class="model-info">
-                <h4 class="model-name">{{ model_data.get('name', model_key) }}</h4>
-                <div class="model-features">
-                  {% if model_data.get('vision') %}<span class="feature-badge vision">Vision</span>{% endif %}
-                  {% if model_data.get('limit') %}<span class="feature-badge limit">{{ model_data.get('limit') }}/day</span>{% endif %}
-                  <span class="feature-badge speed">Fast</span>
-                </div>
-              </div>
-            </div>
-            <div class="model-description">{{ model_data.get('description','') }}</div>
-          </div>
-        {% endfor %}
-      </div>
-    </div>
-  </div>
-
-  <!-- User Menu Dropdown -->
-  <div id="user-menu" class="dropdown-menu">
-    <div class="menu-header">
-      <div class="user-avatar-large">{{ user.name[0].upper() }}</div>
-      <div class="user-info">
-        <div class="user-name">{{ user.name }}</div>
-        <div class="user-email">{{ user.email }}</div>
-        {% if user.ispremium %}
-          <div class="premium-badge-small">Premium Member</div>
-        {% else %}
-          <div class="free-badge-small">Free Account</div>
-        {% endif %}
-      </div>
-    </div>
-    <div class="menu-divider"></div>
-    {% if not user.ispremium %}
-      <a href="{{ url_for('checkout') }}" class="menu-item">Upgrade to Premium</a>
-      <div class="menu-divider"></div>
-    {% endif %}
-    <a href="{{ url_for('logout') }}" class="menu-item">Log out</a>
-  </div>
-
-  <!-- Sidebar with Chat History -->
-  <aside class="sidebar" id="sidebar">
-    <div class="sidebar-content">
-      <div class="sidebar-section">
-        <div class="section-title">Chat History</div>
-
-        <div class="chat-history">
-          {% if chats %}
-            {% for chat in chats %}
-              <div class="chat-item" data-chat-id="{{ chat.id }}" onclick="Chat.loadChat({{ chat.id }})">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                  <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"></path>
-                </svg>
-                <span class="chat-title">{{ chat.title }}</span>
-              </div>
-            {% endfor %}
-          {% else %}
-            <div class="empty-state">No chats yet. Start a new conversation!</div>
-          {% endif %}
-        </div>
-      </div>
-
-      <div class="sidebar-footer">
-        <div class="usage-info">
-          <div class="usage-item">
-            <span class="usage-label">DeepSeek Today</span>
-            <span class="usage-value">{{ user.deepseekcount }}/50</span>
-          </div>
-          {% if not user.ispremium %}
-            <div class="upgrade-cta-small">
-              <a href="{{ url_for('checkout') }}">Upgrade for unlimited access →</a>
-            </div>
-          {% else %}
-            <div class="premium-info">Unlimited access enabled</div>
-          {% endif %}
-        </div>
-      </div>
+    <div class="p-4 border-t">
+      <div class="text-sm text-gray-600">Logged in as</div>
+      <div class="font-medium">{{ user.name }}</div>
+      <a href="/logout" class="text-red-500 text-sm mt-2 inline-block">Logout</a>
     </div>
   </aside>
 
-  <!-- Main Area -->
-  <div class="main-container with-sidebar" id="main-content">
-    <div class="center-content" id="view-container">
-      <!-- Router injects templates/views/*.html here -->
-    </div>
-  </div>
+  <!-- ========== MAIN CONTENT ========== -->
+  <main class="flex-1 flex flex-col">
 
-  <!-- Input Area (only for Chat view; router will show/hide) -->
-  <div class="input-wrapper" id="chat-input-wrapper" style="display:none;">
-    <div class="input-box">
-      <div class="input-inner">
-        <textarea id="chat-input" placeholder="Ask anything..." rows="1"></textarea>
-        <button class="send-button" onclick="Chat.sendMessage()" id="send-btn">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
-          </svg>
-        </button>
+    <!-- TOP BAR -->
+    <header class="bg-white border-b p-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <select id="modelSelect" class="border rounded px-2 py-1">
+          {% for key, model in models.items() %}
+          <option value="{{ key }}" {% if session.selected_model == key %}selected{% endif %}>
+            {{ model.name }}
+          </option>
+          {% endfor %}
+        </select>
       </div>
-      <div class="input-footer">
-        <span class="footer-text">
-          <span id="model-info">{{ session.get('selectedmodel', 'gpt-3.5-turbo') }}</span>
-          NexaAI can make mistakes. Check important info.
-        </span>
-      </div>
-    </div>
-  </div>
 
-  <!-- JS (static/js) -->
-  <script src="{{ url_for('static', filename='js/ui.js') }}"></script>
-  <script src="{{ url_for('static', filename='js/model-selector.js') }}"></script>
-  <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
-  <script src="{{ url_for('static', filename='js/router.js') }}"></script>
-  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+      {% if not user.is_premium %}
+      <a href="/checkout" class="bg-indigo-600 text-white px-4 py-1 rounded">Upgrade</a>
+      {% else %}
+      <span class="text-green-600 font-medium">Premium</span>
+      {% endif %}
+    </header>
+
+    <!-- VIEW CONTAINER -->
+    <section id="viewContainer" class="flex-1 overflow-auto p-4">
+      <!-- Dynamic views load here -->
+    </section>
+
+  </main>
+</div>
+
+<!-- ========== GLOBAL JS ========== -->
+<script src="/static/js/router.js"></script>
+<script src="/static/js/chat.js"></script>
+<script src="/static/js/projects.js"></script>
+<script src="/static/js/files.js"></script>
+<script src="/static/js/memory.js"></script>
+<script src="/static/js/settings.js"></script>
+
+<script>
+  // Sidebar navigation
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.classList.add('w-full','text-left','px-3','py-2','rounded','hover:bg-gray-100');
+    btn.addEventListener('click', () => {
+      loadView(btn.dataset.view)
+    })
+  })
+
+  // Load default view
+  loadView('chat')
+
+  // Model switch
+  document.getElementById('modelSelect').addEventListener('change', e => {
+    fetch('/set-model', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: e.target.value })
+    })
+  })
+</script>
+
 </body>
 </html>
