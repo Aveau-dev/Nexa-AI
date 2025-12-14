@@ -1,10 +1,15 @@
+/* static/js/chat.js - COMPLETE COMBINED FIXED VERSION (old chat.js + DeepThink/Web + session model persist) */
 /* global marked, hljs */
 (() => {
-  let currentModelKey = (window.NEXAAI && window.NEXAAI.initialModelKey) || "gpt-3.5-turbo";
-  let currentModelName = (window.NEXAAI && window.NEXAAI.initialModelName) || "GPT-3.5 Turbo";
+  let currentModelKey = (window.NEXAAI && window.NEXAAI.initialModelKey) || "gemini-flash";
+  let currentModelName = (window.NEXAAI && window.NEXAAI.initialModelName) || "Gemini 2.5 Flash";
 
   let currentChatId = null;
   let isLoading = false;
+
+  // NEW
+  let deepThinkEnabled = false;
+  let webEnabled = false;
 
   const els = {
     sidebar: () => document.getElementById("sidebar"),
@@ -18,6 +23,10 @@
     modelNameFooter: () => document.getElementById("model-info"),
     deepseekUsage: () => document.getElementById("deepseek-usage"),
     chatHistory: () => document.getElementById("chat-history"),
+
+    // NEW
+    btnDeepthink: () => document.getElementById("btn-deepthink"),
+    btnWeb: () => document.getElementById("btn-web"),
   };
 
   // ---- UI: sidebar/menu ----
@@ -46,6 +55,25 @@
     selector.style.display = (selector.style.display === "block") ? "none" : "block";
   };
 
+  // NEW: DeepThink/Web toggles
+  window.toggleDeepThink = function toggleDeepThink() {
+    deepThinkEnabled = !deepThinkEnabled;
+    const b = els.btnDeepthink();
+    if (b) {
+      b.textContent = deepThinkEnabled ? "DeepThink: On" : "DeepThink: Off";
+      b.classList.toggle("active", deepThinkEnabled);
+    }
+  };
+
+  window.toggleWeb = function toggleWeb() {
+    webEnabled = !webEnabled;
+    const b = els.btnWeb();
+    if (b) {
+      b.textContent = webEnabled ? "Web: On" : "Web: Off";
+      b.classList.toggle("active", webEnabled);
+    }
+  };
+
   // ---- Model selection ----
   window.selectModel = async function selectModel(modelKey, modelName) {
     currentModelKey = modelKey;
@@ -54,7 +82,6 @@
     if (els.modelNameTop()) els.modelNameTop().textContent = currentModelName;
     if (els.modelNameFooter()) els.modelNameFooter().textContent = currentModelName;
 
-    // highlight active card
     document.querySelectorAll(".model-card").forEach(card => card.classList.remove("active"));
     const active = document.querySelector(`[data-model="${CSS.escape(modelKey)}"]`);
     if (active) active.classList.add("active");
@@ -67,7 +94,7 @@
         body: JSON.stringify({ model: modelKey })
       });
     } catch (e) {
-      // ignore (UI still works)
+      // ignore
     }
 
     window.toggleModelSelector();
@@ -186,7 +213,7 @@
     } else {
       row.innerHTML = `
         <div class="message error-message">
-          <div class="message-content">⚠️ ${escapeHtml(text)}</div>
+          <div class="message-content">${escapeHtml(text)}</div>
         </div>
       `;
     }
@@ -211,7 +238,6 @@
     const history = els.chatHistory();
     if (!history) return;
 
-    // remove empty state
     const empty = history.querySelector(".empty-state");
     if (empty) empty.remove();
 
@@ -228,8 +254,8 @@
         </svg>
         <span class="chat-title"></span>
         <div class="chat-actions">
-          <button class="icon-btn" title="Rename">✎</button>
-          <button class="icon-btn" title="Delete">🗑</button>
+          <button class="icon-btn" title="Rename"></button>
+          <button class="icon-btn" title="Delete"></button>
         </div>
       `;
 
@@ -263,7 +289,8 @@
     try {
       const data = await apiJson("/chat/new", { method: "POST", headers: { "Content-Type": "application/json" } });
       currentChatId = data.chatid || data.chat_id;
-      els.messages().innerHTML = "";
+
+      if (els.messages()) els.messages().innerHTML = "";
       setWelcomeVisible(true);
 
       upsertChatInSidebar(currentChatId, data.title || "New Chat", true);
@@ -282,7 +309,7 @@
       const data = await apiJson(`/chat/${chatId}/messages`, { method: "GET" });
       currentChatId = chatId;
 
-      els.messages().innerHTML = "";
+      if (els.messages()) els.messages().innerHTML = "";
       setWelcomeVisible(false);
 
       (data.messages || []).forEach(m => addMessage(m.content, m.role, m.model));
@@ -328,7 +355,7 @@
 
       if (currentChatId === chatId) {
         currentChatId = null;
-        els.messages().innerHTML = "";
+        if (els.messages()) els.messages().innerHTML = "";
         setWelcomeVisible(true);
       }
     } catch (e) {
@@ -355,7 +382,15 @@
     showTypingIndicator();
 
     try {
-      const payload = { message, model: currentModelKey, chatid: currentChatId };
+      // NEW: deepthink + web flags added
+      const payload = {
+        message,
+        model: currentModelKey,
+        chatid: currentChatId,
+        deepthink: deepThinkEnabled,
+        web: webEnabled
+      };
+
       const data = await apiJson("/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -365,14 +400,12 @@
       removeTypingIndicator();
 
       if (data.image_url) {
-        // If backend returns image URL + text
         addMessage(data.response || "Image generated.", "assistant", data.model);
         addMessage(data.image_url, "assistant", "Image URL");
       } else {
         addMessage(data.response, "assistant", data.model);
       }
 
-      // ensure chat id and sidebar title are updated
       const newId = data.chatid || data.chat_id;
       if (newId) currentChatId = newId;
 
@@ -381,7 +414,7 @@
 
       if (data.deepseekremaining != null && els.deepseekUsage()) {
         const used = 50 - Number(data.deepseekremaining);
-        els.deepseekUsage().textContent = `${used} / 50`;
+        els.deepseekUsage().textContent = `${used}/50`;
       }
     } catch (e) {
       removeTypingIndicator();
@@ -443,10 +476,13 @@
     });
   }
 
-  // Init model labels (from server session)
   function initModelLabels() {
     if (els.modelNameTop()) els.modelNameTop().textContent = currentModelName;
     if (els.modelNameFooter()) els.modelNameFooter().textContent = currentModelName;
+
+    document.querySelectorAll(".model-card").forEach(card => card.classList.remove("active"));
+    const active = document.querySelector(`[data-model="${CSS.escape(currentModelKey)}"]`);
+    if (active) active.classList.add("active");
   }
 
   // Bootstrap
