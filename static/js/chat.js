@@ -4,7 +4,7 @@ window.Chat = (function () {
   let isLoading = false;
 
   function onViewLoaded() {
-    // Ensure textarea listeners exist (main.js also does this globally)
+    // Nothing heavy; view HTML must include #messages-container and optional #welcome-section
     const input = document.getElementById("chat-input");
     if (input) input.focus();
   }
@@ -74,16 +74,12 @@ window.Chat = (function () {
     try {
       const res = await fetch("/chat/new", { method: "POST" });
       const data = await res.json();
-
       currentChatId = data.chatid ?? data.chat_id ?? null;
 
-      // ensure we are on chat view
       await Router.go("chat");
 
-      // clear messages
       const container = document.getElementById("messages-container");
       if (container) container.innerHTML = "";
-
       setWelcomeVisible(true);
     } catch (e) {
       alert("Failed to create new chat.");
@@ -101,19 +97,14 @@ window.Chat = (function () {
 
       const res = await fetch(`/chat/${chatId}/messages`);
       const data = await res.json();
-
       currentChatId = chatId;
 
       const container = document.getElementById("messages-container");
       if (container) container.innerHTML = "";
 
       setWelcomeVisible(false);
+      (data.messages || []).forEach((m) => addMessage(m.content, m.role, m.model));
 
-      (data.messages || []).forEach((m) => {
-        addMessage(m.content, m.role, m.model);
-      });
-
-      // sidebar highlight
       document.querySelectorAll(".chat-item").forEach((el) => el.classList.remove("active"));
       const active = document.querySelector(`[data-chat-id="${chatId}"]`);
       if (active) active.classList.add("active");
@@ -139,38 +130,38 @@ window.Chat = (function () {
     input.style.height = "auto";
 
     try {
+      const body = {
+        message,
+        model: currentModelKey,
+        chatid: currentChatId,
+      };
+
+      // Attach file path if uploaded via Files module
+      if (window.Files && Files.getSelectedUploadPath) {
+        const p = Files.getSelectedUploadPath();
+        if (p) body.uploadedfile = p;
+      }
+
       const res = await fetch("/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message,
-          model: currentModelKey,
-          chatid: currentChatId,
-          uploadedfile: Files.getSelectedUploadPath ? Files.getSelectedUploadPath() : null,
-        }),
+        body: JSON.stringify(body),
       });
 
       const data = await res.json();
-
       if (data.error) {
         addMessage(data.error, "error");
         return;
       }
 
       addMessage(data.response, "assistant", data.model);
-
       currentChatId = data.chatid ?? data.chat_id ?? currentChatId;
 
-      // update DeepSeek usage if provided
-      if (data.deepseekremaining !== undefined && data.deepseekremaining !== null) {
-        const usageValue = document.querySelector(".usage-value");
-        if (usageValue) usageValue.textContent = `${50 - data.deepseekremaining}/50`;
-      }
+      // clear selected file after successful send
+      if (window.Files && Files.clearSelectedUpload) Files.clearSelectedUpload();
     } catch (e) {
       addMessage("Error connecting to AI. Please try again.", "error");
     } finally {
-      // once message is sent, clear selected upload
-      if (Files.clearSelectedUpload) Files.clearSelectedUpload();
       isLoading = false;
     }
   }
@@ -184,19 +175,11 @@ window.Chat = (function () {
     });
   }
 
-  // Backward compatibility for inline onclick in older templates
+  // optional: keep old inline onclick working
   window.newChat = newChat;
   window.loadChat = loadChat;
   window.sendMessage = sendMessage;
   window.useSuggestion = useSuggestion;
 
-  return {
-    onViewLoaded,
-    newChat,
-    loadChat,
-    sendMessage,
-    useSuggestion,
-    setModel,
-    setCurrentChatId: (id) => (currentChatId = id),
-  };
+  return { onViewLoaded, newChat, loadChat, sendMessage, useSuggestion, setModel };
 })();
