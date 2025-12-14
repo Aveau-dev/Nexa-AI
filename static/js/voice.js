@@ -13,7 +13,7 @@ window.Voice = (function () {
 
   function start() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) return alert("SpeechRecognition not supported in this browser.");
+    if (!SR) return alert("SpeechRecognition not supported.");
 
     recognition = new SR();
     recognition.lang = "en-US";
