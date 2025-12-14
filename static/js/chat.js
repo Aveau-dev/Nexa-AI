@@ -1,38 +1,156 @@
-window.Chat = (function () {
+/* global marked, hljs */
+(() => {
+  let currentModelKey = (window.NEXAAI && window.NEXAAI.initialModelKey) || "gpt-3.5-turbo";
+  let currentModelName = (window.NEXAAI && window.NEXAAI.initialModelName) || "GPT-3.5 Turbo";
+
   let currentChatId = null;
-  let currentModelKey = (document.getElementById("model-info")?.textContent || "gpt-3.5-turbo").trim();
   let isLoading = false;
 
-  function onViewLoaded() {
-    const input = document.getElementById("chat-input");
-    if (input) input.focus();
-  }
+  const els = {
+    sidebar: () => document.getElementById("sidebar"),
+    main: () => document.getElementById("main-content"),
+    userMenu: () => document.getElementById("user-menu"),
+    modelSelector: () => document.getElementById("model-selector"),
+    messages: () => document.getElementById("messages-container"),
+    welcome: () => document.getElementById("welcome-section"),
+    input: () => document.getElementById("chat-input"),
+    modelNameTop: () => document.getElementById("selected-model-name"),
+    modelNameFooter: () => document.getElementById("model-info"),
+    deepseekUsage: () => document.getElementById("deepseek-usage"),
+    chatHistory: () => document.getElementById("chat-history"),
+  };
 
-  function setModel(modelKey) {
+  // ---- UI: sidebar/menu ----
+  window.toggleSidebar = function toggleSidebar() {
+    const sidebar = els.sidebar();
+    const main = els.main();
+    if (!sidebar || !main) return;
+
+    if (window.innerWidth < 1024) {
+      sidebar.classList.toggle("show");
+    } else {
+      sidebar.classList.toggle("collapsed");
+      main.classList.toggle("sidebar-collapsed");
+    }
+  };
+
+  window.toggleUserMenu = function toggleUserMenu() {
+    const menu = els.userMenu();
+    if (!menu) return;
+    menu.style.display = (menu.style.display === "block") ? "none" : "block";
+  };
+
+  window.toggleModelSelector = function toggleModelSelector() {
+    const selector = els.modelSelector();
+    if (!selector) return;
+    selector.style.display = (selector.style.display === "block") ? "none" : "block";
+  };
+
+  // ---- Model selection ----
+  window.selectModel = async function selectModel(modelKey, modelName) {
     currentModelKey = modelKey;
+    currentModelName = modelName || modelKey;
+
+    if (els.modelNameTop()) els.modelNameTop().textContent = currentModelName;
+    if (els.modelNameFooter()) els.modelNameFooter().textContent = currentModelName;
+
+    // highlight active card
+    document.querySelectorAll(".model-card").forEach(card => card.classList.remove("active"));
+    const active = document.querySelector(`[data-model="${CSS.escape(modelKey)}"]`);
+    if (active) active.classList.add("active");
+
+    // persist in session on backend
+    try {
+      await fetch("/set-model", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: modelKey })
+      });
+    } catch (e) {
+      // ignore (UI still works)
+    }
+
+    window.toggleModelSelector();
+  };
+
+  // ---- Helpers ----
+  function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text == null ? "" : String(text);
+    return div.innerHTML;
   }
 
-  function setWelcomeVisible(visible) {
-    const welcome = document.getElementById("welcome-section");
-    if (welcome) welcome.style.display = visible ? "block" : "none";
-  }
-
-  function formatMarkdown(text) {
-    if (typeof marked === "undefined") return UI.escapeHtml(text);
+  function formatMessage(text) {
+    if (typeof marked === "undefined") return escapeHtml(text).replace(/\n/g, "<br>");
     marked.setOptions({
-      breaks: true,
-      gfm: true,
-      highlight: function (code, lang) {
-        if (typeof hljs === "undefined") return code;
-        if (lang && hljs.getLanguage(lang)) return hljs.highlight(code, { language: lang }).value;
-        return hljs.highlightAuto(code).value;
+      highlight(code, lang) {
+        if (typeof hljs !== "undefined" && lang && hljs.getLanguage(lang)) {
+          return hljs.highlight(code, { language: lang }).value;
+        }
+        return (typeof hljs !== "undefined") ? hljs.highlightAuto(code).value : code;
       },
+      breaks: true,
+      gfm: true
     });
     return marked.parse(text || "");
   }
 
-  function addMessage(text, role, modelName) {
-    const container = document.getElementById("messages-container");
+  function addCopyButtons(container) {
+    container.querySelectorAll("pre code").forEach((codeBlock) => {
+      const pre = codeBlock.parentElement;
+      if (!pre || pre.querySelector(".copy-code-btn")) return;
+
+      const btn = document.createElement("button");
+      btn.className = "copy-code-btn";
+      btn.textContent = "Copy";
+
+      btn.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(codeBlock.textContent);
+          btn.textContent = "Copied!";
+          setTimeout(() => (btn.textContent = "Copy"), 1200);
+        } catch (e) {
+          btn.textContent = "Failed";
+          setTimeout(() => (btn.textContent = "Copy"), 1200);
+        }
+      });
+
+      pre.style.position = "relative";
+      btn.style.position = "absolute";
+      btn.style.top = "8px";
+      btn.style.right = "8px";
+      pre.appendChild(btn);
+    });
+  }
+
+  function showTypingIndicator() {
+    const container = els.messages();
+    if (!container) return;
+
+    const typingDiv = document.createElement("div");
+    typingDiv.className = "message-row assistant-row typing-indicator";
+    typingDiv.id = "typing-indicator";
+    typingDiv.innerHTML = `
+      <div class="message assistant-message">
+        <div class="avatar">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"></path>
+          </svg>
+        </div>
+        <div class="typing-dots"><span></span><span></span><span></span></div>
+      </div>
+    `;
+    container.appendChild(typingDiv);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function removeTypingIndicator() {
+    const el = document.getElementById("typing-indicator");
+    if (el) el.remove();
+  }
+
+  function addMessage(text, role, modelNameForBadge) {
+    const container = els.messages();
     if (!container) return;
 
     const row = document.createElement("div");
@@ -41,246 +159,298 @@ window.Chat = (function () {
     if (role === "user") {
       row.innerHTML = `
         <div class="message user-message">
-          <div class="message-content">
-            <div class="message-text">${UI.escapeHtml(text)}</div>
-          </div>
-        </div>`;
+          <div class="message-content">${escapeHtml(text)}</div>
+        </div>
+      `;
     } else if (role === "assistant") {
       row.innerHTML = `
         <div class="message assistant-message">
-          <div class="avatar">N</div>
-          <div class="message-content">
-            ${modelName ? `<div class="model-badge">${UI.escapeHtml(modelName)}</div>` : ""}
-            <div class="message-text markdown-content">${formatMarkdown(text)}</div>
+          <div class="avatar">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"></path>
+            </svg>
           </div>
-        </div>`;
+          <div class="message-content">
+            ${modelNameForBadge ? `<div class="model-badge">${escapeHtml(modelNameForBadge)}</div>` : ""}
+            <div class="markdown-content"></div>
+          </div>
+        </div>
+      `;
+
+      const contentDiv = row.querySelector(".markdown-content");
+      contentDiv.innerHTML = formatMessage(text);
+      if (typeof hljs !== "undefined") {
+        contentDiv.querySelectorAll("pre code").forEach(block => hljs.highlightElement(block));
+      }
+      addCopyButtons(contentDiv);
     } else {
       row.innerHTML = `
         <div class="message error-message">
-          <div class="message-content">${UI.escapeHtml(text)}</div>
-        </div>`;
+          <div class="message-content">⚠️ ${escapeHtml(text)}</div>
+        </div>
+      `;
     }
 
     container.appendChild(row);
-    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+    container.scrollTop = container.scrollHeight;
   }
 
-  function ensureChatListEmptyStateRemoved() {
-    const history = document.querySelector(".chat-history");
-    if (!history) return;
-    const empty = history.querySelector(".empty-state");
-    if (empty) empty.remove();
+  function setWelcomeVisible(visible) {
+    const w = els.welcome();
+    if (!w) return;
+    w.style.display = visible ? "block" : "none";
   }
 
-  function addChatToSidebar(chatId, title, makeActive = true) {
-    const history = document.querySelector(".chat-history");
-    if (!history) return;
-
-    ensureChatListEmptyStateRemoved();
-
-    const item = document.createElement("div");
-    item.className = "chat-item";
-    item.setAttribute("data-chat-id", chatId);
-
-    item.innerHTML = `
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-        <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"></path>
-      </svg>
-      <span class="chat-title">${UI.escapeHtml(title || "New Chat")}</span>
-      <div class="chat-actions">
-        <button class="icon-btn" title="Rename" onclick="event.stopPropagation(); Chat.renameChat(${chatId});">✎</button>
-        <button class="icon-btn" title="Delete" onclick="event.stopPropagation(); Chat.deleteChat(${chatId});">🗑</button>
-      </div>
-    `;
-
-    item.onclick = () => loadChat(chatId);
-
-    // prepend
-    history.insertBefore(item, history.firstChild);
-
-    if (makeActive) setActiveChat(chatId);
-  }
-
-  function setActiveChat(chatId) {
-    document.querySelectorAll(".chat-item").forEach((el) => el.classList.remove("active"));
+  function setActiveChatInSidebar(chatId) {
+    document.querySelectorAll(".chat-item").forEach(el => el.classList.remove("active"));
     const active = document.querySelector(`[data-chat-id="${chatId}"]`);
     if (active) active.classList.add("active");
   }
 
-  async function newChat() {
+  function upsertChatInSidebar(chatId, title, prepend) {
+    const history = els.chatHistory();
+    if (!history) return;
+
+    // remove empty state
+    const empty = history.querySelector(".empty-state");
+    if (empty) empty.remove();
+
+    let item = history.querySelector(`[data-chat-id="${chatId}"]`);
+    if (!item) {
+      item = document.createElement("div");
+      item.className = "chat-item";
+      item.setAttribute("data-chat-id", chatId);
+      item.onclick = () => window.loadChat(chatId);
+
+      item.innerHTML = `
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+          <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"></path>
+        </svg>
+        <span class="chat-title"></span>
+        <div class="chat-actions">
+          <button class="icon-btn" title="Rename">✎</button>
+          <button class="icon-btn" title="Delete">🗑</button>
+        </div>
+      `;
+
+      const buttons = item.querySelectorAll("button.icon-btn");
+      buttons[0].onclick = (e) => { e.stopPropagation(); window.renameChat(chatId); };
+      buttons[1].onclick = (e) => { e.stopPropagation(); window.deleteChat(chatId); };
+
+      if (prepend && history.firstChild) history.insertBefore(item, history.firstChild);
+      else history.appendChild(item);
+    }
+
+    const t = item.querySelector(".chat-title");
+    if (t) t.textContent = title || "New Chat";
+  }
+
+  // ---- API wrappers ----
+  async function apiJson(url, options) {
+    const res = await fetch(url, options);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = data.error || `Request failed (${res.status})`;
+      throw new Error(msg);
+    }
+    return data;
+  }
+
+  // ---- Chat CRUD ----
+  window.newChat = async function newChat() {
     if (isLoading) return;
     isLoading = true;
     try {
-      const res = await fetch("/chat/new", { method: "POST" });
-      const data = await res.json();
-
-      if (!data.success && data.error) throw new Error(data.error);
-
-      currentChatId = data.chatid ?? data.chat_id ?? null;
-
-      await Router.go("chat");
-
-      const container = document.getElementById("messages-container");
-      if (container) container.innerHTML = "";
+      const data = await apiJson("/chat/new", { method: "POST", headers: { "Content-Type": "application/json" } });
+      currentChatId = data.chatid || data.chat_id;
+      els.messages().innerHTML = "";
       setWelcomeVisible(true);
 
-      // add to sidebar immediately
-      if (currentChatId) addChatToSidebar(currentChatId, data.title || "New Chat", true);
+      upsertChatInSidebar(currentChatId, data.title || "New Chat", true);
+      setActiveChatInSidebar(currentChatId);
     } catch (e) {
-      alert(e.message || "Failed to create new chat.");
+      addMessage(e.message || "Failed to create new chat.", "error");
     } finally {
       isLoading = false;
     }
-  }
+  };
 
-  async function loadChat(chatId) {
+  window.loadChat = async function loadChat(chatId) {
     if (isLoading) return;
     isLoading = true;
-
     try {
-      await Router.go("chat");
-
-      const res = await fetch(`/chat/${chatId}/messages`);
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-
+      const data = await apiJson(`/chat/${chatId}/messages`, { method: "GET" });
       currentChatId = chatId;
 
-      const container = document.getElementById("messages-container");
-      if (container) container.innerHTML = "";
-
+      els.messages().innerHTML = "";
       setWelcomeVisible(false);
-      (data.messages || []).forEach((m) => addMessage(m.content, m.role, m.model));
 
-      setActiveChat(chatId);
+      (data.messages || []).forEach(m => addMessage(m.content, m.role, m.model));
+      setActiveChatInSidebar(chatId);
+
+      if (window.innerWidth < 1024) {
+        const sidebar = els.sidebar();
+        if (sidebar) sidebar.classList.remove("show");
+      }
     } catch (e) {
-      alert(e.message || "Failed to load chat.");
+      addMessage(e.message || "Failed to load chat.", "error");
     } finally {
       isLoading = false;
     }
-  }
+  };
 
-  async function renameChat(chatId) {
+  window.renameChat = async function renameChat(chatId) {
     const newTitle = prompt("Enter new chat title:");
     if (!newTitle || !newTitle.trim()) return;
 
     try {
-      const res = await fetch(`/chat/${chatId}/rename`, {
+      await apiJson(`/chat/${chatId}/rename`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: newTitle.trim() }),
+        body: JSON.stringify({ title: newTitle.trim() })
       });
-      const data = await res.json();
-      if (!data.success && data.error) throw new Error(data.error);
 
-      const el = document.querySelector(`[data-chat-id="${chatId}"] .chat-title`);
-      if (el) el.textContent = newTitle.trim();
+      upsertChatInSidebar(chatId, newTitle.trim(), false);
     } catch (e) {
-      alert(e.message || "Failed to rename chat.");
+      addMessage(e.message || "Failed to rename chat.", "error");
     }
-  }
+  };
 
-  async function deleteChat(chatId) {
-    if (!confirm("Delete this chat? This cannot be undone.")) return;
+  window.deleteChat = async function deleteChat(chatId) {
+    const ok = confirm("Delete this chat? This cannot be undone.");
+    if (!ok) return;
 
     try {
-      const res = await fetch(`/chat/${chatId}/delete`, { method: "DELETE" });
-      const data = await res.json();
-      if (!data.success && data.error) throw new Error(data.error);
+      await apiJson(`/chat/${chatId}/delete`, { method: "DELETE" });
 
       const item = document.querySelector(`[data-chat-id="${chatId}"]`);
       if (item) item.remove();
 
       if (currentChatId === chatId) {
         currentChatId = null;
-        await Router.go("chat");
-        const container = document.getElementById("messages-container");
-        if (container) container.innerHTML = "";
+        els.messages().innerHTML = "";
         setWelcomeVisible(true);
       }
     } catch (e) {
-      alert(e.message || "Failed to delete chat.");
+      addMessage(e.message || "Failed to delete chat.", "error");
     }
-  }
+  };
 
-  async function sendMessage() {
-    const input = document.getElementById("chat-input");
-    if (!input) return;
+  // ---- Send message ----
+  window.sendMessage = async function sendMessage() {
+    if (isLoading) return;
 
-    const message = input.value.trim();
-    if (!message || isLoading) return;
+    const input = els.input();
+    const message = (input && input.value ? input.value : "").trim();
+    if (!message) return;
 
     isLoading = true;
-    setWelcomeVisible(false);
 
+    setWelcomeVisible(false);
     addMessage(message, "user");
+
     input.value = "";
     input.style.height = "auto";
 
+    showTypingIndicator();
+
     try {
-      const body = { message, model: currentModelKey, chatid: currentChatId };
-
-      // attach uploaded file path if present
-      if (window.Files && Files.getSelectedUploadPath) {
-        const p = Files.getSelectedUploadPath();
-        if (p) body.uploadedfile = p;
-      }
-
-      const res = await fetch("/chat", {
+      const payload = { message, model: currentModelKey, chatid: currentChatId };
+      const data = await apiJson("/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(payload)
       });
 
-      const data = await res.json();
-      if (data.error) {
-        addMessage(data.error, "error");
-        return;
+      removeTypingIndicator();
+
+      if (data.image_url) {
+        // If backend returns image URL + text
+        addMessage(data.response || "Image generated.", "assistant", data.model);
+        addMessage(data.image_url, "assistant", "Image URL");
+      } else {
+        addMessage(data.response, "assistant", data.model);
       }
 
-      addMessage(data.response, "assistant", data.model);
+      // ensure chat id and sidebar title are updated
+      const newId = data.chatid || data.chat_id;
+      if (newId) currentChatId = newId;
 
-      // server may create chat automatically if chatid was null
-      currentChatId = data.chatid ?? data.chat_id ?? currentChatId;
+      const title = data.chattitle || data.chat_title;
+      if (title && currentChatId) upsertChatInSidebar(currentChatId, title, true);
 
-      // update sidebar title if server returns one
-      if (data.chattitle && currentChatId) {
-        const existing = document.querySelector(`[data-chat-id="${currentChatId}"] .chat-title`);
-        if (existing) existing.textContent = data.chattitle;
-        else addChatToSidebar(currentChatId, data.chattitle, true);
+      if (data.deepseekremaining != null && els.deepseekUsage()) {
+        const used = 50 - Number(data.deepseekremaining);
+        els.deepseekUsage().textContent = `${used} / 50`;
       }
-
-      if (window.Files && Files.clearSelectedUpload) Files.clearSelectedUpload();
     } catch (e) {
-      addMessage("Error connecting to AI. Please try again.", "error");
+      removeTypingIndicator();
+      addMessage(e.message || "Error connecting to AI. Please try again.", "error");
     } finally {
       isLoading = false;
     }
-  }
+  };
 
-  function useSuggestion(text) {
-    Router.go("chat").then(() => {
-      const input = document.getElementById("chat-input");
-      if (!input) return;
-      input.value = text;
-      sendMessage();
+  // Suggestions
+  window.useSuggestion = function useSuggestion(text) {
+    const input = els.input();
+    if (!input) return;
+    input.value = text;
+    input.focus();
+    window.sendMessage();
+  };
+
+  // Enter key behavior + auto-resize
+  function initInput() {
+    const input = els.input();
+    if (!input) return;
+
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        window.sendMessage();
+      }
+    });
+
+    input.addEventListener("input", function () {
+      this.style.height = "auto";
+      this.style.height = Math.min(this.scrollHeight, 200) + "px";
     });
   }
 
-  // Make old inline onclick work
-  window.newChat = newChat;
-  window.loadChat = loadChat;
-  window.sendMessage = sendMessage;
-  window.useSuggestion = useSuggestion;
+  // Close dropdowns on outside click
+  function initGlobalClickClose() {
+    document.addEventListener("click", (e) => {
+      const menu = els.userMenu();
+      const userBtn = e.target.closest(".user-avatar");
+      if (menu && menu.style.display === "block" && !userBtn && !menu.contains(e.target)) {
+        menu.style.display = "none";
+      }
 
-  return {
-    onViewLoaded,
-    setModel,
-    newChat,
-    loadChat,
-    renameChat,
-    deleteChat,
-    sendMessage,
-    useSuggestion,
-  };
+      const selector = els.modelSelector();
+      const modelBtn = e.target.closest(".model-selector-btn");
+      if (selector && selector.style.display === "block" && !modelBtn && !selector.contains(e.target)) {
+        selector.style.display = "none";
+      }
+
+      if (window.innerWidth < 1024) {
+        const sidebar = els.sidebar();
+        const toggle = document.getElementById("sidebar-toggle");
+        if (sidebar && sidebar.classList.contains("show") && !sidebar.contains(e.target) && toggle && !toggle.contains(e.target)) {
+          sidebar.classList.remove("show");
+        }
+      }
+    });
+  }
+
+  // Init model labels (from server session)
+  function initModelLabels() {
+    if (els.modelNameTop()) els.modelNameTop().textContent = currentModelName;
+    if (els.modelNameFooter()) els.modelNameFooter().textContent = currentModelName;
+  }
+
+  // Bootstrap
+  initModelLabels();
+  initInput();
+  initGlobalClickClose();
 })();
