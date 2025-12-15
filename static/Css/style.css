@@ -4,15 +4,34 @@
     box-sizing: border-box;
 }
 
+/* Theme tokens (place near top of style.css) */
 :root {
-    --bg-primary: #212121;
-    --bg-secondary: #2f2f2f;
-    --bg-tertiary: #424242;
-    --text-primary: #ececec;
-    --text-secondary: #b4b4b4;
-    --border-color: #4e4e4e;
-    --accent-color: #19c37d;
-    --hover-bg: #2f2f2f;
+  --toggle-active-bg: #2563eb; /* blue */
+  --toggle-active-text: #ffffff;
+}
+
+/* Dark theme (default look you already have) */
+:root[data-theme="dark"] {
+  --bg-primary: #212121;
+  --bg-secondary: #2f2f2f;
+  --bg-tertiary: #424242;
+  --text-primary: #ececec;
+  --text-secondary: #b4b4b4;
+  --border-color: #4e4e4e;
+  --accent-color: #19c37d;
+  --hover-bg: #2f2f2f;
+}
+
+/* Light theme */
+:root[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f5f5;
+  --bg-tertiary: #e8e8e8;
+  --text-primary: #1a1a1a;
+  --text-secondary: #666666;
+  --border-color: #d0d0d0;
+  --accent-color: #19c37d;
+  --hover-bg: #f0f0f0;
 }
 
 body {
@@ -2220,3 +2239,4 @@ body {
         padding: 0.5rem 0.25rem;
     }
 }
+
