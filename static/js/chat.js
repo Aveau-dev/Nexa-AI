@@ -9,10 +9,38 @@
   let deepThinkEnabled = false;
   let webEnabled = false;
 
+  let deepThinkTimer = null;
+  let deepThinkStart = 0;
+
   function $(id){ return document.getElementById(id); }
 
-  function bindOnce() {
-    // toggles
+  // ---- DeepThink timer UI ----
+  function deepThinkStartTimer() {
+    const box = $("deepthink-status");
+    const sec = $("deepthink-seconds");
+    if (!box || !sec) return;
+
+    deepThinkStart = Date.now();
+    box.style.display = "block";
+    sec.textContent = "0s";
+
+    clearInterval(deepThinkTimer);
+    deepThinkTimer = setInterval(() => {
+      const s = Math.floor((Date.now() - deepThinkStart) / 1000);
+      sec.textContent = `${s}s`;
+    }, 250);
+  }
+
+  function deepThinkStopTimer() {
+    clearInterval(deepThinkTimer);
+    deepThinkTimer = null;
+
+    const box = $("deepthink-status");
+    if (box) box.style.display = "none";
+  }
+
+  // ---- bindings (run after chat view loads) ----
+  function bindChatViewOnce() {
     const dt = $("btn-deepthink");
     const wb = $("btn-web");
     const sendBtn = $("send-btn");
@@ -55,23 +83,23 @@
         this.style.height = "auto";
         this.style.height = Math.min(this.scrollHeight, 200) + "px";
       });
+
+      input.removeAttribute("disabled");
     }
 
-    // labels
     const top = $("selected-model-name");
     const foot = $("model-info");
     if (top) top.textContent = currentModelName;
     if (foot) foot.textContent = currentModelName;
-
-    // ensure input is focusable
-    if (input) input.removeAttribute("disabled");
   }
 
-  // Router replaces #view-container; we must re-bind after view loads.
-  // If your router dispatches an event, hook it. Otherwise, poll lightly.
-  setInterval(bindOnce, 300);
+  // Router event
+  document.addEventListener("nexa:viewchange", (e) => {
+    const view = (e.detail && e.detail.view) || "chat";
+    if (view === "chat") bindChatViewOnce();
+  });
 
-  // ---- global UI funcs used by HTML ----
+  // ---- global UI funcs used by dashboard.html ----
   window.toggleSidebar = function () {
     const sidebar = $("sidebar");
     const main = $("main-content");
@@ -139,7 +167,12 @@
     return marked.parse(text || "");
   }
 
-  function addMessage(text, role, modelNameForBadge) {
+  function setWelcomeVisible(visible) {
+    const w = $("welcome-section");
+    if (w) w.style.display = visible ? "block" : "none";
+  }
+
+  function addMessage(text, role, modelNameForBadge, reasoningText) {
     const container = $("messages-container");
     if (!container) return;
 
@@ -158,12 +191,20 @@
           </div>
           <div class="message-content">
             ${modelNameForBadge ? `<div class="model-badge">${escapeHtml(modelNameForBadge)}</div>` : ""}
+            ${reasoningText ? `
+              <details class="reasoning-panel" style="margin:.35rem 0 .5rem 0;">
+                <summary style="cursor:pointer; color:#b4b4b4;">DeepThink (summary)</summary>
+                <div style="margin-top:.35rem; color:#ececec;">${escapeHtml(reasoningText)}</div>
+              </details>
+            ` : ``}
             <div class="markdown-content"></div>
           </div>
         </div>
       `;
+
       const contentDiv = row.querySelector(".markdown-content");
       contentDiv.innerHTML = formatMessage(text);
+
       if (typeof hljs !== "undefined") {
         contentDiv.querySelectorAll("pre code").forEach(b => hljs.highlightElement(b));
       }
@@ -201,14 +242,9 @@
     if (el) el.remove();
   }
 
-  function setWelcomeVisible(visible) {
-    const w = $("welcome-section");
-    if (w) w.style.display = visible ? "block" : "none";
-  }
-
   function setActiveChatInSidebar(chatId) {
-    document.querySelectorAll(".chat-item").forEach(el => el.classList.remove("active"));
-    const active = document.querySelector(`[data-chat-id="${chatId}"]`);
+    document.querySelectorAll(".chat-item[data-chat-id]").forEach(el => el.classList.remove("active"));
+    const active = document.querySelector(`.chat-item[data-chat-id="${chatId}"]`);
     if (active) active.classList.add("active");
   }
 
@@ -219,7 +255,7 @@
     const empty = history.querySelector(".empty-state");
     if (empty) empty.remove();
 
-    let item = history.querySelector(`[data-chat-id="${chatId}"]`);
+    let item = history.querySelector(`.chat-item[data-chat-id="${chatId}"]`);
     if (!item) {
       item = document.createElement("div");
       item.className = "chat-item";
@@ -260,7 +296,11 @@
   window.newChat = async function () {
     if (isLoading) return;
     isLoading = true;
+
     try {
+      // ensure chat view is loaded (input exists)
+      if (window.Router && Router.go) await Router.go("chat");
+
       const data = await apiJson("/chat/new", { method: "POST", headers: { "Content-Type": "application/json" } });
       currentChatId = data.chatid;
 
@@ -270,6 +310,7 @@
 
       upsertChatInSidebar(currentChatId, data.title || "New Chat", true);
       setActiveChatInSidebar(currentChatId);
+      bindChatViewOnce();
     } catch (e) {
       addMessage(e.message || "Failed to create new chat.", "error");
     } finally {
@@ -280,7 +321,10 @@
   window.loadChat = async function (chatId) {
     if (isLoading) return;
     isLoading = true;
+
     try {
+      if (window.Router && Router.go) await Router.go("chat");
+
       const data = await apiJson(`/chat/${chatId}/messages`, { method: "GET" });
       currentChatId = chatId;
 
@@ -290,6 +334,8 @@
 
       (data.messages || []).forEach(m => addMessage(m.content, m.role, m.model));
       setActiveChatInSidebar(chatId);
+
+      bindChatViewOnce();
 
       if (window.innerWidth < 1024) {
         const sidebar = $("sidebar");
@@ -325,7 +371,7 @@
     try {
       await apiJson(`/chat/${chatId}/delete`, { method: "DELETE" });
 
-      const item = document.querySelector(`[data-chat-id="${chatId}"]`);
+      const item = document.querySelector(`.chat-item[data-chat-id="${chatId}"]`);
       if (item) item.remove();
 
       if (currentChatId === chatId) {
@@ -356,11 +402,15 @@
 
     showTypingIndicator();
 
+    if (deepThinkEnabled) deepThinkStartTimer();
+
     try {
       const payload = {
         message,
         model: currentModelKey,
         chatid: currentChatId,
+
+        // Flags for future backend wiring
         deepthink: deepThinkEnabled,
         web: webEnabled
       };
@@ -372,7 +422,12 @@
       });
 
       removeTypingIndicator();
-      addMessage(data.response, "assistant", data.model);
+      deepThinkStopTimer();
+
+      // If backend returns reasoning/think field, show it (summary panel)
+      const reasoning = data.reasoning || data.think || data.deepthink || null;
+
+      addMessage(data.response, "assistant", data.model, reasoning);
 
       if (data.chatid) currentChatId = data.chatid;
       if (data.chattitle && currentChatId) upsertChatInSidebar(currentChatId, data.chattitle, true);
@@ -384,21 +439,26 @@
       }
     } catch (e) {
       removeTypingIndicator();
+      deepThinkStopTimer();
       addMessage(e.message || "Error connecting to AI.", "error");
     } finally {
       isLoading = false;
     }
   };
 
-  window.useSuggestion = function (text) {
+  window.useSuggestion = async function (text) {
+    if (window.Router && Router.go) await Router.go("chat");
+    bindChatViewOnce();
+
     const input = $("chat-input");
     if (!input) return;
+
     input.value = text;
     input.focus();
     window.sendMessage();
   };
 
-  // Close dropdowns on outside click (won’t block input)
+  // Close dropdowns on outside click
   document.addEventListener("click", (e) => {
     const menu = $("user-menu");
     const userBtn = e.target.closest(".user-avatar");
