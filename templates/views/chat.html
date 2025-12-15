@@ -26,3 +26,39 @@
 </div>
 
 <div id="messages-container"></div>
+
+<!-- DeepThink status (seconds counter) -->
+<div id="deepthink-status"
+     style="display:none; position:fixed; bottom:120px; left:50%; transform:translateX(-50%);
+            background:rgba(0,0,0,.45); border:1px solid rgba(255,255,255,.12);
+            padding:.5rem .9rem; border-radius:999px; color:#ececec; z-index:4000;">
+  <span id="deepthink-status-text">DeepThink: Thinking…</span>
+  <span id="deepthink-seconds" style="margin-left:.5rem; color:#b4b4b4;">0s</span>
+</div>
+
+<!-- Input (ONLY in chat view now) -->
+<div class="input-wrapper" id="chat-input-wrapper" style="display:block;">
+  <div class="input-box">
+    <div class="input-inner">
+      <div class="chat-toggles" style="display:flex; gap:.5rem; align-items:center;">
+        <button id="btn-deepthink" class="toggle-btn" type="button">DeepThink: Off</button>
+        <button id="btn-web" class="toggle-btn" type="button">Web: Off</button>
+      </div>
+
+      <textarea id="chat-input" placeholder="Ask anything..." rows="1"></textarea>
+
+      <button class="send-button" type="button" id="send-btn" onclick="sendMessage()">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
+        </svg>
+      </button>
+    </div>
+
+    <div class="input-footer">
+      <span class="footer-text">
+        <span id="model-info">{{ session.get('selected_model_name', 'Gemini 2.5 Flash') }}</span>
+        · NexaAI can make mistakes. Check important info.
+      </span>
+    </div>
+  </div>
+</div>
