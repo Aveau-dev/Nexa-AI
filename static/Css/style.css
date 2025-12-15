@@ -2240,3 +2240,50 @@ body {
     }
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* Toggle pills like your screenshot */
+.mode-toggles {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.25rem 0.25rem 0.5rem;
+}
+
+.mode-btn {
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.mode-btn:hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+.mode-btn.active {
+  background: var(--toggle-active-bg);
+  border-color: var(--toggle-active-bg);
+  color: var(--toggle-active-text);
+}
+
+
