@@ -1,51 +1,62 @@
-<!-- SETTINGS VIEW -->
-<section class="view" data-view="settings">
-  <div class="welcome-section">
-    <h1 class="main-heading">Settings</h1>
-    <p class="footer-text">App preferences and account actions.</p>
+<!-- templates/views/settings.html -->
+<div class="welcome-section" style="align-items:flex-start;">
+  <div style="display:flex; align-items:center; justify-content:space-between; width:100%; gap:1rem;">
+    <h1 class="main-heading" style="margin:0;">Settings</h1>
+    <button class="nav-button" type="button" onclick="Router.go('chat')">Back to chat</button>
+  </div>
 
-    <div class="suggestion-cards" style="margin-top: 1rem;">
-      <div class="suggestion-card" onclick="ModelSelector.toggle()">
-        <div class="suggestion-text">Choose model</div>
-      </div>
-      <div class="suggestion-card" onclick="Settings.toggleCompact()">
-        <div class="suggestion-text">Toggle compact UI</div>
-      </div>
-      <div class="suggestion-card" onclick="Settings.reset()">
-        <div class="suggestion-text">Reset settings</div>
-      </div>
-      <div class="suggestion-card" onclick="Router.go('chat')">
-        <div class="suggestion-text">Back to chat</div>
-      </div>
+  <p class="footer-text" style="margin-top:.75rem;">
+    Manage workspace tools and account preferences.
+  </p>
+
+  <div class="suggestion-cards" style="margin-top:1rem;">
+    <div class="suggestion-card" onclick="Router.go('files')">
+      <div class="suggestion-icon"></div>
+      <div class="suggestion-text">Files</div>
+    </div>
+
+    <div class="suggestion-card" onclick="Router.go('memory')">
+      <div class="suggestion-icon"></div>
+      <div class="suggestion-text">Memory</div>
+    </div>
+
+    <div class="suggestion-card" onclick="Router.go('projects')">
+      <div class="suggestion-icon"></div>
+      <div class="suggestion-text">Projects</div>
+    </div>
+
+    <div class="suggestion-card" onclick="Router.go('canvas')">
+      <div class="suggestion-icon"></div>
+      <div class="suggestion-text">Canvas</div>
+    </div>
+
+    <div class="suggestion-card" onclick="Router.go('voice')">
+      <div class="suggestion-icon"></div>
+      <div class="suggestion-text">Voice</div>
     </div>
   </div>
 
-  <div class="message-row assistant-row">
-    <div class="message assistant-message">
-      <div class="avatar">N</div>
-      <div class="message-content">
-        <div class="model-badge">Preferences</div>
-        <div class="message-text markdown-content">
-          <div style="display:grid; gap:0.75rem;">
-            <label style="display:flex; align-items:center; gap:0.5rem;">
-              <input id="setting-compact" type="checkbox" onchange="Settings.setCompact(this.checked)" />
-              Compact layout
-            </label>
+  <div style="margin-top:1.25rem; width:100%;">
+    <div class="section-title" style="margin-bottom:.5rem;">Account</div>
 
-            <label style="display:flex; align-items:center; gap:0.5rem;">
-              <input id="setting-enter-send" type="checkbox" checked onchange="Settings.setEnterToSend(this.checked)" />
-              Enter to send (Shift+Enter for new line)
-            </label>
+    <div style="padding:1rem; border:1px solid rgba(255,255,255,.08); border-radius:12px; width:100%;">
+      <div style="display:flex; flex-direction:column; gap:.35rem;">
+        <div style="color:#ececec; font-weight:600;">{{ user.name }}</div>
+        <div style="color:#b4b4b4; font-size:.9rem;">{{ user.email }}</div>
+        {% if user.is_premium %}
+          <div class="premium-badge-small" style="display:inline-flex; width:fit-content;">Premium</div>
+        {% else %}
+          <div class="free-badge-small" style="display:inline-flex; width:fit-content;">Free</div>
+        {% endif %}
+      </div>
 
-            <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-              <button class="nav-button primary" type="button" onclick="Settings.save()">Save</button>
-              <button class="nav-button secondary" type="button" onclick="Settings.reset()">Reset</button>
-            </div>
-
-            <div id="settings-status" class="footer-text">Status: ready.</div>
-          </div>
+      {% if not user.is_premium %}
+        <div style="margin-top:.75rem;">
+          <button class="nav-button upgrade-btn" type="button" onclick="location.href='{{ url_for('checkout') }}'">
+            Upgrade
+          </button>
         </div>
-      </div>
+      {% endif %}
     </div>
   </div>
-</section>
+</div>
