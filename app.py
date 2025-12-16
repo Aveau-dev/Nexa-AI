@@ -573,7 +573,7 @@ def index():
     return render_template("index.html")
 
 
-# --- Demo Chat (no login required) ---
+# --- Demo Chat (no login required) - Gemini 2.5 Flash Lite ---
 @app.route("/demo-chat", methods=["POST"])
 def demo_chat():
     try:
@@ -582,76 +582,45 @@ def demo_chat():
         if not message:
             return jsonify({"success": False, "error": "Message is required"}), 400
 
-        # Optional: simple image keyword demo (matches newer snippet behavior)
-        image_keywords = [
-            "generate image", "create image", "draw", "picture of", "image of",
-            "make an image", "show me"
-        ]
-        if any(k in message.lower() for k in image_keywords):
-            # If you have generate_image(prompt) helper, use it.
-            # Otherwise return a friendly message.
-            if "generateimage" in globals() or "generate_image" in globals():
-                fn = globals().get("generateimage") or globals().get("generate_image")
-                image_url = fn(message)
-                return jsonify({
-                    "success": True,
-                    "demo": True,
-                    "model": "Pollinations AI",
-                    "response": "I've generated the image for you!",
-                    "hasImage": True,
-                    "imageUrl": image_url
-                })
+        # Optional image-demo shortcut (if you already use Pollinations in your project)
+        image_keywords = ["generate image", "create image", "draw", "picture of", "image of", "make an image", "show me"]
+        if any(k in message.lower() for k in image_keywords) and "generateimage" in globals():
+            image_url = generateimage(message)
             return jsonify({
                 "success": True,
                 "demo": True,
-                "model": "Demo",
-                "response": "Image generation demo is not configured on the server.",
-                "hasImage": False
+                "model": "Pollinations AI",
+                "response": "I've generated the image for you!",
+                "hasImage": True,
+                "imageUrl": image_url
             })
 
-        # Text demo: call a free model
-        # Works with older app.py that has openrouterclient + FREEMODELS dict. [file:410]
-        model_path = None
-        model_name = "Demo"
-
-        if "FREEMODELS" in globals() and isinstance(FREEMODELS, dict):
-            # Prefer gpt-3.5-turbo if present else first free model
-            if "gpt-3.5-turbo" in FREEMODELS:
-                model_cfg = FREEMODELS["gpt-3.5-turbo"]
-            else:
-                model_cfg = next(iter(FREEMODELS.values()))
-            model_path = model_cfg.get("path") or model_cfg.get("model") or model_cfg.get("id")
-            model_name = model_cfg.get("name") or "Demo"
-
-        if not model_path:
+        # Gemini 2.5 Flash Lite via your model registry:
+        # FREEMODELS["gemini-flash"]["model"] == "gemini-2.5-flash-lite" and provider == "google". [file:408]
+        if "callaimodel" not in globals():
             return jsonify({
                 "success": False,
-                "error": "Demo model not configured (missing FREEMODELS)."
+                "error": "Gemini demo not configured (missing callaimodel())."
             }), 500
 
-        # OpenRouter call (must have openrouterclient configured)
-        if "openrouterclient" not in globals():
-            return jsonify({
-                "success": False,
-                "error": "OpenRouter client not configured on server."
-            }), 500
+        msgs = [
+            {"role": "system", "content": "You are a helpful AI assistant."},
+            {"role": "user", "content": message}
+        ]
 
-        resp = openrouterclient.chat.completions.create(
-            model=model_path,
-            messages=[{"role": "user", "content": message}]
-        )
+        text = callaimodel("gemini-flash", msgs)
 
-        text = resp.choices[0].message.content if resp and resp.choices else ""
         return jsonify({
             "success": True,
             "demo": True,
-            "model": model_name,
+            "model": "Gemini 2.5 Flash Lite",
             "response": text,
             "message": "Sign up for saved chats, file uploads, and premium models."
         })
 
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
 
 
 
@@ -1115,4 +1084,5 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))
     log.info("Starting NexaAI on port %s", port)
     app.run(debug=True, host="0.0.0.0", port=port)
+
 
