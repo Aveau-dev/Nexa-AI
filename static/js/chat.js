@@ -14,6 +14,28 @@
 
   function $(id){ return document.getElementById(id); }
 
+  // -----------------------------
+  // Theme (data-theme on <html>)
+  // -----------------------------
+  function getSavedTheme() {
+    return localStorage.getItem("nexa_theme") || "dark";
+  }
+  function applyTheme(theme) {
+    const t = (theme === "light") ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", t);
+    localStorage.setItem("nexa_theme", t);
+
+    const btn = $("btn-theme");
+    if (btn) btn.textContent = (t === "light") ? "Theme: Light" : "Theme: Dark";
+  }
+  window.toggleTheme = function () {
+    const curr = document.documentElement.getAttribute("data-theme") || getSavedTheme();
+    applyTheme(curr === "light" ? "dark" : "light");
+  };
+
+  // Apply theme on load
+  applyTheme(getSavedTheme());
+
   // ---- DeepThink timer UI ----
   function deepThinkStartTimer() {
     const box = $("deepthink-status");
@@ -43,6 +65,7 @@
   function bindChatViewOnce() {
     const dt = $("btn-deepthink");
     const wb = $("btn-web");
+    const th = $("btn-theme");
     const sendBtn = $("send-btn");
     const input = $("chat-input");
 
@@ -62,6 +85,14 @@
         wb.textContent = webEnabled ? "Web: On" : "Web: Off";
         wb.classList.toggle("active", webEnabled);
       });
+    }
+
+    if (th && !th.dataset.bound) {
+      th.dataset.bound = "1";
+      th.addEventListener("click", () => window.toggleTheme());
+      // sync label on bind
+      const curr = document.documentElement.getAttribute("data-theme") || getSavedTheme();
+      th.textContent = (curr === "light") ? "Theme: Light" : "Theme: Dark";
     }
 
     if (sendBtn && !sendBtn.dataset.bound) {
@@ -172,7 +203,8 @@
     if (w) w.style.display = visible ? "block" : "none";
   }
 
-  function addMessage(text, role, modelNameForBadge, reasoningText) {
+  // UPDATED: add meta param
+  function addMessage(text, role, modelNameForBadge, reasoningText = null, meta = null) {
     const container = $("messages-container");
     if (!container) return;
 
@@ -191,6 +223,7 @@
           </div>
           <div class="message-content">
             ${modelNameForBadge ? `<div class="model-badge">${escapeHtml(modelNameForBadge)}</div>` : ""}
+            <div class="assistant-meta"></div>
             ${reasoningText ? `
               <details class="reasoning-panel" style="margin:.35rem 0 .5rem 0;">
                 <summary style="cursor:pointer; color:#b4b4b4;">DeepThink (summary)</summary>
@@ -201,6 +234,16 @@
           </div>
         </div>
       `;
+
+      // meta line
+      const metaEl = row.querySelector(".assistant-meta");
+      if (metaEl && meta?.thoughtSeconds) {
+        const s = Number(meta.thoughtSeconds).toFixed(1);
+        metaEl.textContent = meta.webEnabled ? `Thought for ${s}s • Web search on` : `Thought for ${s}s`;
+        metaEl.style.cssText = "color: var(--text-secondary); font-size: 0.8rem; margin: 0.25rem 0 0.5rem 0;";
+      } else if (metaEl) {
+        metaEl.remove();
+      }
 
       const contentDiv = row.querySelector(".markdown-content");
       contentDiv.innerHTML = formatMessage(text);
@@ -401,8 +444,9 @@
     input.style.height = "auto";
 
     showTypingIndicator();
-
     if (deepThinkEnabled) deepThinkStartTimer();
+
+    const t0 = performance.now();
 
     try {
       const payload = {
@@ -410,9 +454,10 @@
         model: currentModelKey,
         chatid: currentChatId,
 
-        // Flags for future backend wiring
+        // Flags for backend wiring
         deepthink: deepThinkEnabled,
-        web: webEnabled
+        web: webEnabled,
+        web_search: webEnabled
       };
 
       const data = await apiJson("/chat", {
@@ -421,13 +466,17 @@
         body: JSON.stringify(payload)
       });
 
+      const seconds = Math.max(0.1, (performance.now() - t0) / 1000);
+
       removeTypingIndicator();
       deepThinkStopTimer();
 
-      // If backend returns reasoning/think field, show it (summary panel)
       const reasoning = data.reasoning || data.think || data.deepthink || null;
 
-      addMessage(data.response, "assistant", data.model, reasoning);
+      addMessage(data.response, "assistant", data.model, reasoning, {
+        thoughtSeconds: seconds,
+        webEnabled: webEnabled
+      });
 
       if (data.chatid) currentChatId = data.chatid;
       if (data.chattitle && currentChatId) upsertChatInSidebar(currentChatId, data.chattitle, true);
@@ -468,4 +517,7 @@
     const modelBtn = e.target.closest(".model-selector-btn");
     if (selector && selector.style.display === "block" && !modelBtn && !selector.contains(e.target)) selector.style.display = "none";
   });
+
+  // Initial bind for non-router loads
+  bindChatViewOnce();
 })();
