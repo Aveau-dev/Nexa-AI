@@ -573,53 +573,54 @@ def index():
     return render_template("index.html")
 
 
-# --- Demo Chat (no login required) - Gemini 2.5 Flash Lite ---
-@app.route("/demo-chat", methods=["POST"])
+@app.route('/demo-chat', methods=['POST'])
 def demo_chat():
     try:
         data = request.get_json(silent=True) or {}
-        message = (data.get("message") or "").strip()
+        message = (data.get('message') or '').strip()
         if not message:
-            return jsonify({"success": False, "error": "Message is required"}), 400
+            return jsonify({'error': 'Message is required'}), 400
 
-        # Optional image-demo shortcut (if you already use Pollinations in your project)
-        image_keywords = ["generate image", "create image", "draw", "picture of", "image of", "make an image", "show me"]
-        if any(k in message.lower() for k in image_keywords) and "generateimage" in globals():
-            image_url = generateimage(message)
-            return jsonify({
-                "success": True,
-                "demo": True,
-                "model": "Pollinations AI",
-                "response": "I've generated the image for you!",
-                "hasImage": True,
-                "imageUrl": image_url
-            })
+        # 1) Image generation shortcut (Pollinations URL)
+        image_keywords = [
+            'generate image', 'create image', 'draw', 'picture of',
+            'image of', 'make an image', 'show me'
+        ]
+        if any(k in message.lower() for k in image_keywords):
+            try:
+                url = generate_image(message)
+                return jsonify({
+                    'response': "Here's your generated image!",
+                    'imageurl': url,
+                    'hasimage': True,
+                    'demo': True,
+                    'model': 'Pollinations'
+                })
+            except Exception as e:
+                log.exception("Demo image generation failed")
+                return jsonify({'error': str(e)}), 500
 
-        # Gemini 2.5 Flash Lite via your model registry:
-        # FREEMODELS["gemini-flash"]["model"] == "gemini-2.5-flash-lite" and provider == "google". [file:408]
-        if "callaimodel" not in globals():
-            return jsonify({
-                "success": False,
-                "error": "Gemini demo not configured (missing callaimodel())."
-            }), 500
-
-        msgs = [
-            {"role": "system", "content": "You are a helpful AI assistant."},
-            {"role": "user", "content": message}
+        # 2) Text chat via Gemini Flash Lite
+        messages = [
+            {'role': 'system', 'content': 'You are a helpful AI assistant.'},
+            {'role': 'user', 'content': message}
         ]
 
-        text = callaimodel("gemini-flash", msgs)
+        # If your project uses callaimodel(), switch to that:
+        # response_text = callaimodel('gemini-flash', messages) [file:408]
+        response_text = call_ai_model('gemini-flash', messages)
 
         return jsonify({
-            "success": True,
-            "demo": True,
-            "model": "Gemini 2.5 Flash Lite",
-            "response": text,
-            "message": "Sign up for saved chats, file uploads, and premium models."
+            'response': response_text,
+            'demo': True,
+            'model': 'Gemini 2.5 Flash lite',
+            'hasimage': False
         })
 
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+        log.exception("Demo chat failed (outer)")
+        return jsonify({'error': str(e)}), 500
+
 
 
 
@@ -1084,5 +1085,6 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))
     log.info("Starting NexaAI on port %s", port)
     app.run(debug=True, host="0.0.0.0", port=port)
+
 
 
