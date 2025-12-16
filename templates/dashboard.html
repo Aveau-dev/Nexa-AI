@@ -1,6 +1,6 @@
 <!-- templates/dashboard.html -->
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta name="google-site-verification" content="1xRfZx8fEbwT18xMYj4l1UFl5jRckIrbs2uk4STqF6Y" />
   <meta charset="UTF-8" />
@@ -25,7 +25,8 @@
   <meta name="twitter:description" content="A modern, privacy-friendly AI dashboard with saved chat history." />
   <meta name="twitter:image" content="https://nexaai.js.org/static/og-image.png" />
 
-  <link rel="stylesheet" href="{{ url_for('static', filename='Css/style.css') }}" />
+  <!-- NOTE: your static path seems to be /static/css/style.css (lowercase). -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" /> <!-- [file:349] -->
 
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <link rel="stylesheet"
@@ -44,12 +45,12 @@
   <!-- IMPORTANT: expose initial model for chat.js -->
   <script>
     window.NEXAAI = window.NEXAAI || {};
-    window.NEXAAI.initialModelKey = "{{ session.get('selected_model', 'gemini-flash') }}";
+    window.NEXAAI.initialModelKey  = "{{ session.get('selected_model', 'gemini-flash') }}";
     window.NEXAAI.initialModelName = "{{ session.get('selected_model_name', 'Gemini 2.5 Flash') }}";
   </script>
 
   <style>
-    /* Optional helpers (safe if your CSS already styles these) */
+    /* Optional helpers */
     .sidebar-footer .footer-actions{ display:flex; flex-direction:column; gap:.5rem; margin-top:.75rem; }
     .sidebar-footer .footer-actions .nav-button{ width:100%; justify-content:center; }
   </style>
@@ -73,7 +74,7 @@
 
       <!-- Always returns to chat -->
       <div class="logo-container" style="cursor:pointer;"
-           onclick="Router && Router.go ? Router.go('chat') : void 0">
+           onclick="window.Router && Router.go ? Router.go('chat') : void 0">
         <svg class="logo-icon" viewBox="0 0 24 24" width="20" height="20">
           <path fill="currentColor" d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"></path>
         </svg>
@@ -89,7 +90,10 @@
     </div>
 
     <div class="nav-right">
-      {% if not user.is_premium %}
+      <!-- Theme toggle button (chat.js will bind to this id) -->
+      <button class="nav-button" id="btn-theme" type="button">Theme: Dark</button>
+
+      {% if not user.ispremium %}
         <button class="nav-button upgrade-btn" onclick="location.href='{{ url_for('checkout') }}'">
           <span>Upgrade</span>
         </button>
@@ -148,7 +152,7 @@
       <div class="user-info">
         <div class="user-name">{{ user.name }}</div>
         <div class="user-email">{{ user.email }}</div>
-        {% if user.is_premium %}
+        {% if user.ispremium %}
           <div class="premium-badge-small">Premium Member</div>
         {% else %}
           <div class="free-badge-small">Free Account</div>
@@ -156,7 +160,7 @@
       </div>
     </div>
     <div class="menu-divider"></div>
-    {% if not user.is_premium %}
+    {% if not user.ispremium %}
       <a href="{{ url_for('checkout') }}" class="menu-item">Upgrade to Premium</a>
       <div class="menu-divider"></div>
     {% endif %}
@@ -172,14 +176,17 @@
         <div class="chat-history" id="chat-history">
           {% if chats %}
             {% for chat in chats %}
-              <div class="chat-item" data-chat-id="{{ chat.id }}" onclick="loadChat({{ chat.id }})">
+              <!-- chat.id is integer in your DB, but passing as string is safest -->
+              <div class="chat-item" data-chat-id="{{ chat.id }}" onclick="loadChat('{{ chat.id }}')">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                   <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"></path>
                 </svg>
                 <span class="chat-title">{{ chat.title }}</span>
                 <div class="chat-actions">
-                  <button class="icon-btn" title="Rename" onclick="event.stopPropagation(); renameChat({{ chat.id }})"></button>
-                  <button class="icon-btn" title="Delete" onclick="event.stopPropagation(); deleteChat({{ chat.id }})"></button>
+                  <button class="icon-btn" title="Rename"
+                          onclick="event.stopPropagation(); renameChat('{{ chat.id }}')"></button>
+                  <button class="icon-btn" title="Delete"
+                          onclick="event.stopPropagation(); deleteChat('{{ chat.id }}')"></button>
                 </div>
               </div>
             {% endfor %}
@@ -194,13 +201,15 @@
         <div class="usage-info">
           <div class="usage-item">
             <span class="usage-label">DeepSeek Today</span>
-            <span class="usage-value" id="deepseek-usage">{{ user.deepseek_count }}/50</span>
+            <!-- Your User model uses deepseekcount (not deepseek_count) -->
+            <span class="usage-value"><span id="deepseek-usage">{{ user.deepseekcount }}</span>/50</span> <!-- [file:349] -->
           </div>
 
           <div class="footer-actions">
-            <button class="nav-button" type="button" onclick="Router.go('settings')">Settings</button>
+            <button class="nav-button" type="button"
+                    onclick="window.Router && Router.go ? Router.go('settings') : void 0">Settings</button>
 
-            {% if not user.is_premium %}
+            {% if not user.ispremium %}
               <div class="upgrade-cta-small">
                 <a href="{{ url_for('checkout') }}">Upgrade for unlimited access →</a>
               </div>
@@ -221,12 +230,9 @@
       </div>
     </div>
   </div>
-  <!-- IMPORTANT: remove these if they also define toggleSidebar/sendMessage/etc -->
-  <!-- If ui.js/model-selector.js overlap with chat.js, input/toggles can break -->
-  <!-- <script src="{{ url_for('static', filename='js/ui.js') }}"></script> -->
-  <script src="{{ url_for('static', filename='js/router.js') }}"></script>
-  <!-- <script src="{{ url_for('static', filename='js/model-selector.js') }}"></script> -->
 
+  <!-- Scripts: include ONCE each (your pasted file had duplicates) -->
+  <script src="{{ url_for('static', filename='js/router.js') }}"></script> <!-- [file:408] -->
   <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
 
   <script src="{{ url_for('static', filename='js/files.js') }}"></script>
@@ -236,8 +242,6 @@
   <script src="{{ url_for('static', filename='js/voice.js') }}"></script>
   <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-  <script src="{{ url_for('static', filename='js/router.js') }}"></script>
-  <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
 
   <script>
     document.addEventListener("DOMContentLoaded", function () {
