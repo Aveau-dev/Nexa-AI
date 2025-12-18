@@ -185,6 +185,16 @@
             }
         }
 
+        // Demo mode: default theme = system
+        const THEME_KEY = "theme";
+            if (!localStorage.getItem(THEME_KEY)) {
+              localStorage.setItem(THEME_KEY, "system");
+            }
+            
+            // Apply theme on load (system/light/dark)
+            setTheme(localStorage.getItem(THEME_KEY));
+
+        
         function sendMessage() {
             const input = document.getElementById('chat-input');
             const message = input.value.trim();
@@ -356,4 +366,5 @@
     </script>
 </body>
 </html>
+
 
