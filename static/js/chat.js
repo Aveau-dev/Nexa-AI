@@ -61,45 +61,40 @@
     if (box) box.style.display = "none";
   }
 
-  // ---- bindings (run after chat view loads) ----
+  // -----------------------------
+  // Bindings (run after chat view loads)
+  // -----------------------------
   function bindChatViewOnce() {
     const dt = $("btn-deepthink");
     const wb = $("btn-web");
-    const th = $("btn-theme");
     const sendBtn = $("send-btn");
     const input = $("chat-input");
 
+    // DeepThink pill
     if (dt && !dt.dataset.bound) {
       dt.dataset.bound = "1";
       dt.addEventListener("click", () => {
         deepThinkEnabled = !deepThinkEnabled;
-        dt.textContent = deepThinkEnabled ? "DeepThink: On" : "DeepThink: Off";
         dt.classList.toggle("active", deepThinkEnabled);
       });
     }
 
+    // Web Search pill
     if (wb && !wb.dataset.bound) {
       wb.dataset.bound = "1";
       wb.addEventListener("click", () => {
         webEnabled = !webEnabled;
-        wb.textContent = webEnabled ? "Web: On" : "Web: Off";
         wb.classList.toggle("active", webEnabled);
       });
     }
 
-    if (th && !th.dataset.bound) {
-      th.dataset.bound = "1";
-      th.addEventListener("click", () => window.toggleTheme());
-      // sync label on bind
-      const curr = document.documentElement.getAttribute("data-theme") || getSavedTheme();
-      th.textContent = (curr === "light") ? "Theme: Light" : "Theme: Dark";
-    }
-
+    // Send button
     if (sendBtn && !sendBtn.dataset.bound) {
       sendBtn.dataset.bound = "1";
       sendBtn.addEventListener("click", () => window.sendMessage());
     }
 
+    // Textarea
     if (input && !input.dataset.bound) {
       input.dataset.bound = "1";
 
@@ -137,7 +132,10 @@
     if (!sidebar || !main) return;
 
     if (window.innerWidth < 1024) sidebar.classList.toggle("show");
-    else { sidebar.classList.toggle("collapsed"); main.classList.toggle("sidebar-collapsed"); }
+    else {
+      sidebar.classList.toggle("collapsed");
+      main.classList.toggle("sidebar-collapsed");
+    }
   };
 
   window.toggleUserMenu = function () {
@@ -184,7 +182,9 @@
   }
 
   function formatMessage(text) {
-    if (typeof marked === "undefined") return escapeHtml(text).replace(/\n/g, "<br>");
+    if (typeof marked === "undefined") {
+      return escapeHtml(text).replace(/\n/g, "<br>");
+    }
     marked.setOptions({
       highlight(code, lang) {
         if (typeof hljs !== "undefined" && lang && hljs.getLanguage(lang)) {
@@ -203,7 +203,7 @@
     if (w) w.style.display = visible ? "block" : "none";
   }
 
-  // UPDATED: add meta param
+  // addMessage now supports meta (thought time + web flag)
   function addMessage(text, role, modelNameForBadge, reasoningText = null, meta = null) {
     const container = $("messages-container");
     if (!container) return;
@@ -212,7 +212,10 @@
     row.className = `message-row ${role}-row`;
 
     if (role === "user") {
-      row.innerHTML = `<div class="message user-message"><div class="message-content">${escapeHtml(text)}</div></div>`;
+      row.innerHTML = `
+        <div class="message user-message">
+          <div class="message-content">${escapeHtml(text)}</div>
+        </div>`;
     } else if (role === "assistant") {
       row.innerHTML = `
         <div class="message assistant-message">
@@ -226,10 +229,9 @@
             <div class="assistant-meta"></div>
             ${reasoningText ? `
               <details class="reasoning-panel" style="margin:.35rem 0 .5rem 0;">
-                <summary style="cursor:pointer; color:#b4b4b4;">DeepThink (summary)</summary>
-                <div style="margin-top:.35rem; color:#ececec;">${escapeHtml(reasoningText)}</div>
-              </details>
-            ` : ``}
+                <summary style="cursor:pointer; color:var(--text-secondary);">DeepThink (summary)</summary>
+                <div style="margin-top:.35rem; color:var(--text-primary);">${escapeHtml(reasoningText)}</div>
+              </details>` : ``}
             <div class="markdown-content"></div>
           </div>
         </div>
@@ -239,7 +241,9 @@
       const metaEl = row.querySelector(".assistant-meta");
       if (metaEl && meta?.thoughtSeconds) {
         const s = Number(meta.thoughtSeconds).toFixed(1);
-        metaEl.textContent = meta.webEnabled ? `Thought for ${s}s • Web search on` : `Thought for ${s}s`;
+        metaEl.textContent = meta.webEnabled
+          ? `Thought for ${s}s • Web search on`
+          : `Thought for ${s}s`;
         metaEl.style.cssText = "color: var(--text-secondary); font-size: 0.8rem; margin: 0.25rem 0 0.5rem 0;";
       } else if (metaEl) {
         metaEl.remove();
@@ -252,7 +256,10 @@
         contentDiv.querySelectorAll("pre code").forEach(b => hljs.highlightElement(b));
       }
     } else {
-      row.innerHTML = `<div class="message error-message"><div class="message-content">${escapeHtml(text)}</div></div>`;
+      row.innerHTML = `
+        <div class="message error-message">
+          <div class="message-content">${escapeHtml(text)}</div>
+        </div>`;
     }
 
     container.appendChild(row);
@@ -341,10 +348,13 @@
     isLoading = true;
 
     try {
-      // ensure chat view is loaded (input exists)
       if (window.Router && Router.go) await Router.go("chat");
 
-      const data = await apiJson("/chat/new", { method: "POST", headers: { "Content-Type": "application/json" } });
+      const data = await apiJson("/chat/new", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+
       currentChatId = data.chatid;
 
       const container = $("messages-container");
@@ -453,8 +463,6 @@
         message,
         model: currentModelKey,
         chatid: currentChatId,
-
-        // Flags for backend wiring
         deepthink: deepThinkEnabled,
         web: webEnabled,
         web_search: webEnabled
@@ -484,7 +492,7 @@
       if (data.deepseekremaining != null) {
         const used = 50 - Number(data.deepseekremaining);
         const usage = $("deepseek-usage");
-        if (usage) usage.textContent = `${used}/50`;
+        if (usage) usage.textContent = used;
       }
     } catch (e) {
       removeTypingIndicator();
@@ -511,11 +519,15 @@
   document.addEventListener("click", (e) => {
     const menu = $("user-menu");
     const userBtn = e.target.closest(".user-avatar");
-    if (menu && menu.style.display === "block" && !userBtn && !menu.contains(e.target)) menu.style.display = "none";
+    if (menu && menu.style.display === "block" && !userBtn && !menu.contains(e.target)) {
+      menu.style.display = "none";
+    }
 
     const selector = $("model-selector");
     const modelBtn = e.target.closest(".model-selector-btn");
-    if (selector && selector.style.display === "block" && !modelBtn && !selector.contains(e.target)) selector.style.display = "none";
+    if (selector && selector.style.display === "block" && !modelBtn && !selector.contains(e.target)) {
+      selector.style.display = "none";
+    }
   });
 
   // Initial bind for non-router loads
