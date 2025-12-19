@@ -1,70 +1,73 @@
-<!-- templates/views/chat.html -->
-
-<!-- Welcome / Suggestions -->
+<!-- Chat View (loaded by router.js) -->
 <div class="welcome-section" id="welcome-section">
-  <h1 class="main-heading">What can I help with?</h1>
-
+  <h1 class="main-heading">What can I help you with?</h1>
+  
   <div class="suggestion-cards">
-    <div class="suggestion-card" onclick="useSuggestion('Create a weekly schedule for studying programming')">
-      <div class="suggestion-icon"></div>
-      <div class="suggestion-text">Create a schedule</div>
+    <div class="suggestion-card" onclick="useSuggestion('Explain quantum computing in simple terms')">
+      <div class="suggestion-icon">💡</div>
+      <div class="suggestion-text">Explain quantum computing</div>
     </div>
-
-    <div class="suggestion-card" onclick="useSuggestion('Write Python code to sort a list')">
-      <div class="suggestion-icon"></div>
-      <div class="suggestion-text">Write code</div>
+    
+    <div class="suggestion-card" onclick="useSuggestion('Write a Python function to sort a list')">
+      <div class="suggestion-icon">💻</div>
+      <div class="suggestion-text">Help me code something</div>
     </div>
-
-    <div class="suggestion-card" onclick="useSuggestion('Explain machine learning concepts in simple terms')">
-      <div class="suggestion-icon"></div>
-      <div class="suggestion-text">Learn AI concepts</div>
+    
+    <div class="suggestion-card" onclick="useSuggestion('What are the latest AI trends?')">
+      <div class="suggestion-icon">🔍</div>
+      <div class="suggestion-text">Research AI trends</div>
     </div>
-
-    <div class="suggestion-card" onclick="useSuggestion('Help me write a creative story')">
-      <div class="suggestion-icon"></div>
-      <div class="suggestion-text">Write a story</div>
+    
+    <div class="suggestion-card" onclick="useSuggestion('Give me creative writing ideas')">
+      <div class="suggestion-icon">✨</div>
+      <div class="suggestion-text">Creative inspiration</div>
     </div>
   </div>
 </div>
 
-<!-- Chat stream -->
+<!-- Messages Container -->
 <div id="messages-container"></div>
 
-<!-- Optional: where you can inject "Thought for X seconds" and "Searching for ..." UI
-     (recommended instead of fixed-position overlays). -->
-<div id="status-stream"></div>
-
-<!-- Input (chat view) -->
-<div class="input-wrapper" id="chat-input-wrapper" style="display:block;">
+<!-- Input Area (Fixed at bottom) -->
+<div class="input-wrapper">
   <div class="input-box">
-
-    <!-- DeepSeek-like action pills (better than putting toggles inside the textarea row) -->
+    <!-- Action Pills (DeepThink / Web) -->
     <div class="input-actions">
-      <button id="btn-deepthink" class="action-pill" type="button">
-        <span class="pill-icon">🧠</span> DeepThink
+      <button class="action-pill" id="btn-deepthink">
+        <span class="pill-icon">🧠</span>
+        <span>DeepThink</span>
       </button>
-
-      <button id="btn-web" class="action-pill" type="button">
-        <span class="pill-icon">🌐</span> Search
+      
+      <button class="action-pill" id="btn-web">
+        <span class="pill-icon">🌐</span>
+        <span>Search</span>
       </button>
     </div>
-
-    <!-- Composer -->
+    
+    <!-- Main Input -->
     <div class="input-inner">
-      <textarea id="chat-input" placeholder="Ask anything..." rows="1"></textarea>
-
-      <button class="send-button" type="button" id="send-btn" onclick="sendMessage()">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+      <textarea 
+        id="chat-input" 
+        placeholder="Message NexaAI..." 
+        rows="1"
+        disabled
+      ></textarea>
+      
+      <button class="send-button" id="send-btn" title="Send message">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
           <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
         </svg>
       </button>
     </div>
-
+    
+    <!-- Footer Info -->
     <div class="input-footer">
-      <span class="footer-text">
-        <span id="model-info">{{ session.get('selected_model_name', 'Gemini 2.5 Flash') }}</span>
-        · NexaAI can make mistakes. Check important info.
-      </span>
+      <span id="model-info">Gemini 2.5 Flash</span> can make mistakes. Verify important info.
     </div>
   </div>
+</div>
+
+<!-- DeepThink Status (shows during thinking) -->
+<div id="deepthink-status" style="display:none;">
+  🧠 Thinking<span id="deepthink-seconds">0s</span>
 </div>
