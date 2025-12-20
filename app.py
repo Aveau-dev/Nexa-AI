@@ -549,6 +549,41 @@ def web_search_snippet(query, timeout=8):
         return ""
 
 
+
+@app.route("/demo-login", methods=["POST"])
+def demo_login():
+    """
+    Auto-login route for a demo user.
+    Used by index.html to jump straight into the dashboard.
+    """
+    # If already authenticated, just say OK
+    if current_user.is_authenticated:
+        return jsonify(success=True, redirect=url_for("dashboard"))
+
+    # Look for existing demo user
+    demo_email = "demo@nexaai.local"
+    demo_user = User.query.filter_by(email=demo_email).first()
+
+    if not demo_user:
+        demo_user = User(
+            email=demo_email,
+            name="Demo User",
+            password=generate_password_hash("demo-password"),
+            ispremium=False,
+            deepseekcount=0,
+            deepseekdate=datetime.utcnow().strftime("%Y-%m-%d"),
+        )
+        db.session.add(demo_user)
+        db.session.commit()
+
+    login_user(demo_user, remember=False)
+    # Optional: select default model in session
+    session["selected_model"] = session.get("selected_model", "gemini-flash")
+    session["selected_model_name"] = session.get("selected_model_name", "Gemini 2.5 Flash")
+
+    return jsonify(success=True, redirect=url_for("dashboard"))
+
+
 # ============ ERROR HANDLERS ============
 @app.errorhandler(413)
 def too_large(e):
@@ -1085,6 +1120,7 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))
     log.info("Starting NexaAI on port %s", port)
     app.run(debug=True, host="0.0.0.0", port=port)
+
 
 
 
