@@ -163,55 +163,64 @@
   </div>
 
   <!-- Sidebar -->
-  <aside class="sidebar" id="sidebar">
-    <div class="sidebar-content">
-      <div class="sidebar-section">
-        <div class="section-title">Chat History</div>
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-content">
+    <div class="sidebar-section">
+      <div class="section-title">Chat History</div>
 
-        <div class="chat-history" id="chat-history">
-          {% if chats %}
-            {% for chat in chats %}
-              <div class="chat-item" data-chat-id="{{ chat.id }}" onclick="loadChat('{{ chat.id }}')">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                  <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"></path>
-                </svg>
-                <span class="chat-title">{{ chat.title }}</span>
-                <div class="chat-actions">
-                  <button class="icon-btn" title="Rename"
-                          onclick="event.stopPropagation(); renameChat('{{ chat.id }}')"></button>
-                  <button class="icon-btn" title="Delete"
-                          onclick="event.stopPropagation(); deleteChat('{{ chat.id }}')"></button>
-                </div>
+      <div class="chat-history" id="chat-history">
+        {% if chats %}
+          {% for chat in chats %}
+            <div class="chat-item"
+                 data-chat-id="{{ chat.id }}"
+                 onclick="window.loadChat('{{ chat.id }}')">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"></path>
+              </svg>
+              <span class="chat-title">{{ chat.title }}</span>
+              <div class="chat-actions">
+                <button class="icon-btn"
+                        title="Rename"
+                        onclick="event.stopPropagation(); window.renameChat('{{ chat.id }}')">
+                </button>
+                <button class="icon-btn"
+                        title="Delete"
+                        onclick="event.stopPropagation(); window.deleteChat('{{ chat.id }}')">
+                </button>
               </div>
-            {% endfor %}
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="empty-state">No chats yet. Start a new conversation!</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="usage-info">
+        <div class="usage-item">
+          <span class="usage-label">DeepSeek Today</span>
+          <span class="usage-value">
+            <span id="deepseek-usage">{{ user.deepseekcount }}</span>/50
+          </span>
+        </div>
+
+        <div class="footer-actions">
+          <button class="nav-button" type="button" onclick="Settings.open()">Settings</button>
+
+          {% if not user.ispremium %}
+            <div class="upgrade-cta-small">
+              <a href="{{ url_for('checkout') }}">Upgrade for unlimited access →</a>
+            </div>
           {% else %}
-            <div class="empty-state">No chats yet. Start a new conversation!</div>
+            <div class="premium-info">Unlimited access enabled</div>
           {% endif %}
         </div>
       </div>
-
-      <div class="sidebar-footer">
-        <div class="usage-info">
-          <div class="usage-item">
-            <span class="usage-label">DeepSeek Today</span>
-            <span class="usage-value"><span id="deepseek-usage">{{ user.deepseekcount }}</span>/50</span>
-          </div>
-
-          <div class="footer-actions">
-            <button class="nav-button" type="button" onclick="Settings.open()">Settings</button>
-
-            {% if not user.ispremium %}
-              <div class="upgrade-cta-small">
-                <a href="{{ url_for('checkout') }}">Upgrade for unlimited access →</a>
-              </div>
-            {% else %}
-              <div class="premium-info">Unlimited access enabled</div>
-            {% endif %}
-          </div>
-        </div>
-      </div>
     </div>
-  </aside>
+  </div>
+</aside>
+
 
   <!-- Main Container (Router injects partial views here) -->
   <div class="main-container with-sidebar" id="main-content">
@@ -281,4 +290,5 @@
   </script>
 </body>
 </html>
+
 
