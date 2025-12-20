@@ -1,47 +1,18 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-  <meta name="google-site-verification" content="1xRfZx8fEbwT18xMYj4l1UFl5jRckIrbs2uk4STqF6Y" />
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
   <title>NexaAI – Dashboard</title>
-  <meta name="description" content="NexaAI dashboard: multi-model AI chat with saved history, file uploads, and premium tools." />
-  <meta name="keywords" content="AI, NexaAI, chatbot, GPT-4, Claude, Gemini, DeepSeek, OpenRouter, AI assistant" />
-  <link rel="canonical" href="https://nexaai.js.org/dashboard" />
-  <meta name="robots" content="index, follow" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <link rel="icon" type="image/svg+xml"
-        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2319c37d' d='M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z'/></svg>">
+  <!-- DeepSeek main CSS (your big paste.txt as style.css) -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='Css/style.css') }}">
 
-  <meta property="og:title" content="NexaAI – Dashboard" />
-  <meta property="og:description" content="Your NexaAI workspace with chat history and multiple AI models." />
-  <meta property="og:url" content="https://nexaai.js.org/dashboard" />
-  <meta property="og:type" content="website" />
-  <meta property="og:image" content="https://nexaai.js.org/static/og-image.png" />
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="NexaAI – Dashboard" />
-  <meta name="twitter:description" content="A modern, privacy-friendly AI dashboard with saved chat history." />
-  <meta name="twitter:image" content="https://nexaai.js.org/static/og-image.png" />
-  <link href="https://static.deepseek.com/chat/static/main.97956ec606.css" rel="stylesheet">
-  
-  <link rel="stylesheet" href="{{ url_for('static', filename='Css/style.css') }}" />
-
-  <!-- Markdown + Highlight -->
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- Markdown + code highlight -->
   <link rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-
-  <!-- Polyfills -->
-  <script>
-    if(!window.Promise){
-      document.write('<script src="https://cdn.jsdelivr.net/npm/promise-polyfill@8/dist/polyfill.min.js"><\/script>');
-    }
-    if(!window.fetch){
-      document.write('<script src="https://cdn.jsdelivr.net/npm/whatwg-fetch@3.6.2/dist/fetch.umd.js"><\/script>');
-    }
-  </script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
   <!-- Initial model for chat.js -->
   <script>
@@ -51,96 +22,114 @@
   </script>
 </head>
 
-<body>
-  <!-- Top Navigation -->
-  <nav class="top-nav">
-    <div class="nav-left">
-      <button class="nav-button icon-only" id="sidebar-toggle" onclick="toggleSidebar()">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-          <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"></path>
-        </svg>
+<body class="ds-app">
+
+  <!-- Top bar -->
+  <header class="ds-top-nav">
+    <div class="ds-top-nav__left">
+      <button class="ds-icon-button ds-icon-button--m" id="sidebar-toggle" onclick="toggleSidebar()">
+        <span class="ds-icon-button__hover-bg"></span>
+        <span class="ds-icon">
+          <svg viewBox="0 0 24 24"><path fill="currentColor"
+            d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"></path></svg>
+        </span>
       </button>
 
-      <button class="nav-button" onclick="newChat()">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-          <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path>
-        </svg>
+      <button class="ds-button ds-button--filled ds-button--primary ds-button--m" onclick="newChat()">
+        <span class="ds-button__icon">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path>
+          </svg>
+        </span>
         <span>New chat</span>
       </button>
 
-      <div class="logo-container" onclick="window.Router && Router.go ? Router.go('chat') : void 0">
-        <svg class="logo-icon" viewBox="0 0 24 24" width="20" height="20">
+      <div class="ds-top-nav__logo">
+        <svg class="ds-top-nav__logo-icon" viewBox="0 0 24 24" width="20" height="20">
           <path fill="currentColor" d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"></path>
         </svg>
-        <span class="logo-text">NexaAI</span>
+        <span class="ds-top-nav__product-name">NexaAI</span>
       </div>
 
-      <button class="model-selector-btn" onclick="toggleModelSelector()">
+      <button class="ds-button ds-button--bordered ds-button--secondary ds-button--m model-selector-btn"
+              onclick="toggleModelSelector()">
         <span id="selected-model-name">{{ session.get('selected_model_name', 'Gemini 2.5 Flash') }}</span>
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-          <path d="M7 10l5 5 5-5z"></path>
-        </svg>
+        <span class="ds-button__icon">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path d="M7 10l5 5 5-5z"></path>
+          </svg>
+        </span>
       </button>
     </div>
 
-    <div class="nav-right">
-      <button class="nav-button" type="button" onclick="Settings.open()">Settings</button>
-
+    <div class="ds-top-nav__right">
       {% if not user.ispremium %}
-        <button class="nav-button upgrade-btn" onclick="location.href='{{ url_for('checkout') }}'">
+        <button class="ds-button ds-button--filled ds-button--primary ds-button--m"
+                onclick="location.href='{{ url_for('checkout') }}'">
           <span>Upgrade</span>
         </button>
       {% else %}
         <div class="premium-badge-nav">Premium</div>
       {% endif %}
 
-      <button class="nav-button icon-only" onclick="toggleUserMenu()">
+      <button class="ds-icon-button ds-icon-button--m" onclick="toggleUserMenu()">
+        <span class="ds-icon-button__hover-bg"></span>
         <div class="user-avatar">{{ (user.name or 'U')[0].upper() }}</div>
       </button>
     </div>
-  </nav>
+  </header>
 
-  <!-- Model Selector -->
+  <!-- Model selector -->
   <div id="model-selector" class="model-selector-dropdown" style="display:none;">
-    <div class="model-selector-header">
-      <h3>Select AI Model</h3>
-      <button class="close-selector" onclick="toggleModelSelector()">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-          <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path>
-        </svg>
-      </button>
-    </div>
+    <div class="ds-modal-content" style="max-width:520px;">
+      <div class="ds-modal-content__header-wrapper">
+        <div class="ds-modal-content__title">Select AI model</div>
+        <button class="ds-icon-button ds-icon-button--s" onclick="toggleModelSelector()">
+          <span class="ds-icon-button__hover-bg"></span>
+          <span class="ds-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19
+                       12 13.41 17.59 19 19 17.59 13.41 12z"></path>
+            </svg>
+          </span>
+        </button>
+      </div>
 
-    <div class="model-selector-content">
-      <div class="model-group">
-        <div class="model-group-header">
-          <span class="group-badge free">Models</span>
-          <span class="group-title">Available</span>
-        </div>
+      <div class="model-selector-content">
+        <div class="model-group">
+          <div class="model-group-header">
+            <span class="group-badge free">Models</span>
+            <span class="group-title">Available</span>
+          </div>
 
-        {% for model_key, model_data in models.items() %}
-          <div class="model-card {% if session.get('selected_model', 'gemini-flash') == model_key %}active{% endif %}"
-               data-model="{{ model_key }}"
-               onclick="selectModel('{{ model_key }}','{{ model_data.get('name', model_key) }}')">
-            <div class="model-card-header">
-              <div class="model-icon"><span class="icon-text">AI</span></div>
-              <div class="model-info">
-                <h4 class="model-name">{{ model_data.get('name', model_key) }}</h4>
-                <div class="model-features">
-                  {% if model_data.get('vision') %}<span class="feature-badge vision">Vision</span>{% endif %}
-                  {% if model_data.get('limit') %}<span class="feature-badge limit">{{ model_data.get('limit') }}/day</span>{% endif %}
-                  <span class="feature-badge speed">Fast</span>
+          {% for model_key, model_data in models.items() %}
+            <div class="model-card {% if session.get('selected_model', 'gemini-flash') == model_key %}active{% endif %}"
+                 data-model="{{ model_key }}"
+                 onclick="selectModel('{{ model_key }}','{{ model_data.get('name', model_key) }}')">
+              <div class="model-card-header">
+                <div class="model-icon"><span class="icon-text">AI</span></div>
+                <div class="model-info">
+                  <h4 class="model-name">{{ model_data.get('name', model_key) }}</h4>
+                  <div class="model-features">
+                    {% if model_data.get('vision') %}
+                      <span class="feature-badge vision">Vision</span>
+                    {% endif %}
+                    {% if model_data.get('limit') %}
+                      <span class="feature-badge limit">{{ model_data.get('limit') }}/day</span>
+                    {% endif %}
+                    <span class="feature-badge speed">Fast</span>
+                  </div>
                 </div>
               </div>
+              <div class="model-description">{{ model_data.get('description','') }}</div>
             </div>
-            <div class="model-description">{{ model_data.get('description','') }}</div>
-          </div>
-        {% endfor %}
+          {% endfor %}
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- User Menu -->
+  <!-- User menu -->
   <div id="user-menu" class="dropdown-menu" style="display:none;">
     <div class="menu-header">
       <div class="user-avatar-large">{{ (user.name or 'U')[0].upper() }}</div>
@@ -162,119 +151,78 @@
     <a href="{{ url_for('logout') }}" class="menu-item">Log out</a>
   </div>
 
-  <!-- Sidebar -->
-<aside class="sidebar" id="sidebar">
-  <div class="sidebar-content">
-    <div class="sidebar-section">
-      <div class="section-title">Chat History</div>
+  <!-- App layout -->
+  <div class="ds-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-content">
+        <div class="sidebar-section">
+          <div class="section-title">Chat History</div>
 
-      <div class="chat-history" id="chat-history">
-        {% if chats %}
-          {% for chat in chats %}
-            <div class="chat-item"
-                 data-chat-id="{{ chat.id }}"
-                 onclick="window.loadChat('{{ chat.id }}')">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"></path>
-              </svg>
-              <span class="chat-title">{{ chat.title }}</span>
-              <div class="chat-actions">
-                <button class="icon-btn"
-                        title="Rename"
-                        onclick="event.stopPropagation(); window.renameChat('{{ chat.id }}')">
-                </button>
-                <button class="icon-btn"
-                        title="Delete"
-                        onclick="event.stopPropagation(); window.deleteChat('{{ chat.id }}')">
-                </button>
-              </div>
-            </div>
-          {% endfor %}
-        {% else %}
-          <div class="empty-state">No chats yet. Start a new conversation!</div>
-        {% endif %}
-      </div>
-    </div>
-
-    <div class="sidebar-footer">
-      <div class="usage-info">
-        <div class="usage-item">
-          <span class="usage-label">DeepSeek Today</span>
-          <span class="usage-value">
-            <span id="deepseek-usage">{{ user.deepseekcount }}</span>/50
-          </span>
-        </div>
-
-        <div class="footer-actions">
-          <button class="nav-button" type="button" onclick="Settings.open()">Settings</button>
-
-          {% if not user.ispremium %}
-            <div class="upgrade-cta-small">
-              <a href="{{ url_for('checkout') }}">Upgrade for unlimited access →</a>
-            </div>
-          {% else %}
-            <div class="premium-info">Unlimited access enabled</div>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-  </div>
-</aside>
-
-
-  <!-- Main Container (Router injects partial views here) -->
-  <div class="main-container with-sidebar" id="main-content">
-    <div class="center-content" id="view-container">
-      <div class="welcome-section" id="welcome-section" style="display:block;">
-        <h1 class="main-heading">Loading…</h1>
-      </div>
-    </div>
-  </div>
-
-  <!-- Settings Popup Modal -->
-  <div class="modal" id="settings-modal">
-    <div class="modal-content">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-        <h2 style="margin:0; font-size:1.1rem;">Settings</h2>
-        <button class="icon-btn" type="button" onclick="Settings.close()" aria-label="Close">✕</button>
-      </div>
-
-      <div style="display:grid; grid-template-columns: 220px 1fr; gap:1rem;">
-        <div style="background:var(--bg-primary); border:1px solid var(--border-color); border-radius:12px; padding:.75rem;">
-          <button class="nav-button" type="button" style="width:100%; justify-content:flex-start;">General</button>
-          <button class="nav-button" type="button" style="width:100%; justify-content:flex-start;">Profile</button>
-          <button class="nav-button" type="button" style="width:100%; justify-content:flex-start;">Data</button>
-          <button class="nav-button" type="button" style="width:100%; justify-content:flex-start;">About</button>
-        </div>
-
-        <div style="background:var(--bg-primary); border:1px solid var(--border-color); border-radius:12px; padding:1rem;">
-          <div style="font-weight:600; margin-bottom:.75rem;">Theme</div>
-
-          <div style="display:flex; gap:.75rem; flex-wrap:wrap;">
-            <button class="nav-button" type="button" id="theme-light"  onclick="Settings.setTheme('light')">Light</button>
-            <button class="nav-button" type="button" id="theme-dark"   onclick="Settings.setTheme('dark')">Dark</button>
-            <button class="nav-button" type="button" id="theme-system" onclick="Settings.setTheme('system')">System</button>
+          <div class="chat-history" id="chat-history">
+            {% if chats %}
+              {% for chat in chats %}
+                <div class="chat-item"
+                     data-chat-id="{{ chat.id }}"
+                     onclick="window.loadChat('{{ chat.id }}')">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                    <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"></path>
+                  </svg>
+                  <span class="chat-title">{{ chat.title }}</span>
+                  <div class="chat-actions">
+                    <button class="icon-btn" title="Rename"
+                            onclick="event.stopPropagation(); window.renameChat('{{ chat.id }}')"></button>
+                    <button class="icon-btn" title="Delete"
+                            onclick="event.stopPropagation(); window.deleteChat('{{ chat.id }}')"></button>
+                  </div>
+                </div>
+              {% endfor %}
+            {% else %}
+              <div class="empty-state">No chats yet. Start a new conversation!</div>
+            {% endif %}
           </div>
+        </div>
 
-          <div style="margin-top:1.25rem; display:flex; justify-content:space-between; align-items:center;">
-            <div style="font-weight:600;">Language</div>
-            <select class="nav-button" style="padding:.5rem .75rem;">
-              <option>System</option>
-              <option>English</option>
-              <option>Hindi</option>
-            </select>
+        <div class="sidebar-footer">
+          <div class="usage-info">
+            <div class="usage-item">
+              <span class="usage-label">DeepSeek Today</span>
+              <span class="usage-value">
+                <span id="deepseek-usage">{{ user.deepseekcount }}</span>/50
+              </span>
+            </div>
+
+            <div class="footer-actions">
+              <button class="ds-button ds-button--bordered ds-button--secondary ds-button--s"
+                      type="button" onclick="Settings.open()">Settings</button>
+
+              {% if not user.ispremium %}
+                <div class="upgrade-cta-small">
+                  <a href="{{ url_for('checkout') }}">Upgrade for unlimited access →</a>
+                </div>
+              {% else %}
+                <div class="premium-info">Unlimited access enabled</div>
+              {% endif %}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="main-container with-sidebar" id="main-content">
+      <div class="center-content" id="view-container">
+        <div class="welcome-section" id="welcome-section" style="display:block;">
+          <h1 class="main-heading">Loading…</h1>
+        </div>
+      </div>
+    </main>
   </div>
 
   <!-- Scripts -->
   <script src="{{ url_for('static', filename='js/router.js') }}"></script>
   <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
   <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
-
-  <!-- Optional feature modules -->
   <script src="{{ url_for('static', filename='js/files.js') }}"></script>
   <script src="{{ url_for('static', filename='js/memory.js') }}"></script>
   <script src="{{ url_for('static', filename='js/projects.js') }}"></script>
@@ -290,5 +238,3 @@
   </script>
 </body>
 </html>
-
-
