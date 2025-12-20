@@ -46,6 +46,13 @@
     }
   </script>
 </head>
+  
+{% if current_user.is_authenticated %}
+<script>
+  // Already logged in → go straight to dashboard
+  window.location.href = "{{ url_for('dashboard') }}";
+</script>
+{% endif %}
 
 <body class="ds-body">
   <!-- Navigation Bar -->
@@ -382,3 +389,4 @@
   </script>
 </body>
 </html>
+
