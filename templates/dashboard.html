@@ -5,22 +5,22 @@
   <title>NexaAI – Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- Main DeepSeek-style CSS (your big paste.txt as style.css) -->
+  <!-- Only this CSS, nothing else -->
   <link rel="stylesheet" href="{{ url_for('static', filename='Css/style.css') }}">
 
-  <!-- Markdown + code highlight -->
+  <!-- Markdown + code highlight (keep these) -->
   <link rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
-  <!-- Initial model for chat.js -->
   <script>
     window.NEXAAI = window.NEXAAI || {};
     window.NEXAAI.initialModelKey  = "{{ session.get('selected_model', 'gemini-flash') }}";
     window.NEXAAI.initialModelName = "{{ session.get('selected_model_name', 'Gemini 2.5 Flash') }}";
   </script>
 </head>
+
 
 <body class="ds-app">
 
@@ -280,3 +280,4 @@
   </script>
 </body>
 </html>
+
