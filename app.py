@@ -194,6 +194,65 @@ def migrate_database():
 
 migrate_database()
 
+
+def init_database():
+    with app.app_context():
+        try:
+            # Create all tables
+            db.create_all()
+            log.info("Database tables created/verified")
+            
+            # Run migration for existing databases
+            migrate_message_table_schema()
+            
+            return True
+        except Exception as e:
+            log.error(f"Database initialization failed: {e}")
+            log.exception("Database error details")
+            return False
+
+def migrate_message_table_schema():
+    """Add missing columns to message table if they don't exist"""
+    try:
+        with db.engine.connect() as conn:
+            conn.begin()
+            
+            if "sqlite" in str(db.engine.url):
+                # SQLite: Check and add columns
+                result = conn.execute(sqltext("PRAGMA table_info(message)"))
+                columns = [row[1] for row in result.fetchall()]
+                
+                if "imageurl" not in columns:
+                    conn.execute(sqltext("ALTER TABLE message ADD COLUMN imageurl VARCHAR(1000);"))
+                    log.info("Added imageurl column")
+                
+                if "imagepath" not in columns:
+                    conn.execute(sqltext("ALTER TABLE message ADD COLUMN imagepath VARCHAR(1000);"))
+                    log.info("Added imagepath column")
+                
+                if "imagedata" not in columns:
+                    conn.execute(sqltext("ALTER TABLE message ADD COLUMN imagedata TEXT;"))
+                    log.info("Added imagedata column")
+            
+            else:
+                # PostgreSQL: Try to add columns
+                for col_name, col_type in [("imageurl", "VARCHAR(1000)"), 
+                                           ("imagepath", "VARCHAR(1000)"),
+                                           ("imagedata", "TEXT")]:
+                    try:
+                        conn.execute(sqltext(f"ALTER TABLE message ADD COLUMN {col_name} {col_type};"))
+                        log.info(f"Added {col_name} column")
+                    except Exception:
+                        pass  # Column likely already exists
+            
+            conn.commit()
+            log.info("Message table schema verified")
+    except Exception as e:
+        log.warning(f"Schema migration warning: {e}")
+
+init_database()
+
+
 # ============ AI MODELS CONFIG ============
 # Primary default model:
 DEFAULT_MODEL_KEY = "gemini-flash"
@@ -1120,6 +1179,7 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))
     log.info("Starting NexaAI on port %s", port)
     app.run(debug=True, host="0.0.0.0", port=port)
+
 
 
 
