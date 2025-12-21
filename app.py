@@ -1,7 +1,7 @@
 """
-Nexa-AI - Complete Fixed Version with Unique Chat URLs
+Nexa-AI - Complete Fixed Version with Enhanced Error Handling
 Production-ready Flask app with proper database schema,
-Stripe integration, and AI model support
+Stripe integration, AI model support, and detailed logging
 """
 
 from flask import Flask, render_template, request, redirect, url_for, jsonify, session, send_from_directory, abort
@@ -71,38 +71,41 @@ log.info('Configuring AI APIs...')
 google_api_key = os.getenv('GOOGLE_API_KEY')
 if google_api_key:
     try:
+        google_api_key = google_api_key.strip()
         genai.configure(api_key=google_api_key)
-        log.info('Google Generative AI configured')
+        log.info('✅ Google Generative AI configured')
     except Exception as e:
-        log.error(f'Google AI config error: {e}')
+        log.error(f'❌ Google AI config error: {e}')
+        google_api_key = None
 else:
-    log.warning('GOOGLE_API_KEY not set')
+    log.warning('⚠️ GOOGLE_API_KEY not set')
 
 # OpenRouter API Key
 openrouter_api_key = os.getenv('OPENROUTER_API_KEY')
 if openrouter_api_key:
-    log.info('OpenRouter configured')
+    openrouter_api_key = openrouter_api_key.strip()
+    log.info('✅ OpenRouter configured')
 else:
-    log.warning('OPENROUTER_API_KEY not set')
+    log.warning('⚠️ OPENROUTER_API_KEY not set')
 
-# Stripe Configuration (Fixed)
+# Stripe Configuration
 stripe_key = os.getenv('STRIPE_SECRET_KEY')
 if stripe_key:
     stripe_key = stripe_key.strip()
     if stripe_key.startswith('sk_'):
         stripe.api_key = stripe_key
-        log.info('Stripe configured: %s', stripe_key[:20] + '...')
+        log.info('✅ Stripe configured: %s...', stripe_key[:15])
     else:
-        log.error('INVALID Stripe key format (must start with sk_test_ or sk_live_)')
+        log.error('❌ INVALID Stripe key format')
         stripe.api_key = None
 else:
     stripe.api_key = None
-    log.warning('STRIPE_SECRET_KEY not set in environment')
+    log.warning('⚠️ STRIPE_SECRET_KEY not set')
 
-# ========== Database Models (FIXED for PostgreSQL "user" table) ==========
+# ========== Database Models ==========
 
 class User(UserMixin, db.Model):
-    __tablename__ = '"user"'  # Quoted for PostgreSQL compatibility
+    __tablename__ = '"user"'  # Quoted for PostgreSQL
     
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(100), unique=True, nullable=False, index=True)
@@ -140,7 +143,7 @@ class Message(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     chat_id = db.Column(db.Integer, db.ForeignKey('chat.id'), nullable=False, index=True)
-    role = db.Column(db.String(20), nullable=False)  # user, assistant, system
+    role = db.Column(db.String(20), nullable=False)
     content = db.Column(db.Text, nullable=False)
     has_image = db.Column(db.Boolean, default=False)
     image_path = db.Column(db.String(1000), nullable=True)
@@ -164,12 +167,38 @@ def load_user(user_id):
         return None
 
 
+def validate_api_keys():
+    """Validate API keys on startup"""
+    issues = []
+    
+    if not google_api_key or len(google_api_key) < 20:
+        issues.append('⚠️ GOOGLE_API_KEY missing or invalid')
+        log.warning('GOOGLE_API_KEY not properly configured')
+    else:
+        log.info('✅ Google API key validated')
+    
+    if not openrouter_api_key or len(openrouter_api_key) < 20:
+        issues.append('⚠️ OPENROUTER_API_KEY missing or invalid')
+        log.warning('OPENROUTER_API_KEY not properly configured')
+    else:
+        log.info('✅ OpenRouter API key validated')
+    
+    if issues:
+        log.warning('API Configuration Issues:\n' + '\n'.join(issues))
+    
+    return len(issues) == 0
+
+
 def init_database():
     """Initialize database with proper schema"""
     with app.app_context():
         try:
             db.create_all()
             log.info('✓ Database tables created/verified')
+            
+            # Validate API keys
+            validate_api_keys()
+            
             return True
         except Exception as e:
             log.error(f'Database initialization failed: {e}')
@@ -184,7 +213,7 @@ init_database()
 FREE_MODELS = [
     {
         'name': 'Gemini 2.5 Flash',
-        'model': 'gemini-2.5-flash-lite',
+        'model': 'gemini-2.0-flash-exp',
         'provider': 'google',
         'vision': True,
         'limit': None,
@@ -291,12 +320,14 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def call_google_gemini(model_path, messages, image_data=None, image_path=None, timeout=60):
-    """Call Google Generative AI (Gemini)"""
+def call_google_gemini(model_path, messages, image_data=None, image_path=None, timeout=90):
+    """Call Google Generative AI (Gemini) - Enhanced Error Handling"""
     try:
         if not google_api_key:
-            raise Exception('Google API key not configured')
+            log.error('❌ Google API key not configured')
+            raise Exception('Google API key not configured. Please set GOOGLE_API_KEY in environment.')
         
+        log.info(f'📤 Calling Gemini model: {model_path}')
         model = genai.GenerativeModel(model_path)
         
         # Prepare content
@@ -308,6 +339,7 @@ def call_google_gemini(model_path, messages, image_data=None, image_path=None, t
             text = extract_text_content(last_msg.get('content', ''))
             if text:
                 content.append(text)
+                log.info(f'📝 Message length: {len(text)} chars')
         
         # Add image if provided
         if image_data:
@@ -315,32 +347,62 @@ def call_google_gemini(model_path, messages, image_data=None, image_path=None, t
                 image_bytes = base64.b64decode(image_data)
                 image = Image.open(io.BytesIO(image_bytes))
                 content.append(image)
+                log.info('🖼️ Image attached to request')
             except Exception as e:
-                log.warning(f'Failed to process image data: {e}')
+                log.warning(f'Failed to process image: {e}')
         
         if not content:
             content = ['Please respond.']
         
-        response = model.generate_content(content, request_options={'timeout': timeout})
-        return response.text if response else 'No response'
+        log.info(f'⏱️ Sending request with {timeout}s timeout...')
+        response = model.generate_content(
+            content, 
+            request_options={'timeout': timeout}
+        )
+        
+        if response and response.text:
+            log.info(f'✅ Gemini response received: {len(response.text)} chars')
+            return response.text
+        else:
+            log.warning('⚠️ Empty response from Gemini')
+            return 'No response generated. Please try again.'
         
     except Exception as e:
-        log.error(f'Gemini API error: {e}')
-        return f'Error: {str(e)[:100]}'
+        error_msg = str(e)
+        log.error(f'❌ Gemini API error: {error_msg}')
+        
+        # Better error messages for common issues
+        if 'API_KEY' in error_msg.upper() or 'INVALID_ARGUMENT' in error_msg.upper():
+            return 'Error: Invalid or missing Google API key. Please check your configuration.'
+        elif 'TIMEOUT' in error_msg.upper() or 'DEADLINE_EXCEEDED' in error_msg.upper():
+            return 'Error: Request timed out. The model took too long to respond. Try again with a shorter prompt.'
+        elif 'QUOTA' in error_msg.upper() or 'RATE' in error_msg.upper():
+            return 'Error: API rate limit exceeded. Please wait a moment and try again.'
+        elif 'SAFETY' in error_msg.upper() or 'BLOCK' in error_msg.upper():
+            return 'Error: Content blocked by safety filters. Please rephrase your request.'
+        elif 'NOT_FOUND' in error_msg.upper():
+            return 'Error: Model not found. Please select a different model.'
+        else:
+            return f'Error: {error_msg[:150]}'
 
 
 def call_openrouter(model_path, messages, image_data=None, image_path=None):
-    """Call OpenRouter API"""
+    """Call OpenRouter API - Enhanced Error Handling"""
     try:
         if not openrouter_api_key:
-            raise Exception('OpenRouter API key not configured')
+            log.error('❌ OpenRouter API key not configured')
+            raise Exception('OpenRouter API key not configured. Please set OPENROUTER_API_KEY.')
+        
+        log.info(f'📤 Calling OpenRouter model: {model_path}')
         
         headers = {
             'Authorization': f'Bearer {openrouter_api_key}',
             'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://nexa-ai-2d8d.onrender.com',
+            'X-Title': 'NexaAI'
         }
         
-        # Prepare messages for OpenRouter
+        # Prepare messages
         formatted_messages = []
         for msg in messages:
             content = msg.get('content', '')
@@ -355,12 +417,15 @@ def call_openrouter(model_path, messages, image_data=None, image_path=None):
                     'content': extract_text_content(content)
                 })
         
-        # Add image if available (for vision models)
-        if image_data and ('-vision' in model_path.lower() or 'claude' in model_path.lower() or 'gpt-4' in model_path.lower()):
+        log.info(f'📝 Message history: {len(formatted_messages)} messages')
+        
+        # Add image for vision models
+        if image_data and ('gpt-4' in model_path.lower() or 'claude' in model_path.lower()):
             formatted_messages[-1]['content'] = [
                 {'type': 'text', 'text': formatted_messages[-1]['content']},
                 {'type': 'image_url', 'image_url': {'url': f'data:image/jpeg;base64,{image_data}'}}
             ]
+            log.info('🖼️ Image attached to OpenRouter request')
         
         payload = {
             'model': model_path,
@@ -368,23 +433,47 @@ def call_openrouter(model_path, messages, image_data=None, image_path=None):
             'temperature': 0.7,
         }
         
+        log.info(f'⏱️ Sending OpenRouter request...')
         response = requests.post(
             'https://openrouter.ai/api/v1/chat/completions',
             headers=headers,
             json=payload,
-            timeout=60
+            timeout=90
         )
         
+        log.info(f'📊 OpenRouter status: {response.status_code}')
+        
         if response.status_code != 200:
-            error_msg = response.json().get('error', {}).get('message', response.text)
-            raise Exception(f'OpenRouter error: {error_msg}')
+            error_data = response.json() if response.text else {}
+            error_msg = error_data.get('error', {}).get('message', response.text[:200])
+            log.error(f'❌ OpenRouter error: {error_msg}')
+            raise Exception(f'OpenRouter API error ({response.status_code}): {error_msg}')
         
         result = response.json()
-        return result['choices'][0]['message']['content']
+        ai_response = result['choices'][0]['message']['content']
+        log.info(f'✅ OpenRouter response: {len(ai_response)} chars')
+        return ai_response
         
+    except requests.exceptions.Timeout:
+        log.error('❌ OpenRouter request timed out')
+        return 'Error: Request timed out after 90 seconds. Try a shorter prompt or different model.'
+    
+    except requests.exceptions.ConnectionError:
+        log.error('❌ OpenRouter connection failed')
+        return 'Error: Could not connect to OpenRouter API. Check your internet connection.'
+    
     except Exception as e:
-        log.error(f'OpenRouter API error: {e}')
-        return f'Error: {str(e)[:100]}'
+        error_msg = str(e)
+        log.error(f'❌ OpenRouter error: {error_msg}')
+        
+        if 'API_KEY' in error_msg.upper() or '401' in error_msg:
+            return 'Error: Invalid OpenRouter API key. Please check your configuration.'
+        elif 'RATE' in error_msg.upper() or '429' in error_msg:
+            return 'Error: Rate limit exceeded. Please wait and try again.'
+        elif 'INSUFFICIENT_QUOTA' in error_msg.upper():
+            return 'Error: API quota exceeded. Please add credits to your OpenRouter account.'
+        else:
+            return f'Error: {error_msg[:150]}'
 
 
 def is_stripe_configured():
@@ -404,13 +493,12 @@ def check_deepseek_limit(user):
     today = str(datetime.utcnow().date())
     
     if user.deepseek_date != today:
-        # Reset counter for new day
         user.deepseek_count = 0
         user.deepseek_date = today
         db.session.commit()
     
     if user.is_premium:
-        return True  # No limit for premium
+        return True
     
     return user.deepseek_count < 50
 
@@ -452,8 +540,10 @@ def login():
         
         if user and check_password_hash(user.password, password):
             login_user(user, remember=True)
+            log.info(f'✅ User logged in: {email}')
             return jsonify({'success': True, 'redirect': url_for('dashboard')})
         
+        log.warning(f'❌ Failed login attempt: {email}')
         return jsonify({'success': False, 'error': 'Invalid credentials'}), 401
     
     return render_template('login.html')
@@ -486,6 +576,7 @@ def signup():
             db.session.add(user)
             db.session.commit()
             login_user(user, remember=True)
+            log.info(f'✅ New user registered: {email}')
             return jsonify({'success': True, 'redirect': url_for('dashboard')})
         except Exception as e:
             db.session.rollback()
@@ -499,6 +590,7 @@ def signup():
 @login_required
 def logout():
     """User logout"""
+    log.info(f'User logged out: {current_user.email}')
     logout_user()
     return redirect(url_for('index'))
 
@@ -525,7 +617,6 @@ def chat_view(chat_id):
     """View specific chat with unique URL"""
     chat = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first_or_404()
     
-    # Get all user's chats for sidebar
     all_chats = Chat.query.filter_by(user_id=current_user.id).order_by(desc(Chat.updated_at)).all()
     
     available_models = FREE_MODELS
@@ -548,6 +639,7 @@ def new_chat():
         chat = Chat(user_id=current_user.id, title='New Chat')
         db.session.add(chat)
         db.session.commit()
+        log.info(f'✅ New chat created: {chat.id} by {current_user.email}')
         return jsonify({
             'success': True,
             'chatid': chat.id, 
@@ -586,12 +678,14 @@ def chat_route():
     try:
         data = request.get_json()
         message = data.get('message', '').strip()
-        model_key = data.get('model', 'gemini-2.5-flash-lite')
+        model_key = data.get('model', 'gemini-2.0-flash-exp')
         chat_id = data.get('chatid')
-        image_data = data.get('image')  # Base64 image if provided
+        image_data = data.get('image')
         
         if not message:
             return jsonify({'error': 'Message cannot be empty'}), 400
+        
+        log.info(f'📨 Chat request: user={current_user.email}, model={model_key}, chat_id={chat_id}')
         
         # Get or create chat
         if chat_id:
@@ -636,6 +730,7 @@ def chat_route():
         messages = [{'role': m.role, 'content': m.content} for m in history]
         
         # Call AI API
+        log.info(f'🤖 Calling AI: {model_config["provider"]} - {model_key}')
         if model_config['provider'] == 'google':
             response = call_google_gemini(model_config['model'], messages, image_data=image_data)
         else:
@@ -663,6 +758,8 @@ def chat_route():
         
         db.session.commit()
         
+        log.info(f'✅ Chat response sent: chat_id={chat.id}, response_length={len(response)}')
+        
         return jsonify({
             'success': True,
             'chatid': chat.id,
@@ -674,8 +771,8 @@ def chat_route():
         
     except Exception as e:
         db.session.rollback()
-        log.exception('Chat error')
-        return jsonify({'error': str(e)[:100]}), 500
+        log.exception('❌ Chat error')
+        return jsonify({'error': str(e)[:200]}), 500
 
 
 @app.route('/chat/<int:chat_id>/rename', methods=['POST'])
@@ -692,6 +789,7 @@ def rename_chat(chat_id):
         
         chat.title = new_title
         db.session.commit()
+        log.info(f'✅ Chat renamed: {chat_id} -> {new_title}')
         return jsonify({'success': True})
         
     except Exception as e:
@@ -708,6 +806,7 @@ def delete_chat(chat_id):
         chat = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first_or_404()
         db.session.delete(chat)
         db.session.commit()
+        log.info(f'✅ Chat deleted: {chat_id}')
         return jsonify({'success': True})
         
     except Exception as e:
@@ -721,7 +820,7 @@ def delete_chat(chat_id):
 def set_model():
     """Set user's default model"""
     data = request.get_json()
-    session['selected_model'] = data.get('model', 'gemini-2.5-flash-lite')
+    session['selected_model'] = data.get('model', 'gemini-2.0-flash-exp')
     return jsonify({'success': True})
 
 
@@ -749,6 +848,7 @@ def upload_image():
             # Convert to base64
             image_base64 = encode_image_to_base64(filepath)
             
+            log.info(f'✅ Image uploaded: {filename}')
             return jsonify({
                 'success': True,
                 'image_data': image_base64,
@@ -776,18 +876,12 @@ def uploaded_file(filename):
 def checkout():
     """Stripe checkout"""
     if not stripe.api_key:
-        return render_template('error.html', 
-            error='Payment system is not configured. Please contact support.'), 503
+        return jsonify({'error': 'Payment system not configured'}), 503
     
     if current_user.is_premium:
         return redirect(url_for('dashboard'))
     
     try:
-        if not stripe.api_key.startswith('sk_'):
-            log.error('Invalid Stripe key format in checkout')
-            return render_template('error.html', 
-                error='Payment system configuration error.'), 500
-        
         session_obj = stripe.checkout.Session.create(
             payment_method_types=['card'],
             customer_email=current_user.email,
@@ -807,27 +901,12 @@ def checkout():
             success_url=url_for('payment_success', _external=True) + '?session_id={CHECKOUT_SESSION_ID}',
             cancel_url=url_for('dashboard', _external=True),
         )
+        log.info(f'✅ Stripe checkout created for {current_user.email}')
         return redirect(session_obj.url)
     
-    except stripe.error.AuthenticationError as e:
-        log.error(f'Stripe Authentication Error: {e}')
-        return render_template('error.html', 
-            error='Payment authentication failed. Please check Stripe configuration.'), 500
-    
-    except stripe.error.RateLimitError as e:
-        log.error(f'Stripe Rate Limit: {e}')
-        return render_template('error.html', 
-            error='Too many requests to payment service. Try again later.'), 429
-    
-    except stripe.error.StripeError as e:
-        log.error(f'Stripe Error: {e}')
-        return render_template('error.html', 
-            error=f'Payment error: {str(e)[:100]}'), 500
-    
     except Exception as e:
-        log.exception('Checkout failed')
-        return render_template('error.html', 
-            error='Failed to create checkout session'), 500
+        log.error(f'Checkout error: {e}')
+        return jsonify({'error': 'Failed to create checkout session'}), 500
 
 
 @app.route('/payment-success')
@@ -846,7 +925,7 @@ def payment_success():
             current_user.is_premium = True
             current_user.subscription_id = session_obj.subscription
             db.session.commit()
-            log.info(f'User {current_user.email} became premium')
+            log.info(f'✅ User became premium: {current_user.email}')
     
     except Exception as e:
         log.error(f'Payment verification error: {e}')
@@ -865,11 +944,8 @@ def stripe_webhook():
         return jsonify({'error': 'Webhook secret not configured'}), 500
     
     try:
-        event = stripe.Webhook.construct_event(
-            payload, sig_header, webhook_secret
-        )
+        event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
         
-        # Handle subscription events
         if event['type'] == 'customer.subscription.deleted':
             subscription_id = event['data']['object']['id']
             user = User.query.filter_by(subscription_id=subscription_id).first()
@@ -877,7 +953,7 @@ def stripe_webhook():
                 user.is_premium = False
                 user.subscription_id = None
                 db.session.commit()
-                log.info(f'User {user.email} subscription cancelled')
+                log.info(f'❌ Subscription cancelled: {user.email}')
         
         return jsonify({'success': True})
         
@@ -886,7 +962,7 @@ def stripe_webhook():
         return jsonify({'error': str(e)}), 400
 
 
-# ========== Debug & API Endpoints ==========
+# ========== API Endpoints ==========
 
 @app.route('/api/stripe-status', methods=['GET'])
 def stripe_status():
@@ -895,8 +971,7 @@ def stripe_status():
         'stripe_configured': bool(stripe.api_key),
         'has_api_key': bool(os.getenv('STRIPE_SECRET_KEY')),
         'key_format_valid': stripe.api_key.startswith('sk_') if stripe.api_key else False,
-        'webhook_secret_set': bool(os.getenv('STRIPE_WEBHOOK_SECRET')),
-        'error': None if stripe.api_key else 'STRIPE_SECRET_KEY not set in environment'
+        'webhook_secret_set': bool(os.getenv('STRIPE_WEBHOOK_SECRET'))
     })
 
 
@@ -929,30 +1004,202 @@ def health_check():
     return jsonify({
         'status': 'healthy',
         'database': 'connected' if db.engine else 'disconnected',
+        'google_api': 'configured' if google_api_key else 'missing',
+        'openrouter_api': 'configured' if openrouter_api_key else 'missing',
+        'stripe': 'configured' if stripe.api_key else 'missing',
         'timestamp': datetime.utcnow().isoformat()
     })
 
 
-# ========== Error Handlers ==========
+# ========== Error Handlers (FIXED - No templates required) ==========
 
 @app.errorhandler(404)
 def not_found(e):
+    """Handle 404 errors without templates"""
     if request.path.startswith('/api/'):
-        return jsonify({'error': 'Not found'}), 404
-    return render_template('404.html'), 404
+        return jsonify({'error': 'Endpoint not found', 'path': request.path}), 404
+    
+    return '''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>404 - Page Not Found | NexaAI</title>
+        <style>
+            body { 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+                text-align: center; 
+                padding: 50px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                margin: 0;
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .container {
+                background: rgba(255,255,255,0.1);
+                padding: 40px;
+                border-radius: 20px;
+                backdrop-filter: blur(10px);
+            }
+            h1 { 
+                font-size: 72px;
+                margin: 0;
+            }
+            p { font-size: 20px; margin: 20px 0; }
+            a { 
+                color: white;
+                text-decoration: none;
+                background: rgba(255,255,255,0.2);
+                padding: 12px 24px;
+                border-radius: 8px;
+                display: inline-block;
+                margin-top: 20px;
+                transition: all 0.3s;
+            }
+            a:hover {
+                background: rgba(255,255,255,0.3);
+                transform: translateY(-2px);
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>404</h1>
+            <p>Page Not Found</p>
+            <p style="font-size: 16px; opacity: 0.8;">The page you're looking for doesn't exist.</p>
+            <a href="/">← Go to Homepage</a>
+        </div>
+    </body>
+    </html>
+    ''', 404
 
 
 @app.errorhandler(500)
 def server_error(e):
+    """Handle 500 errors without templates"""
     log.error(f'Server error: {e}')
+    
     if request.path.startswith('/api/'):
-        return jsonify({'error': 'Server error'}), 500
-    return render_template('error.html', error='Internal server error'), 500
+        return jsonify({
+            'error': 'Internal server error',
+            'message': str(e)[:200]
+        }), 500
+    
+    return '''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>500 - Server Error | NexaAI</title>
+        <style>
+            body { 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+                text-align: center; 
+                padding: 50px;
+                background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+                color: white;
+                margin: 0;
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .container {
+                background: rgba(255,255,255,0.1);
+                padding: 40px;
+                border-radius: 20px;
+                backdrop-filter: blur(10px);
+            }
+            h1 { 
+                font-size: 72px;
+                margin: 0;
+            }
+            p { font-size: 20px; margin: 20px 0; }
+            a { 
+                color: white;
+                text-decoration: none;
+                background: rgba(255,255,255,0.2);
+                padding: 12px 24px;
+                border-radius: 8px;
+                display: inline-block;
+                margin-top: 20px;
+                transition: all 0.3s;
+            }
+            a:hover {
+                background: rgba(255,255,255,0.3);
+                transform: translateY(-2px);
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>500</h1>
+            <p>Something Went Wrong</p>
+            <p style="font-size: 16px; opacity: 0.8;">We're working to fix this issue.</p>
+            <a href="/">← Go to Homepage</a>
+        </div>
+    </body>
+    </html>
+    ''', 500
 
 
 @app.errorhandler(403)
 def forbidden(e):
-    return jsonify({'error': 'Forbidden'}), 403
+    """Handle 403 errors"""
+    return jsonify({'error': 'Access forbidden', 'message': str(e)}), 403
+
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    """Catch-all exception handler"""
+    log.exception('❌ Unhandled exception')
+    
+    if request.path.startswith('/api/'):
+        return jsonify({
+            'error': 'Server error',
+            'type': type(e).__name__,
+            'message': str(e)[:200]
+        }), 500
+    
+    return '''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Error | NexaAI</title>
+        <style>
+            body { 
+                font-family: Arial; 
+                text-align: center; 
+                padding: 50px;
+                background: #f5f5f5;
+            }
+            .container {
+                background: white;
+                padding: 40px;
+                border-radius: 10px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                max-width: 500px;
+                margin: 0 auto;
+            }
+            h1 { color: #e74c3c; }
+            a { 
+                color: #3498db; 
+                text-decoration: none;
+                display: inline-block;
+                margin-top: 20px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Unexpected Error</h1>
+            <p>Please try again or contact support.</p>
+            <a href="/">← Go Home</a>
+        </div>
+    </body>
+    </html>
+    ''', 500
 
 
 # ========== Context Processors ==========
@@ -971,4 +1218,5 @@ def utility_processor():
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
     debug = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
+    log.info(f'🚀 Starting NexaAI on port {port} (debug={debug})')
     app.run(debug=debug, host='0.0.0.0', port=port)
