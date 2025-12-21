@@ -1,5 +1,5 @@
 """
-Nexa-AI - Complete Fixed Version
+Nexa-AI - Complete Fixed Version with Unique Chat URLs
 Production-ready Flask app with proper database schema,
 Stripe integration, and AI model support
 """
@@ -99,19 +99,19 @@ else:
     stripe.api_key = None
     log.warning('STRIPE_SECRET_KEY not set in environment')
 
-# ========== Database Models ==========
+# ========== Database Models (FIXED for PostgreSQL "user" table) ==========
 
 class User(UserMixin, db.Model):
-    __tablename__ = 'user'
+    __tablename__ = '"user"'  # Quoted for PostgreSQL compatibility
     
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(100), unique=True, nullable=False, index=True)
     password = db.Column(db.String(200), nullable=False)
     name = db.Column(db.String(100), nullable=False)
-    is_premium = db.Column(db.Boolean, default=False)
-    subscription_id = db.Column(db.String(100), nullable=True)
     deepseek_count = db.Column(db.Integer, default=0)
-    deepseek_date = db.Column(db.String(10), default=str(datetime.utcnow().date()))
+    deepseek_date = db.Column(db.String(10), default='')
+    subscription_id = db.Column(db.String(100), nullable=True)
+    is_premium = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     chats = db.relationship('Chat', backref='user', lazy=True, cascade='all, delete-orphan')
@@ -124,7 +124,7 @@ class Chat(db.Model):
     __tablename__ = 'chat'
     
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('"user".id'), nullable=False, index=True)
     title = db.Column(db.String(200), default='New Chat')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -142,18 +142,18 @@ class Message(db.Model):
     chat_id = db.Column(db.Integer, db.ForeignKey('chat.id'), nullable=False, index=True)
     role = db.Column(db.String(20), nullable=False)  # user, assistant, system
     content = db.Column(db.Text, nullable=False)
-    model = db.Column(db.String(200), nullable=True)
     has_image = db.Column(db.Boolean, default=False)
-    image_data = db.Column(db.Text, nullable=True)  # Base64 for vision models
-    image_path = db.Column(db.String(1000), nullable=True)  # Uploaded file path
-    image_url = db.Column(db.String(1000), nullable=True)  # Generated image URL
+    image_path = db.Column(db.String(1000), nullable=True)
+    image_url = db.Column(db.String(1000), nullable=True)
+    image_data = db.Column(db.Text, nullable=True)
+    model = db.Column(db.String(200), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     
     def __repr__(self):
         return f'<Message {self.id} in Chat {self.chat_id}>'
 
 
-# ========== Database Initialization & Migration ==========
+# ========== Database Initialization ==========
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -164,58 +164,12 @@ def load_user(user_id):
         return None
 
 
-def migrate_message_table_schema():
-    """Add missing columns to message table if they don't exist (for existing databases)"""
-    try:
-        with db.engine.connect() as conn:
-            conn.begin()
-            
-            if 'sqlite' in str(db.engine.url):
-                # SQLite: Check and add columns
-                result = conn.execute(sqltext('PRAGMA table_info(message)'))
-                columns = [row[1] for row in result.fetchall()]
-                
-                if 'image_url' not in columns:
-                    conn.execute(sqltext('ALTER TABLE message ADD COLUMN image_url VARCHAR(1000);'))
-                    log.info('✓ Added image_url column to SQLite')
-                
-                if 'image_path' not in columns:
-                    conn.execute(sqltext('ALTER TABLE message ADD COLUMN image_path VARCHAR(1000);'))
-                    log.info('✓ Added image_path column to SQLite')
-                
-                if 'image_data' not in columns:
-                    conn.execute(sqltext('ALTER TABLE message ADD COLUMN image_data TEXT;'))
-                    log.info('✓ Added image_data column to SQLite')
-            
-            else:
-                # PostgreSQL: Try to add columns
-                for col_name, col_type in [('image_url', 'VARCHAR(1000)'), 
-                                           ('image_path', 'VARCHAR(1000)'),
-                                           ('image_data', 'TEXT')]:
-                    try:
-                        conn.execute(sqltext(f'ALTER TABLE message ADD COLUMN {col_name} {col_type};'))
-                        log.info(f'✓ Added {col_name} column to PostgreSQL')
-                    except Exception as e:
-                        if 'already exists' not in str(e):
-                            log.warning(f'Column {col_name} migration note: {e}')
-            
-            conn.commit()
-            log.info('✓ Message table schema verified')
-    except Exception as e:
-        log.warning(f'Schema migration note: {e}')
-
-
 def init_database():
     """Initialize database with proper schema"""
     with app.app_context():
         try:
-            # Create all tables
             db.create_all()
             log.info('✓ Database tables created/verified')
-            
-            # Run migration for existing databases
-            migrate_message_table_schema()
-            
             return True
         except Exception as e:
             log.error(f'Database initialization failed: {e}')
@@ -332,6 +286,11 @@ def encode_image_to_base64(image_path):
         return None
 
 
+def allowed_file(filename):
+    """Check if file extension is allowed"""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
 def call_google_gemini(model_path, messages, image_data=None, image_path=None, timeout=60):
     """Call Google Generative AI (Gemini)"""
     try:
@@ -397,10 +356,10 @@ def call_openrouter(model_path, messages, image_data=None, image_path=None):
                 })
         
         # Add image if available (for vision models)
-        if image_data and '-vision' in model_path.lower() or 'claude' in model_path.lower():
+        if image_data and ('-vision' in model_path.lower() or 'claude' in model_path.lower() or 'gpt-4' in model_path.lower()):
             formatted_messages[-1]['content'] = [
                 {'type': 'text', 'text': formatted_messages[-1]['content']},
-                {'type': 'image', 'image': image_data}
+                {'type': 'image_url', 'image_url': {'url': f'data:image/jpeg;base64,{image_data}'}}
             ]
         
         payload = {
@@ -438,6 +397,35 @@ def is_stripe_configured():
     except Exception as e:
         log.error(f'Stripe API test failed: {e}')
         return False
+
+
+def check_deepseek_limit(user):
+    """Check if user has exceeded DeepSeek daily limit"""
+    today = str(datetime.utcnow().date())
+    
+    if user.deepseek_date != today:
+        # Reset counter for new day
+        user.deepseek_count = 0
+        user.deepseek_date = today
+        db.session.commit()
+    
+    if user.is_premium:
+        return True  # No limit for premium
+    
+    return user.deepseek_count < 50
+
+
+def increment_deepseek_count(user):
+    """Increment user's DeepSeek usage count"""
+    today = str(datetime.utcnow().date())
+    
+    if user.deepseek_date != today:
+        user.deepseek_count = 1
+        user.deepseek_date = today
+    else:
+        user.deepseek_count += 1
+    
+    db.session.commit()
 
 
 # ========== Routes ==========
@@ -518,7 +506,7 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    """User dashboard"""
+    """User dashboard - shows chat list"""
     chats = Chat.query.filter_by(user_id=current_user.id).order_by(desc(Chat.updated_at)).all()
     
     available_models = FREE_MODELS
@@ -531,6 +519,27 @@ def dashboard():
                          user=current_user)
 
 
+@app.route('/chat/<int:chat_id>')
+@login_required
+def chat_view(chat_id):
+    """View specific chat with unique URL"""
+    chat = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first_or_404()
+    
+    # Get all user's chats for sidebar
+    all_chats = Chat.query.filter_by(user_id=current_user.id).order_by(desc(Chat.updated_at)).all()
+    
+    available_models = FREE_MODELS
+    if current_user.is_premium:
+        available_models = FREE_MODELS + PREMIUM_MODELS
+    
+    return render_template('chat.html', 
+                         chat=chat,
+                         chats=all_chats,
+                         messages=chat.messages,
+                         models=available_models,
+                         user=current_user)
+
+
 @app.route('/chat/new', methods=['POST'])
 @login_required
 def new_chat():
@@ -539,7 +548,12 @@ def new_chat():
         chat = Chat(user_id=current_user.id, title='New Chat')
         db.session.add(chat)
         db.session.commit()
-        return jsonify({'chatid': chat.id, 'title': chat.title})
+        return jsonify({
+            'success': True,
+            'chatid': chat.id, 
+            'title': chat.title,
+            'url': url_for('chat_view', chat_id=chat.id)
+        })
     except Exception as e:
         db.session.rollback()
         log.error(f'Create chat error: {e}')
@@ -557,10 +571,12 @@ def get_chat_messages(chat_id):
         'role': m.role,
         'content': m.content,
         'model': m.model,
+        'has_image': m.has_image,
+        'image_url': m.image_url,
         'created_at': m.created_at.isoformat() if m.created_at else None
     } for m in chat.messages]
     
-    return jsonify({'messages': messages})
+    return jsonify({'messages': messages, 'title': chat.title})
 
 
 @app.route('/chat', methods=['POST'])
@@ -572,6 +588,7 @@ def chat_route():
         message = data.get('message', '').strip()
         model_key = data.get('model', 'gemini-2.5-flash-lite')
         chat_id = data.get('chatid')
+        image_data = data.get('image')  # Base64 image if provided
         
         if not message:
             return jsonify({'error': 'Message cannot be empty'}), 400
@@ -579,17 +596,26 @@ def chat_route():
         # Get or create chat
         if chat_id:
             chat = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first()
+            if not chat:
+                return jsonify({'error': 'Chat not found'}), 404
         else:
             chat = Chat(user_id=current_user.id, title=message[:50])
             db.session.add(chat)
             db.session.flush()
+        
+        # Check DeepSeek limit
+        if 'deepseek' in model_key.lower():
+            if not check_deepseek_limit(current_user):
+                return jsonify({'error': 'Daily DeepSeek limit reached (50 messages). Upgrade to Premium for unlimited access.'}), 429
         
         # Save user message
         user_msg = Message(
             chat_id=chat.id,
             role='user',
             content=message,
-            model=model_key
+            model=model_key,
+            has_image=bool(image_data),
+            image_data=image_data if image_data else None
         )
         db.session.add(user_msg)
         db.session.commit()
@@ -601,15 +627,19 @@ def chat_route():
         if not model_config:
             return jsonify({'error': 'Model not found'}), 400
         
+        # Check premium requirement
+        if not current_user.is_premium and model_config in PREMIUM_MODELS:
+            return jsonify({'error': 'This model requires Premium subscription'}), 403
+        
         # Prepare history for AI
         history = Message.query.filter_by(chat_id=chat.id).order_by(Message.created_at).all()
         messages = [{'role': m.role, 'content': m.content} for m in history]
         
         # Call AI API
         if model_config['provider'] == 'google':
-            response = call_google_gemini(model_config['model'], messages)
+            response = call_google_gemini(model_config['model'], messages, image_data=image_data)
         else:
-            response = call_openrouter(model_config['model'], messages)
+            response = call_openrouter(model_config['model'], messages, image_data=image_data)
         
         # Save AI response
         ai_msg = Message(
@@ -620,17 +650,26 @@ def chat_route():
         )
         db.session.add(ai_msg)
         
+        # Increment DeepSeek counter if applicable
+        if 'deepseek' in model_key.lower():
+            increment_deepseek_count(current_user)
+        
         # Update chat title if new
         if not chat_id and message:
             chat.title = message[:50] + ('...' if len(message) > 50 else '')
         
+        # Update chat timestamp
+        chat.updated_at = datetime.utcnow()
+        
         db.session.commit()
         
         return jsonify({
+            'success': True,
             'chatid': chat.id,
             'response': response,
             'model': model_key,
-            'chattitle': chat.title
+            'chattitle': chat.title,
+            'url': url_for('chat_view', chat_id=chat.id)
         })
         
     except Exception as e:
@@ -684,6 +723,50 @@ def set_model():
     data = request.get_json()
     session['selected_model'] = data.get('model', 'gemini-2.5-flash-lite')
     return jsonify({'success': True})
+
+
+@app.route('/upload-image', methods=['POST'])
+@login_required
+def upload_image():
+    """Upload image for vision models"""
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+            filename = f"{current_user.id}_{timestamp}_{filename}"
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            
+            file.save(filepath)
+            
+            # Convert to base64
+            image_base64 = encode_image_to_base64(filepath)
+            
+            return jsonify({
+                'success': True,
+                'image_data': image_base64,
+                'filename': filename
+            })
+        
+        return jsonify({'error': 'Invalid file type'}), 400
+        
+    except Exception as e:
+        log.error(f'Image upload error: {e}')
+        return jsonify({'error': 'Upload failed'}), 500
+
+
+@app.route('/uploads/<filename>')
+@login_required
+def uploaded_file(filename):
+    """Serve uploaded files"""
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 
 # ========== Stripe Routes ==========
@@ -771,7 +854,39 @@ def payment_success():
     return redirect(url_for('dashboard'))
 
 
-# ========== Debug Endpoints ==========
+@app.route('/webhook/stripe', methods=['POST'])
+def stripe_webhook():
+    """Handle Stripe webhooks"""
+    payload = request.get_data()
+    sig_header = request.headers.get('Stripe-Signature')
+    webhook_secret = os.getenv('STRIPE_WEBHOOK_SECRET')
+    
+    if not webhook_secret:
+        return jsonify({'error': 'Webhook secret not configured'}), 500
+    
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, webhook_secret
+        )
+        
+        # Handle subscription events
+        if event['type'] == 'customer.subscription.deleted':
+            subscription_id = event['data']['object']['id']
+            user = User.query.filter_by(subscription_id=subscription_id).first()
+            if user:
+                user.is_premium = False
+                user.subscription_id = None
+                db.session.commit()
+                log.info(f'User {user.email} subscription cancelled')
+        
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        log.error(f'Webhook error: {e}')
+        return jsonify({'error': str(e)}), 400
+
+
+# ========== Debug & API Endpoints ==========
 
 @app.route('/api/stripe-status', methods=['GET'])
 def stripe_status():
@@ -802,7 +917,19 @@ def get_user_info():
     return jsonify({
         'email': current_user.email,
         'name': current_user.name,
-        'is_premium': current_user.is_premium
+        'is_premium': current_user.is_premium,
+        'deepseek_count': current_user.deepseek_count,
+        'deepseek_limit': 50
+    })
+
+
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    """Health check endpoint"""
+    return jsonify({
+        'status': 'healthy',
+        'database': 'connected' if db.engine else 'disconnected',
+        'timestamp': datetime.utcnow().isoformat()
     })
 
 
@@ -810,16 +937,38 @@ def get_user_info():
 
 @app.errorhandler(404)
 def not_found(e):
-    return jsonify({'error': 'Not found'}), 404
+    if request.path.startswith('/api/'):
+        return jsonify({'error': 'Not found'}), 404
+    return render_template('404.html'), 404
 
 
 @app.errorhandler(500)
 def server_error(e):
     log.error(f'Server error: {e}')
-    return jsonify({'error': 'Server error'}), 500
+    if request.path.startswith('/api/'):
+        return jsonify({'error': 'Server error'}), 500
+    return render_template('error.html', error='Internal server error'), 500
+
+
+@app.errorhandler(403)
+def forbidden(e):
+    return jsonify({'error': 'Forbidden'}), 403
+
+
+# ========== Context Processors ==========
+
+@app.context_processor
+def utility_processor():
+    """Make utilities available in templates"""
+    return {
+        'now': datetime.utcnow,
+        'stripe_configured': bool(stripe.api_key)
+    }
 
 
 # ========== Main ==========
 
 if __name__ == '__main__':
-    app.run(debug=False, host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
+    port = int(os.getenv('PORT', 5000))
+    debug = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
+    app.run(debug=debug, host='0.0.0.0', port=port)
