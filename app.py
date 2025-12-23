@@ -548,6 +548,50 @@ def login():
     
     return render_template('login.html')
 
+@app.route('/demo-chat', methods=['POST'])
+def demo_chat():
+    try:
+        data = request.get_json() or {}
+        message = (data.get('message') or '').strip()
+        if not message:
+            return jsonify({'error': 'Message is required'}), 400
+
+        # Image generation check
+        image_keywords = ['generate image', 'create image', 'draw', 'picture of', 'image of', 'make an image', 'show me']
+        if any(k in message.lower() for k in image_keywords):
+            try:
+                url = generate_image(message)
+                return jsonify({
+                    'response': "Here's your generated image!",
+                    'image_url': url,
+                    'has_image': True,
+                    'demo': True,
+                    'model': 'Pollinations AI'
+                })
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+
+        # Use Gemini Flash for demo
+        try:
+            messages = [
+                {'role': 'system', 'content': 'You are a helpful AI assistant.'},
+                {'role': 'user', 'content': message}
+            ]
+            response_text = call_ai_model('gemini-flash', messages)
+            return jsonify({
+                'response': response_text,
+                'demo': True,
+                'model': 'Gemini 2.5 Flash lite',
+                'has_image': False
+            })
+        except Exception as e:
+            log.exception("Demo chat failed")
+            return jsonify({'error': str(e)}), 500
+
+    except Exception:
+        log.exception("Demo chat outer error")
+        return jsonify({'error': 'An error occurred. Please try again.'}), 500
+
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
@@ -1220,3 +1264,4 @@ if __name__ == '__main__':
     debug = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
     log.info(f'🚀 Starting NexaAI on port {port} (debug={debug})')
     app.run(debug=debug, host='0.0.0.0', port=port)
+
