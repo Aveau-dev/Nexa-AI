@@ -78,18 +78,22 @@
     </div>
   </nav>
 
-  <!-- Main Content -->
-  <div class="main-container">
-    <div class="center-content">
-      <div class="welcome-section">
-        <h1 class="main-heading">What can I help with?</h1>
+  <!-- Main Content (updated structure so input is at bottom) -->
+  <div class="landing-shell">
+    <main class="landing-main">
+      <!-- Chat Messages Area -->
+      <div class="main-container">
+        <div class="center-content">
+          <div class="welcome-section">
+            <h1 class="main-heading">What can I help with?</h1>
+          </div>
+
+          <div id="messages-container"></div>
+        </div>
       </div>
 
-      <!-- Chat Messages Area -->
-      <div id="messages-container"></div>
-
-      <!-- Input Area -->
-      <div class="input-wrapper">
+      <!-- Input Area pinned to bottom -->
+      <div class="input-wrapper fixed-input">
         <div class="input-box">
           <div class="input-inner">
             <textarea id="chat-input"
@@ -112,7 +116,7 @@
           </div>
         </div>
       </div>
-    </div>
+    </main>
   </div>
 
   <!-- Terms & Policies Modal -->
@@ -132,6 +136,7 @@
     </div>
   </div>
 
+  <!-- Existing scripts below – unchanged -->
   <script>
     // Auto-login demo user on first visit (if not authenticated)
     async function autoLoginDemo() {
