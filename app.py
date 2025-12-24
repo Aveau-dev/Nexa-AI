@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from datetime import datetime, timedelta
 from sqlalchemy import text as sqltext, desc
 import requests
+import urllib.parse
 import stripe
 import os
 import base64
@@ -293,6 +294,22 @@ PREMIUM_MODELS = [
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf'}
 
 # ========== Utility Functions ==========
+
+
+def generate_image(prompt):
+    """Generate image using Pollinations.ai"""
+    try:
+        log.info(f"🎨 Generating image for: {prompt}")
+        clean_prompt = prompt.lower()
+        for prefix in ['draw ', 'generate image ', 'create image ', 'make an image of ']:
+            clean_prompt = clean_prompt.replace(prefix, '')
+
+        encoded = urllib.parse.quote(clean_prompt.strip())
+        return f"https://image.pollinations.ai/prompt/{encoded}?nologo=true"
+    except Exception as e:
+        log.error(f"Image gen error: {e}")
+        return None
+
 
 def extract_text_content(content):
     """Extract text from various content formats"""
@@ -737,98 +754,74 @@ def chat_route():
         model_key = data.get('model', 'gemini-2.0-flash-exp')
         chat_id = data.get('chatid')
         image_data = data.get('image')
-        
+
         if not message:
             return jsonify({'error': 'Message cannot be empty'}), 400
-        
-        log.info(f'📨 Chat request: user={current_user.email}, model={model_key}, chat_id={chat_id}')
-        
-        # Get or create chat
+
+        log.info(f'📨 Chat request: user={current_user.email}, model={model_key}')
+
         if chat_id:
             chat = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first()
-            if not chat:
-                return jsonify({'error': 'Chat not found'}), 404
+            if not chat: return jsonify({'error': 'Chat not found'}), 404
         else:
             chat = Chat(user_id=current_user.id, title=message[:50])
             db.session.add(chat)
             db.session.flush()
-        
-        # Check DeepSeek limit
-        if 'deepseek' in model_key.lower():
-            if not check_deepseek_limit(current_user):
-                return jsonify({'error': 'Daily DeepSeek limit reached (50 messages). Upgrade to Premium for unlimited access.'}), 429
-        
-        # Save user message
-        user_msg = Message(
-            chat_id=chat.id,
-            role='user',
-            content=message,
-            model=model_key,
-            has_image=bool(image_data),
-            image_data=image_data if image_data else None
-        )
+
+        # IMAGE GEN
+        if message.lower().startswith(('draw ', 'generate image ', 'create image ')):
+            image_url = generate_image(message)
+            response = f"Here is your image for: **{message}**\n\n![Generated Image]({image_url})" if image_url else "Sorry, image gen failed."
+
+            user_msg = Message(chat_id=chat.id, role='user', content=message, model='image-gen')
+            ai_msg = Message(chat_id=chat.id, role='assistant', content=response, model='image-gen')
+            db.session.add_all([user_msg, ai_msg])
+            db.session.commit()
+
+            return jsonify({
+                'success': True, 'chatid': chat.id, 'response': response, 
+                'model': 'image-gen', 'chattitle': chat.title, 
+                'url': url_for('chat_view', chat_id=chat.id)
+            })
+
+        # TEXT GEN
+        if 'deepseek' in model_key.lower() and not check_deepseek_limit(current_user):
+            return jsonify({'error': 'Daily DeepSeek limit reached.'}), 429
+
+        user_msg = Message(chat_id=chat.id, role='user', content=message, model=model_key, 
+                           has_image=bool(image_data), image_data=image_data)
         db.session.add(user_msg)
         db.session.commit()
-        
-        # Find model config
+
         all_models = FREE_MODELS + (PREMIUM_MODELS if current_user.is_premium else [])
-        model_config = next((m for m in all_models if m['model'] == model_key), None)
-        
-        if not model_config:
-            return jsonify({'error': 'Model not found'}), 400
-        
-        # Check premium requirement
-        if not current_user.is_premium and model_config in PREMIUM_MODELS:
-            return jsonify({'error': 'This model requires Premium subscription'}), 403
-        
-        # Prepare history for AI
+        model_config = next((m for m in all_models if m['model'] == model_key), FREE_MODELS[0])
+
         history = Message.query.filter_by(chat_id=chat.id).order_by(Message.created_at).all()
         messages = [{'role': m.role, 'content': m.content} for m in history]
-        
-        # Call AI API
-        log.info(f'🤖 Calling AI: {model_config["provider"]} - {model_key}')
+
         if model_config['provider'] == 'google':
             response = call_google_gemini(model_config['model'], messages, image_data=image_data)
         else:
             response = call_openrouter(model_config['model'], messages, image_data=image_data)
-        
-        # Save AI response
-        ai_msg = Message(
-            chat_id=chat.id,
-            role='assistant',
-            content=response,
-            model=model_key
-        )
+
+        ai_msg = Message(chat_id=chat.id, role='assistant', content=response, model=model_key)
         db.session.add(ai_msg)
-        
-        # Increment DeepSeek counter if applicable
-        if 'deepseek' in model_key.lower():
-            increment_deepseek_count(current_user)
-        
-        # Update chat title if new
-        if not chat_id and message:
-            chat.title = message[:50] + ('...' if len(message) > 50 else '')
-        
-        # Update chat timestamp
+
+        if 'deepseek' in model_key.lower(): increment_deepseek_count(current_user)
+        if not chat_id: chat.title = message[:50]
         chat.updated_at = datetime.utcnow()
-        
         db.session.commit()
-        
-        log.info(f'✅ Chat response sent: chat_id={chat.id}, response_length={len(response)}')
-        
+
         return jsonify({
-            'success': True,
-            'chatid': chat.id,
-            'response': response,
-            'model': model_key,
-            'chattitle': chat.title,
+            'success': True, 'chatid': chat.id, 'response': response, 
+            'model': model_key, 'chattitle': chat.title, 
             'url': url_for('chat_view', chat_id=chat.id)
         })
-        
+
     except Exception as e:
         db.session.rollback()
-        log.exception('❌ Chat error')
-        return jsonify({'error': str(e)[:200]}), 500
+        log.exception('Chat error')
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/chat/<int:chat_id>/rename', methods=['POST'])
@@ -1279,4 +1272,36 @@ if __name__ == '__main__':
 
 
 
+
+# --- DEMO ROUTES ---
+@app.route('/demo-login', methods=['POST'])
+def demo_login():
+    """Mock login for landing page demo"""
+    return jsonify({'success': True, 'redirect': url_for('index')})
+
+@app.route('/demo-chat', methods=['POST'])
+def demo_chat():
+    """Public demo chat endpoint"""
+    try:
+        data = request.get_json()
+        message = data.get('message', '').strip()
+        if not message: return jsonify({'error': 'Empty message'})
+
+        # Simple response logic for demo
+        if message.lower().startswith(('draw', 'generate')):
+             url = generate_image(message)
+             return jsonify({'response': f"![Image]({url})"})
+
+        # Try Gemini if available, else Mock
+        if google_api_key:
+             try:
+                 model = genai.GenerativeModel('gemini-2.0-flash-exp')
+                 resp = model.generate_content(message)
+                 return jsonify({'response': resp.text})
+             except: pass
+
+        return jsonify({'response': "Hello! I am NexaAI (Demo Mode). Sign up to chat fully!"})
+    except Exception as e:
+        return jsonify({'error': str(e)})
+# -------------------
 
