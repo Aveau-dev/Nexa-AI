@@ -2798,3 +2798,46 @@ html {
   }
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+/* ========================================================================
+   FONT SIZE INCREASE - OVERRIDES
+   ======================================================================== */
+
+/* 1. Chat Messages (Main Conversation) */
+.message-content {
+  font-size: 16px;      /* Was roughly 14px */
+  line-height: 1.6;     /* Better spacing for reading */
+}
+
+/* 2. Input Box (Typing Area) */
+#chat-input {
+  font-size: 16px;      /* Was 14px */
+}
+
+/* 3. Welcome Screen Title */
+.main-heading {
+  font-size: 42px;      /* Much larger "What can I help with?" */
+  font-weight: 600;
+}
+
+/* 4. Sidebar Items */
+.chat-title {
+  font-size: 14.5px;    /* Slightly larger history items */
+}
+
+/* 5. Code Blocks */
+pre, code {
+  font-size: 14.5px;    /* More readable code snippets */
+}
+
