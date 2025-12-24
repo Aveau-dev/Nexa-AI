@@ -569,57 +569,72 @@ def login():
 def demo_chat():
     """
     Public demo endpoint used on the landing page.
-    Uses Gemini Flash via call_google_gemini.
+    Supports image generation via Pollinations and text via Gemini Flash.
     """
     try:
         data = request.get_json() or {}
         message = (data.get('message') or '').strip()
+        
         if not message:
-            return jsonify({'error': 'Message is required'}), 400
+            return jsonify({'error': 'Message cannot be empty'}), 400
 
-        # Image generation check (Pollinations or whatever you use)
-        image_keywords = [
-            'generate image', 'create image', 'draw',
-            'picture of', 'image of', 'make an image', 'show me'
-        ]
-        if any(k in message.lower() for k in image_keywords):
-            try:
-                url = generate_image(message)
-                return jsonify({
-                    'response': "Here's your generated image!",
-                    'image_url': url,
-                    'has_image': True,
-                    'demo': True,
-                    'model': 'Pollinations AI'
-                })
-            except Exception as e:
-                log.exception("Demo image generation failed")
-                return jsonify({'error': str(e)[:200]}), 500
-
-        # Text demo: use Gemini Flash (your helper)
+        # 1. IMAGE GENERATION CHECK
+        # We check if the message starts with common drawing commands
+        if message.lower().startswith(('draw', 'generate', 'create image', 'make an image')):
+             try:
+                 # Use the free generator function defined earlier
+                 url = generate_image(message)
+                 if url:
+                     # Return markdown format directly so frontend renders it easily
+                     return jsonify({
+                         'response': f"Here is your generated image!\n\n![Generated Image]({url})",
+                         'has_image': True,
+                         'image_url': url,
+                         'demo': True
+                     })
+                 else:
+                     return jsonify({'response': "Sorry, I couldn't generate that image right now."})
+             except Exception as e:
+                 log.exception("Demo image generation failed")
+                 return jsonify({'error': str(e)}), 500
+             
+        # 2. TEXT GENERATION (Gemini Flash)
+        # Use your existing helper function 'call_google_gemini' if available
         try:
-            messages = [
-                {'role': 'user', 'content': message}
-            ]
-            # model path taken from FREE_MODELS config
+            # Check if API key exists (simple check)
+            if not google_api_key:
+                 return jsonify({'response': "I am in Demo Mode, but no API key is configured. Please sign up!"})
+
+            messages = [{'role': 'user', 'content': message}]
+            
+            # Call your helper function with the specific model
             response_text = call_google_gemini(
-                'gemini-2.5-flash',
+                'gemini-2.0-flash-exp',  # or 'gemini-1.5-flash' depending on what works for you
                 messages,
                 image_data=None
             )
+            
             return jsonify({
                 'response': response_text,
                 'demo': True,
-                'model': 'Gemini 2.5 Flash ',
-                'has_image': False
+                'model': 'Gemini Flash'
             })
+            
         except Exception as e:
-            log.exception("Demo chat failed")
-            return jsonify({'error': str(e)[:200]}), 500
-
-    except Exception:
+            # Fallback if the helper fails (e.g., rate limit)
+            log.error(f"Demo chat error: {e}")
+            try:
+                # Direct fallback attempt if helper failed
+                model = genai.GenerativeModel('gemini-2.0-flash-exp')
+                resp = model.generate_content(message)
+                return jsonify({'response': resp.text})
+            except:
+                return jsonify({'response': "I am currently overloaded in Demo Mode. Please sign up for dedicated access!"})
+        
+    except Exception as e:
         log.exception("Demo chat outer error")
-        return jsonify({'error': 'An error occurred. Please try again.'}), 500
+        return jsonify({'error': str(e)}), 500
+
 
 
 @app.route('/signup', methods=['GET', 'POST'])
@@ -1315,6 +1330,7 @@ if __name__ == '__main__':
     debug = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
     log.info(f'🚀 Starting NexaAI on port {port} (debug={debug})')
     app.run(debug=debug, host='0.0.0.0', port=port)
+
 
 
 
