@@ -550,14 +550,21 @@ def login():
 
 @app.route('/demo-chat', methods=['POST'])
 def demo_chat():
+    """
+    Public demo endpoint used on the landing page.
+    Uses Gemini Flash via call_google_gemini.
+    """
     try:
         data = request.get_json() or {}
         message = (data.get('message') or '').strip()
         if not message:
             return jsonify({'error': 'Message is required'}), 400
 
-        # Image generation check
-        image_keywords = ['generate image', 'create image', 'draw', 'picture of', 'image of', 'make an image', 'show me']
+        # Image generation check (Pollinations or whatever you use)
+        image_keywords = [
+            'generate image', 'create image', 'draw',
+            'picture of', 'image of', 'make an image', 'show me'
+        ]
         if any(k in message.lower() for k in image_keywords):
             try:
                 url = generate_image(message)
@@ -569,15 +576,20 @@ def demo_chat():
                     'model': 'Pollinations AI'
                 })
             except Exception as e:
-                return jsonify({'error': str(e)}), 500
+                log.exception("Demo image generation failed")
+                return jsonify({'error': str(e)[:200]}), 500
 
-        # Use Gemini Flash for demo
+        # Text demo: use Gemini Flash (your helper)
         try:
             messages = [
-                {'role': 'system', 'content': 'You are a helpful AI assistant.'},
                 {'role': 'user', 'content': message}
             ]
-            response_text = call_ai_model('gemini-flash', messages)
+            # model path taken from FREE_MODELS config
+            response_text = call_google_gemini(
+                'gemini-2.0-flash-exp',
+                messages,
+                image_data=None
+            )
             return jsonify({
                 'response': response_text,
                 'demo': True,
@@ -586,7 +598,7 @@ def demo_chat():
             })
         except Exception as e:
             log.exception("Demo chat failed")
-            return jsonify({'error': str(e)}), 500
+            return jsonify({'error': str(e)[:200]}), 500
 
     except Exception:
         log.exception("Demo chat outer error")
@@ -1264,4 +1276,5 @@ if __name__ == '__main__':
     debug = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
     log.info(f'🚀 Starting NexaAI on port {port} (debug={debug})')
     app.run(debug=debug, host='0.0.0.0', port=port)
+
 
