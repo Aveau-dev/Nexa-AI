@@ -609,7 +609,7 @@ def demo_chat():
             
             # Call your helper function with the specific model
             response_text = call_google_gemini(
-                'gemini-2.0-flash-exp',  # or 'gemini-1.5-flash' depending on what works for you
+                'gemini-2.5-flash-lite',  # or 'gemini-1.5-flash' depending on what works for you
                 messages,
                 image_data=None
             )
@@ -617,7 +617,7 @@ def demo_chat():
             return jsonify({
                 'response': response_text,
                 'demo': True,
-                'model': 'Gemini Flash'
+                'model': 'Gemini Flash 2.5 lite'
             })
             
         except Exception as e:
@@ -625,7 +625,7 @@ def demo_chat():
             log.error(f"Demo chat error: {e}")
             try:
                 # Direct fallback attempt if helper failed
-                model = genai.GenerativeModel('gemini-2.0-flash-exp')
+                model = genai.GenerativeModel('gemini-2.5-flash-lite')
                 resp = model.generate_content(message)
                 return jsonify({'response': resp.text})
             except:
@@ -1330,6 +1330,7 @@ if __name__ == '__main__':
     debug = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
     log.info(f'🚀 Starting NexaAI on port {port} (debug={debug})')
     app.run(debug=debug, host='0.0.0.0', port=port)
+
 
 
 
