@@ -2841,3 +2841,31 @@ pre, code {
   font-size: 14.5px;    /* More readable code snippets */
 }
 
+
+
+
+
+
+.message-content img {
+  max-width: 100%;       /* Never wider than the chat bubble */
+  height: auto;          /* Maintain aspect ratio */
+  border-radius: 8px;    /* Nice rounded corners */
+  display: block;        /* Prevent inline spacing issues */
+  margin: 10px 0;        /* Add vertical spacing */
+  object-fit: contain;   /* Ensure full visibility */
+}
+
+/* 2. Fix Horizontal Scrollbar Issue */
+.center-content {
+  overflow-x: hidden !important; /* Force hide horizontal scrollbar */
+  width: 100%;
+  max-width: 900px;      /* Keep the Gemini width limit */
+}
+
+/* 3. Ensure Chat Bubbles Wrap Content */
+.message-content {
+  word-wrap: break-word; /* Break long words/urls */
+  overflow-wrap: break-word;
+  white-space: pre-wrap; /* Preserve line breaks but wrap text */
+  max-width: 100%;
+}
