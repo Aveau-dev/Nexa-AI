@@ -326,15 +326,6 @@ body {
 }
 
 
-/* Main container must allow overflow */
-.center-content {
-  max-width: 48rem;
-  margin: 0 auto;
-  width: 100%;
-  padding: 2rem 1rem 10rem 1rem;  /* Reduced top padding */
-  overflow-y: auto;  /* Allow scrolling */
-}
-
 .welcome-section {
   text-align: center;
   padding: 2rem 0 3rem 0;  /* Reduced from 6rem */
@@ -373,11 +364,6 @@ body {
   scrollbar-color: var(--border-color) var(--bg-primary);
 }
 
-
-body {
-  margin: 0;
-  padding: 0;
-}
 
 *,
 *::before,
@@ -809,17 +795,7 @@ select.form-control {
    Production-ready, fully responsive
    ========================================================================= */
 
-/* Reset */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
 
-html, body {
-  height: 100%;
-  width: 100%;
-}
 
 :root {
   /* Layout dimensions */
@@ -831,14 +807,7 @@ html, body {
 }
 
 /* Base styles */
-body {
-  font-family: var(--font-family-base);
-  background-color: var(--color-background);
-  color: var(--color-text);
-  line-height: var(--line-height-normal);
-  overflow: hidden;
-  font-size: var(--font-size-base);
-}
+
 
 /* Scrollbar */
 ::-webkit-scrollbar {
@@ -1255,8 +1224,10 @@ a:hover {
 .app-layout {
   display: flex;
   flex: 1;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
+
 
 /* Sidebar */
 .sidebar {
@@ -1448,12 +1419,6 @@ a:hover {
   background-color: var(--color-background);
 }
 
-.center-content {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow-y: auto;
-}
 
 .welcome-section {
   flex: 1;
@@ -2019,21 +1984,6 @@ body {
    Modern Login & Signup Styling
    ======================================== */
 
-/* ========== Base Styles ========== */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    line-height: 1.6;
-    color: #333;
-}
-
 /* ========== Auth Page Layout ========== */
 .auth-page {
     min-height: 100vh;
@@ -2149,6 +2099,17 @@ body {
         transform: translateX(0);
     }
 }
+
+.auth-page {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+    Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.6;
+  color: #333;
+}
+
+
 
 .feature-icon {
     font-size: 36px;
@@ -2678,15 +2639,7 @@ html {
   flex-direction: column;
 }
 
-/* messages should scroll, input stays at bottom */
-.center-content {
-  flex: 1;
-  max-width: 48rem;
-  margin: 0 auto;
-  width: 100%;
-  padding: 2rem 1rem 1rem 1rem;
-  overflow-y: auto;
-}
+
 
 /* input bar fixed to bottom of viewport */
 .fixed-input {
@@ -2701,3 +2654,4 @@ html {
     rgba(0, 0, 0, 0)
   );
 }
+
