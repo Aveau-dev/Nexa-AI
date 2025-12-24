@@ -586,7 +586,7 @@ def demo_chat():
             ]
             # model path taken from FREE_MODELS config
             response_text = call_google_gemini(
-                'gemini-2.0-flash-exp',
+                'gemini-2.5-flash-lite',
                 messages,
                 image_data=None
             )
@@ -1276,5 +1276,6 @@ if __name__ == '__main__':
     debug = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
     log.info(f'🚀 Starting NexaAI on port {port} (debug={debug})')
     app.run(debug=debug, host='0.0.0.0', port=port)
+
 
 
