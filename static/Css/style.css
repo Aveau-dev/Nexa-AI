@@ -2713,3 +2713,88 @@ html {
     rgba(0, 0, 0, 0)
   );
 }
+
+
+
+/* ========================================================================
+   RESPONSIVE MOBILE STYLES (Add to bottom of style.css)
+   ======================================================================== */
+
+@media (max-width: 768px) {
+
+  /* 1. Sidebar becomes an overlay drawer */
+  .sidebar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    z-index: 200;
+    transform: translateX(-100%); /* Hidden by default */
+    width: 260px;
+    background-color: var(--color-surface);
+    box-shadow: 2px 0 10px rgba(0,0,0,0.3);
+    transition: transform 0.3s ease;
+  }
+
+  /* Toggle class to show sidebar */
+  .sidebar.show {
+    transform: translateX(0);
+  }
+
+  /* Overlay backdrop when sidebar is open */
+  .sidebar-overlay {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 150;
+  }
+  .sidebar.show + .sidebar-overlay {
+    display: block;
+  }
+
+  /* 2. Top Nav adjustments */
+  .top-nav {
+    padding: 0 10px;
+  }
+
+  .logo-text {
+    display: none; /* Save space on small screens */
+  }
+
+  .nav-button span {
+    display: none; /* Hide text labels on buttons, keep icons */
+  }
+
+  /* Ensure hamburger menu is visible */
+  #sidebar-toggle {
+    display: flex !important; 
+  }
+
+  /* 3. Main Container & Input */
+  .center-content {
+    padding: 1rem 10px 0 10px; /* Less padding on sides */
+  }
+
+  .input-wrapper {
+    padding: 10px;
+  }
+
+  .input-box {
+    width: 100%;
+  }
+
+  /* 4. Chat Messages */
+  .message {
+    max-width: 90%; /* Messages take more width on mobile */
+  }
+
+  /* 5. Suggestion Cards (Stack vertically) */
+  .suggestion-cards {
+    grid-template-columns: 1fr; /* 1 card per row */
+  }
+}
+
