@@ -2869,3 +2869,16 @@ pre, code {
   white-space: pre-wrap; /* Preserve line breaks but wrap text */
   max-width: 100%;
 }
+
+
+
+
+
+
+
+
+
+.image-actions { display:flex; gap:8px; margin-top:6px; }
+.image-actions .btn-small { font-size:12px; padding:4px 8px; }
+.image-actions.liked .btn-small[data-action="like"] { color:#22c55e; }
+
