@@ -11,10 +11,11 @@
   <link rel="canonical" href="https://yoursite.com/">
   <meta name="robots" content="index, follow">
 
+  <!-- Green shield favicon -->
   <link rel="icon" type="image/svg+xml"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2319c37d' d='M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z'/></svg>">
 
-  <!-- Your DeepSeek-style CSS -->
+  <!-- Main CSS -->
   <link rel="stylesheet" href="{{ url_for('static', filename='Css/style.css') }}">
 
   <!-- Open Graph / Twitter -->
@@ -77,7 +78,7 @@
     </div>
   </nav>
 
-  <!-- Main Content (updated structure so input is at bottom) -->
+  <!-- Main Content -->
   <div class="landing-shell">
     <main class="landing-main">
       <!-- Chat Messages Area -->
@@ -88,6 +89,9 @@
           </div>
 
           <div id="messages-container"></div>
+
+          <!-- spacer so last message not hidden behind input -->
+          <div style="height: 110px;"></div>
         </div>
       </div>
 
@@ -96,7 +100,7 @@
         <div class="input-box">
           <div class="input-inner">
             <textarea id="chat-input"
-                      placeholder="Ask anything"
+                      placeholder="Ask anything (e.g. “Draw a lion in Pixar style”)"
                       rows="1"
                       onkeydown="handleKeyDown(event)"></textarea>
             <button class="send-button" onclick="sendMessage()" id="send-btn">
@@ -107,7 +111,7 @@
           </div>
           <div class="input-footer">
             <span class="demo-notice">
-              🎁 Demo Mode - Limited features.
+              🎁 Demo Mode – Limited features.
               <a href="javascript:void(0)" onclick="openTermsModal()"
                  style="text-decoration:underline;cursor:pointer;">Terms &amp; Policies</a> ·
               <a href="{{ url_for('signup') }}">Sign up</a> for full access
@@ -126,8 +130,7 @@
         <button class="modal-close" onclick="closeTermsModal()">×</button>
       </div>
       <div class="modal-body">
-        <!-- (terms sections unchanged) -->
-        <!-- ... keep your sections here ... -->
+        <!-- your terms content here -->
       </div>
       <div class="modal-footer">
         <button class="modal-btn primary" onclick="closeTermsModal()">I Understand</button>
@@ -135,41 +138,31 @@
     </div>
   </div>
 
-  <!-- Existing scripts below – unchanged -->
   <script>
-    // Auto-login demo user on first visit (if not authenticated)
+    // Simple in-tab "memory" for demo mode
+    let demoMessages = [];
+
     async function autoLoginDemo() {
       try {
         const res = await fetch("/demo-login", {
           method: "POST",
           headers: { "Content-Type": "application/json" }
         });
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && data.success && data.redirect) {
-          window.location.href = data.redirect;
-        }
+        await res.json().catch(() => ({}));
       } catch (e) {
         console.warn("Auto demo login failed", e);
       }
     }
 
-    document.addEventListener("DOMContentLoaded", autoLoginDemo);
-
-    let messageCount = 0;
+    document.addEventListener("DOMContentLoaded", () => {
+      autoLoginDemo();
+    });
 
     function handleKeyDown(event) {
       if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
         sendMessage();
       }
-    }
-
-    const THEME_KEY = "theme";
-    if (!localStorage.getItem(THEME_KEY)) {
-      localStorage.setItem(THEME_KEY, "system");
-    }
-    if (typeof setTheme === "function") {
-      setTheme(localStorage.getItem(THEME_KEY));
     }
 
     function sendMessage() {
@@ -181,10 +174,19 @@
       if (welcome) welcome.style.display = 'none';
 
       addMessage(message, 'user');
+      demoMessages.push({ role: 'user', content: message });
+
       input.value = '';
       input.style.height = 'auto';
 
-      showTypingIndicator();
+      const lower = message.toLowerCase();
+      const isImage = lower.startsWith('draw') || lower.startsWith('generate') || lower.startsWith('create image');
+
+      if (isImage) {
+        showImageGeneratingIndicator();
+      } else {
+        showTypingIndicator();
+      }
 
       fetch('/demo-chat', {
         method: 'POST',
@@ -196,7 +198,7 @@
         removeTypingIndicator();
         if (data.response) {
           addMessage(data.response, 'assistant');
-          messageCount++;
+          demoMessages.push({ role: 'assistant', content: data.response });
         } else if (data.error) {
           addMessage(data.error, 'error');
         }
@@ -273,6 +275,7 @@
           contentDiv.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
         }
         addDemoCopyButtons(contentDiv);
+        attachImageActions(contentDiv);
       } else {
         messageDiv.innerHTML = `
           <div class="message error-message">
@@ -280,8 +283,75 @@
           </div>`;
       }
 
+      // Add message action bar (listen/like/dislike/share)
+      const actions = document.createElement('div');
+      actions.className = 'message-actions';
+      actions.innerHTML = `
+        <button class="msg-btn" data-action="listen">Listen</button>
+        <button class="msg-btn" data-action="like">👍</button>
+        <button class="msg-btn" data-action="dislike">👎</button>
+        <button class="msg-btn" data-action="share">Share</button>
+      `;
+      actions.addEventListener('click', (e) => {
+        if (e.target.matches('.msg-btn')) {
+          handleMessageAction(e.target.dataset.action, text, actions);
+        }
+      });
+      messageDiv.querySelector('.message').appendChild(actions);
+
       container.appendChild(messageDiv);
       container.scrollTop = container.scrollHeight;
+    }
+
+    function handleMessageAction(action, text, actionsEl) {
+      if (action === 'listen') {
+        try {
+          const utter = new SpeechSynthesisUtterance(text);
+          speechSynthesis.speak(utter);
+        } catch (e) { console.warn(e); }
+      } else if (action === 'like') {
+        actionsEl.classList.add('liked');
+        actionsEl.classList.remove('disliked');
+      } else if (action === 'dislike') {
+        actionsEl.classList.add('disliked');
+        actionsEl.classList.remove('liked');
+      } else if (action === 'share') {
+        if (navigator.share) {
+          navigator.share({ text });
+        } else {
+          navigator.clipboard.writeText(text);
+          alert('Message copied to clipboard');
+        }
+      }
+    }
+
+    // Add download/like controls under images
+    function attachImageActions(container) {
+      container.querySelectorAll('img').forEach(img => {
+        if (img.dataset.actionsAttached === '1') return;
+        img.dataset.actionsAttached = '1';
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'image-actions';
+        wrapper.innerHTML = `
+          <button class="btn-small" data-action="download">Download</button>
+          <button class="btn-small" data-action="like">♥ Like</button>
+        `;
+        wrapper.addEventListener('click', (e) => {
+          if (e.target.matches('[data-action="download"]')) {
+            const link = document.createElement('a');
+            link.href = img.src;
+            link.download = 'nexa-image.png';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          } else if (e.target.matches('[data-action="like"]')) {
+            wrapper.classList.toggle('liked');
+          }
+        });
+
+        img.after(wrapper);
+      });
     }
 
     function openTermsModal() {
@@ -326,6 +396,31 @@
       container.scrollTop = container.scrollHeight;
     }
 
+    function showImageGeneratingIndicator() {
+      const container = document.getElementById('messages-container');
+      const existing = document.getElementById('typing-indicator');
+      if (existing) existing.remove();
+
+      const typingDiv = document.createElement('div');
+      typingDiv.className = 'message-row assistant-row typing-indicator';
+      typingDiv.id = 'typing-indicator';
+      typingDiv.innerHTML = `
+        <div class="message assistant-message">
+          <div class="avatar">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"></path>
+            </svg>
+          </div>
+          <div class="typing-dots" style="display:flex;align-items:center;gap:8px;">
+            <span>🎨 Creating your image...</span>
+            <div class="spinner" style="width:16px;height:16px;border:2px solid #555;border-top:2px solid transparent;border-radius:50%;animation:spin 1s linear infinite;"></div>
+          </div>
+        </div>
+        <style>@keyframes spin{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}</style>`;
+      container.appendChild(typingDiv);
+      container.scrollTop = container.scrollHeight;
+    }
+
     function removeTypingIndicator() {
       const indicator = document.getElementById('typing-indicator');
       if (indicator) indicator.remove();
@@ -347,4 +442,3 @@
   </script>
 </body>
 </html>
-
