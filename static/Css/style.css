@@ -2951,3 +2951,69 @@ pre, code {
   100% { background-position: -200% 0; }
 }
 
+
+
+
+
+
+/* Message actions ------------------------------------------------------- */
+
+.message-actions {
+  margin-top: 6px;
+  display: inline-flex;
+  gap: 6px;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.msg-btn {
+  border: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.15);
+  color: var(--color-text-secondary, #9ca3af);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.msg-btn:hover {
+  background: rgba(148, 163, 184, 0.25);
+  color: var(--color-text, #e5e7eb);
+}
+
+.message-actions.liked .msg-btn[data-action="like"] {
+  color: #22c55e;
+}
+
+.message-actions.disliked .msg-btn[data-action="dislike"] {
+  color: #f97373;
+}
+
+/* Image download / like buttons ---------------------------------------- */
+
+.image-actions {
+  margin-top: 6px;
+  display: inline-flex;
+  gap: 8px;
+}
+
+.image-actions .btn-small {
+  border: none;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: rgba(15, 23, 42, 0.9);
+  color: #e5e7eb;
+  cursor: pointer;
+}
+
+.image-actions .btn-small:hover {
+  background: rgba(55, 65, 81, 0.95);
+}
+
+.image-actions.liked .btn-small[data-action="like"] {
+  background: rgba(22, 163, 74, 0.18);
+  color: #4ade80;
+}
