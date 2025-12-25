@@ -1,26 +1,30 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
+
 <head>
   <meta name="google-site-verification" content="1xRfZx8fEbwT18xMYj4l1UFl5jRckIrbs2uk4STqF6Y" />
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NexaAI – Modern AI Assistant</title>
 
-  <meta name="description" content="NexaAI is a modern, free, multi-model AI assistant platform. Chat with GPT-4, Claude, Gemini, DeepSeek, and more. Save your history, upload images, and get premium AI features!">
-  <meta name="keywords" content="AI, NexaAI, chatbot, GPT-4, Claude, Gemini, DeepSeek, OpenRouter, AI assistant, LLM, FOSS, paywall, chat history, free, ai tools">
+  <meta name="description"
+    content="NexaAI is a modern, free, multi-model AI assistant platform. Chat with GPT-4, Claude, Gemini, DeepSeek, and more. Save your history, upload images, and get premium AI features!">
+  <meta name="keywords"
+    content="AI, NexaAI, chatbot, GPT-4, Claude, Gemini, DeepSeek, OpenRouter, AI assistant, LLM, FOSS, paywall, chat history, free, ai tools">
   <link rel="canonical" href="https://yoursite.com/">
   <meta name="robots" content="index, follow">
 
   <!-- Green shield favicon -->
   <link rel="icon" type="image/svg+xml"
-        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2319c37d' d='M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z'/></svg>">
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2319c37d' d='M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z'/></svg>">
 
   <!-- Main CSS -->
   <link rel="stylesheet" href="{{ url_for('static', filename='Css/style.css') }}">
 
   <!-- Open Graph / Twitter -->
   <meta property="og:title" content="NexaAI – AI Chat Assistant" />
-  <meta property="og:description" content="A smart, free AI chat dashboard supporting GPT-4, Claude, Gemini, and more." />
+  <meta property="og:description"
+    content="A smart, free AI chat dashboard supporting GPT-4, Claude, Gemini, and more." />
   <meta property="og:url" content="https://nexaai.js.org/" />
   <meta property="og:type" content="website" />
   <meta property="og:image" content="https://nexaai.js.org/static/og-image.png" />
@@ -31,8 +35,7 @@
 
   <!-- Markdown + syntax highlighting -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <link rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 
   <!-- Polyfills -->
@@ -59,8 +62,7 @@
     <div class="nav-left">
       <div class="logo-container">
         <svg class="logo-icon" viewBox="0 0 24 24" width="24" height="24">
-          <path fill="currentColor"
-                d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z" />
+          <path fill="currentColor" d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z" />
         </svg>
         <span class="logo-text">NexaAI</span>
       </div>
@@ -99,10 +101,8 @@
       <div class="input-wrapper fixed-input">
         <div class="input-box">
           <div class="input-inner">
-            <textarea id="chat-input"
-                      placeholder="Ask anything (e.g. “Draw a lion in Pixar style”)"
-                      rows="1"
-                      onkeydown="handleKeyDown(event)"></textarea>
+            <textarea id="chat-input" placeholder="Ask anything (e.g. “Draw a lion in Pixar style”)" rows="1"
+              onkeydown="handleKeyDown(event)"></textarea>
             <button class="send-button" onclick="sendMessage()" id="send-btn">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                 <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
@@ -113,7 +113,7 @@
             <span class="demo-notice">
               🎁 Demo Mode – Limited features.
               <a href="javascript:void(0)" onclick="openTermsModal()"
-                 style="text-decoration:underline;cursor:pointer;">Terms &amp; Policies</a> ·
+                style="text-decoration:underline;cursor:pointer;">Terms &amp; Policies</a> ·
               <a href="{{ url_for('signup') }}">Sign up</a> for full access
             </span>
           </div>
@@ -193,20 +193,20 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message })
       })
-      .then(res => res.json())
-      .then(data => {
-        removeTypingIndicator();
-        if (data.response) {
-          addMessage(data.response, 'assistant');
-          demoMessages.push({ role: 'assistant', content: data.response });
-        } else if (data.error) {
-          addMessage(data.error, 'error');
-        }
-      })
-      .catch(() => {
-        removeTypingIndicator();
-        addMessage('Error connecting to AI. Please try again.', 'error');
-      });
+        .then(res => res.json())
+        .then(data => {
+          removeTypingIndicator();
+          if (data.response) {
+            addMessage(data.response, 'assistant');
+            demoMessages.push({ role: 'assistant', content: data.response });
+          } else if (data.error) {
+            addMessage(data.error, 'error');
+          }
+        })
+        .catch(() => {
+          removeTypingIndicator();
+          addMessage('Error connecting to AI. Please try again.', 'error');
+        });
     }
 
     function formatDemoMessage(text) {
@@ -404,22 +404,36 @@
       const typingDiv = document.createElement('div');
       typingDiv.className = 'message-row assistant-row typing-indicator';
       typingDiv.id = 'typing-indicator';
+
       typingDiv.innerHTML = `
-        <div class="message assistant-message">
-          <div class="avatar">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-              <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"></path>
-            </svg>
-          </div>
-          <div class="typing-dots" style="display:flex;align-items:center;gap:8px;">
-            <span>🎨 Creating your image...</span>
-            <div class="spinner" style="width:16px;height:16px;border:2px solid #555;border-top:2px solid transparent;border-radius:50%;animation:spin 1s linear infinite;"></div>
-          </div>
+    <div class="message assistant-message">
+      <div class="avatar">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+          <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"></path>
+        </svg>
+      </div>
+
+      <div class="image-thinking">
+        <div class="image-thinking-header">
+          <span class="image-thinking-label">Generating image…</span>
+          <span class="image-thinking-sub">Using advanced model</span>
         </div>
-        <style>@keyframes spin{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}</style>`;
+
+        <!-- Grid skeleton animation -->
+        <div class="image-thinking-grid">
+          <div class="image-skel"></div>
+          <div class="image-skel"></div>
+          <div class="image-skel"></div>
+          <div class="image-skel"></div>
+        </div>
+      </div>
+    </div>
+  `;
+
       container.appendChild(typingDiv);
       container.scrollTop = container.scrollHeight;
     }
+
 
     function removeTypingIndicator() {
       const indicator = document.getElementById('typing-indicator');
@@ -441,4 +455,5 @@
     }
   </script>
 </body>
+
 </html>
