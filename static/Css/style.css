@@ -2890,3 +2890,64 @@ pre, code {
 .message-actions { margin-top:6px; display:flex; gap:6px; font-size:12px; opacity:0.8; }
 .msg-btn { background:transparent; border:none; color:var(--color-text-secondary); cursor:pointer; }
 .msg-btn:hover { color:var(--color-text); }
+
+
+
+
+/* Image generation thinking animation ----------------------------------- */
+
+.image-thinking {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.7); /* subtle darker bubble */
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  max-width: 420px;
+}
+
+.image-thinking-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.image-thinking-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.image-thinking-sub {
+  font-size: 11px;
+  color: var(--color-text-secondary, #9ca3af);
+}
+
+/* 2x2 grid of shimmering tiles */
+.image-thinking-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.image-skel {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 8px;
+  background: linear-gradient(
+    120deg,
+    #1f2933 0%,
+    #4b5563 20%,
+    #1f2933 40%,
+    #1f2933 100%
+  );
+  background-size: 200% 100%;
+  animation: image-shimmer 1.2s ease-in-out infinite;
+}
+
+/* Shimmer animation */
+@keyframes image-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
