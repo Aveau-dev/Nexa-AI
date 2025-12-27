@@ -3017,3 +3017,114 @@ pre, code {
   background: rgba(22, 163, 74, 0.18);
   color: #4ade80;
 }
+
+
+/* Mobile nav tweaks */
+@media (max-width: 640px) {
+  .top-nav {
+    padding-inline: 8px;
+  }
+
+  .nav-right {
+    gap: 4px;
+  }
+
+  .nav-button.primary,
+  .nav-button.secondary {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+
+  /* Show only first letter on very small screens */
+  .nav-button.primary span,
+  .nav-button.secondary span {
+    display: none;
+  }
+
+  .nav-button.primary::before {
+    content: "S";   /* Sign up */
+  }
+
+  .nav-button.secondary::before {
+    content: "L";   /* Log in */
+  }
+
+  .nav-button.icon-only {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+  }
+}
+
+
+
+
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.75);
+  z-index: 50;
+}
+
+
+
+
+/* Assistant action bar (Perplexity style) */
+.message-actions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-start;   /* under text, a bit to left */
+  gap: 8px;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.msg-btn {
+  border: none;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.9);
+  color: #e5e7eb;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.msg-btn svg {
+  display: block;
+}
+
+.msg-btn:hover {
+  background: rgba(55, 65, 81, 0.95);
+}
+
+.message-actions.liked  .msg-btn[data-action="like"]    { color: #22c55e; }
+.message-actions.disliked .msg-btn[data-action="dislike"] { color: #f97373; }
+
+/* Image download / like */
+.image-actions {
+  margin-top: 6px;
+  display: inline-flex;
+  gap: 8px;
+}
+.image-actions .btn-small {
+  border: none;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: rgba(15, 23, 42, 0.9);
+  color: #e5e7eb;
+  cursor: pointer;
+}
+.image-actions .btn-small:hover {
+  background: rgba(55, 65, 81, 0.95);
+}
+.image-actions.liked .btn-small[data-action="like"] {
+  background: rgba(22, 163, 74, 0.18);
+  color: #4ade80;
+}
