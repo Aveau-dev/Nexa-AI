@@ -2953,34 +2953,85 @@ pre, code {
 
 
 
+/* Assistant action bar (safe version) ------------------------------- */
 
-
-
-/* Message actions ------------------------------------------------------- */
+/* Do NOT change .message-content display; it stays normal block.
+   We only style the bar itself. */
 
 .message-actions {
   margin-top: 6px;
-  display: inline-flex;
+  display: inline-flex;       /* just the row of icons */
   gap: 6px;
   font-size: 12px;
-  opacity: 0.85;
+  opacity: 0.9;
+}
+
+/* Align slightly left under the text by default */
+.assistant-message .message-actions {
+  padding-top: 2px;
+}
+
+
+/* --- NexaAI demo overrides --- */
+
+/* Mobile nav: show only first letter to avoid overlap */
+@media (max-width: 480px) {
+  .nav-right {
+    gap: var(--space-4, 4px);
+  }
+
+  .nav-button.secondary span.nav-full-text,
+  .nav-button.primary span.nav-full-text {
+    display: none;
+  }
+
+  .nav-button.secondary,
+  .nav-button.primary {
+    padding: var(--space-4, 4px) var(--space-8, 8px);
+    min-width: 36px;
+    justify-content: center;
+  }
+}
+
+/* Disable input visual state */
+.input-disabled {
+  opacity: 0.7;
+}
+
+/* Send / stop button minor disabled style */
+#send-btn.btn-disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+/* Assistant action bar */
+.message-actions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  opacity: 0.9;
 }
 
 .msg-btn {
   border: none;
-  padding: 2px 8px;
+  padding: 4px 8px;
   border-radius: 999px;
-  background: rgba(148, 163, 184, 0.15);
-  color: var(--color-text-secondary, #9ca3af);
+  background: rgba(15, 23, 42, 0.9);
+  color: #e5e7eb;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+}
+
+.msg-btn svg {
+  display: block;
 }
 
 .msg-btn:hover {
-  background: rgba(148, 163, 184, 0.25);
-  color: var(--color-text, #e5e7eb);
+  background: rgba(55, 65, 81, 0.95);
 }
 
 .message-actions.liked .msg-btn[data-action="like"] {
@@ -2991,70 +3042,17 @@ pre, code {
   color: #f97373;
 }
 
-/* Image download / like buttons ---------------------------------------- */
-
-.image-actions {
-  margin-top: 6px;
-  display: inline-flex;
-  gap: 8px;
+/* Modal overlay fix so scroll works correctly when closed */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.75);
+  z-index: 50;
 }
 
-.image-actions .btn-small {
-  border: none;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  background: rgba(15, 23, 42, 0.9);
-  color: #e5e7eb;
-  cursor: pointer;
-}
-
-.image-actions .btn-small:hover {
-  background: rgba(55, 65, 81, 0.95);
-}
-
-.image-actions.liked .btn-small[data-action="like"] {
-  background: rgba(22, 163, 74, 0.18);
-  color: #4ade80;
-}
-
-
-/* Mobile nav tweaks */
-@media (max-width: 640px) {
-  .top-nav {
-    padding-inline: 8px;
-  }
-
-  .nav-right {
-    gap: 4px;
-  }
-
-  .nav-button.primary,
-  .nav-button.secondary {
-    padding: 4px 8px;
-    font-size: 11px;
-  }
-
-  /* Show only first letter on very small screens */
-  .nav-button.primary span,
-  .nav-button.secondary span {
-    display: none;
-  }
-
-  .nav-button.primary::before {
-    content: "S";   /* Sign up */
-  }
-
-  .nav-button.secondary::before {
-    content: "L";   /* Log in */
-  }
-
-  .nav-button.icon-only {
-    width: 32px;
-    height: 32px;
-    padding: 0;
-  }
-}
 
 
 
@@ -3069,7 +3067,6 @@ pre, code {
   background: rgba(15, 23, 42, 0.75);
   z-index: 50;
 }
-
 
 
 
@@ -3128,3 +3125,5 @@ pre, code {
   background: rgba(22, 163, 74, 0.18);
   color: #4ade80;
 }
+
+
