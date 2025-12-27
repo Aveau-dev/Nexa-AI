@@ -1,21 +1,35 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
+  <meta name="google-site-verification" content="1xRfZx8fEbwT18xMYj4l1UFl5jRckIrbs2uk4STqF6Y" />
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NexaAI – Modern AI Assistant</title>
 
   <meta name="description" content="NexaAI is a modern, free, multi-model AI assistant platform. Chat with GPT-4, Claude, Gemini, DeepSeek, and more.">
-  <link rel="stylesheet" href="{{ url_for('static', filename='Css/style.css') }}">
+  <meta name="keywords" content="AI, NexaAI, chatbot, GPT-4, Claude, Gemini, DeepSeek, OpenRouter, AI assistant, LLM, FOSS, paywall, chat history, free, ai tools">
+  <link rel="canonical" href="https://yoursite.com/">
+  <meta name="robots" content="index, follow">
+
+  <!-- Green shield favicon -->
   <link rel="icon" type="image/svg+xml"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2319c37d' d='M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z'/></svg>">
 
+  <!-- Main CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='Css/style.css') }}">
+
+  <!-- Open Graph / Twitter -->
+  <meta property="og:title" content="NexaAI – AI Chat Assistant" />
+  <meta property="og:description" content="A smart, free AI chat dashboard supporting GPT-4, Claude, Gemini, and more." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="https://nexaai.js.org/static/og-image.png" />
+
   <!-- Markdown + syntax highlighting -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <link rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 
+  <!-- Polyfills -->
   <script>
     if (!window.Promise) {
       document.write('<script src="https://cdn.jsdelivr.net/npm/promise-polyfill@8/dist/polyfill.min.js"><\/script>');
@@ -27,6 +41,7 @@
 
   {% if current_user.is_authenticated %}
   <script>
+    // Already logged in → go straight to dashboard
     window.location.href = "{{ url_for('dashboard') }}";
   </script>
   {% endif %}
@@ -415,3 +430,4 @@
   </script>
 </body>
 </html>
+
