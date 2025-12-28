@@ -408,23 +408,61 @@ def index():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    """User login"""
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
     
     if request.method == 'POST':
-        email = request.form.get('email', '').lower().strip()
-        password = request.form.get('password', '')
+        # Handle BOTH form data AND JSON
+        data = request.get_json() or request.form.to_dict()
+        email = data.get('email', '').lower().strip()
+        password = data.get('password', '')
+        
+        if not email or not password:
+            return jsonify(success=False, error="All fields required"), 400
         
         user = User.query.filter_by(email=email).first()
         if user and check_password_hash(user.password, password):
             login_user(user, remember=True)
             log.info(f"User logged in: {email}")
-            return jsonify({'success': True, 'redirect': url_for('dashboard')})
+            return jsonify(success=True, redirect=url_for('dashboard'))
+        
         log.warning(f"Failed login attempt: {email}")
-        return jsonify({'success': False, 'error': 'Invalid credentials'}), 401
+        return jsonify(success=False, error="Invalid credentials"), 401
     
     return render_template('login.html')
+
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+    
+    if request.method == 'POST':
+        # Handle BOTH form data AND JSON
+        data = request.get_json() or request.form.to_dict()
+        email = data.get('email', '').lower().strip()
+        password = data.get('password', '')
+        name = data.get('name', '').strip()
+        
+        if not email or not password or not name:
+            return jsonify(success=False, error="All fields required"), 400
+        
+        if User.query.filter_by(email=email).first():
+            return jsonify(success=False, error="Email already exists"), 409
+        
+        user = User(email=email, password=generate_password_hash(password), name=name)
+        try:
+            db.session.add(user)
+            db.session.commit()
+            login_user(user, remember=True)
+            log.info(f"New user registered: {email}")
+            return jsonify(success=True, redirect=url_for('dashboard'))
+        except Exception as e:
+            db.session.rollback()
+            log.error(f"Signup error: {e}")
+            return jsonify(success=False, error="Registration failed"), 500
+    
+    return render_template('signup.html')
+
 
 @app.route('/demo-chat', methods=['POST'])
 def demo_chat():
@@ -479,36 +517,6 @@ def demo_chat():
         log.exception("Demo chat outer error")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/signup', methods=['GET', 'POST'])
-def signup():
-    """User registration"""
-    if current_user.is_authenticated:
-        return redirect(url_for('dashboard'))
-    
-    if request.method == 'POST':
-        email = request.form.get('email', '').lower().strip()
-        password = request.form.get('password', '')
-        name = request.form.get('name', '').strip()
-        
-        if not email or not password or not name:
-            return jsonify({'success': False, 'error': 'All fields required'}), 400
-        
-        if User.query.filter_by(email=email).first():
-            return jsonify({'success': False, 'error': 'Email already exists'}), 409
-        
-        user = User(email=email, password=generate_password_hash(password), name=name)
-        try:
-            db.session.add(user)
-            db.session.commit()
-            login_user(user, remember=True)
-            log.info(f"New user registered: {email}")
-            return jsonify({'success': True, 'redirect': url_for('dashboard')})
-        except Exception as e:
-            db.session.rollback()
-            log.error(f"Signup error: {e}")
-            return jsonify({'success': False, 'error': 'Registration failed'}), 500
-    
-    return render_template('signup.html')
 
 @app.route('/logout')
 @login_required
@@ -1072,3 +1080,4 @@ if __name__ == '__main__':
     debug = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
     log.info(f"Starting NexaAI on port {port}, debug={debug}")
     app.run(debug=debug, host='0.0.0.0', port=port)
+
