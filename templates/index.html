@@ -95,7 +95,7 @@
         <div class="input-box">
           <div class="input-inner">
             <textarea id="chat-input"
-                      placeholder="Ask anything (demo is text-only)"
+                      placeholder="Ask anything"
                       rows="1"
                       onkeydown="handleKeyDown(event)"></textarea>
             <button class="send-button" onclick="sendMessage()" id="send-btn">
@@ -115,7 +115,7 @@
           </div>
           <div class="input-footer">
             <span class="demo-notice">
-              🎁 Demo Mode – Limited, no image generation.
+              🎁 Demo Mode – Limited, no Vision support.
               <a href="javascript:void(0)" onclick="openTermsModal()"
                  style="text-decoration:underline;cursor:pointer;">Terms &amp; Policies</a> ·
               <a href="{{ url_for('signup') }}">Sign up</a> for full access
@@ -430,4 +430,5 @@
   </script>
 </body>
 </html>
+
 
