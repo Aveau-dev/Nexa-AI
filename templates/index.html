@@ -127,20 +127,38 @@
   </div>
 
   <!-- Terms Modal -->
-  <div id="terms-modal" class="modal-overlay" style="display:none;">
-    <div class="modal-container">
-      <div class="modal-header">
-        <h2>NexaAI - Terms &amp; Usage Policies</h2>
-        <button class="modal-close" onclick="closeTermsModal()">×</button>
-      </div>
-      <div class="modal-body">
-        <p>AI answers may be inaccurate or unsafe. Verify important information independently.</p>
-      </div>
-      <div class="modal-footer">
-        <button class="modal-btn primary" onclick="closeTermsModal()">I Understand</button>
-      </div>
-    </div>
-  </div>
+<!-- Replace the modal-body section in index.html -->
+<div class="modal-body">
+  <h3>🔒 Privacy & Data Use</h3>
+  <p>This is a demo mode with limited features. Your conversations are <strong>not saved</strong> in demo mode. Sign up for a free account to save chat history and access premium AI models.</p>
+  
+  <h3>⚠️ AI Limitations</h3>
+  <ul>
+    <li>AI responses may contain inaccurate or outdated information</li>
+    <li>Do not rely on AI for medical, legal, or financial advice</li>
+    <li>Always verify important information from authoritative sources</li>
+    <li>AI may occasionally produce biased or inappropriate content</li>
+  </ul>
+  
+  <h3>✅ Acceptable Use</h3>
+  <ul>
+    <li>Be respectful and constructive in your queries</li>
+    <li>Do not attempt to jailbreak or manipulate the AI</li>
+    <li>Do not use for illegal activities or harmful purposes</li>
+    <li>Content moderation policies apply</li>
+  </ul>
+  
+  <h3>🎁 Demo vs Full Access</h3>
+  <p><strong>Demo:</strong> Text-only chat, no history, rate-limited<br>
+  <strong>Free Account:</strong> 4 AI models, chat history, image generation<br>
+  <strong>Pro (Free 6 months):</strong> All models, DeepThink, Web Scraper, unlimited</p>
+  
+  <p style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+    By using NexaAI, you agree to these terms. For full Terms of Service and Privacy Policy, 
+    <a href="#" style="color: var(--primary);">visit our documentation</a>.
+  </p>
+</div>
+
 
   <script>
     let isResponding = false;
@@ -430,5 +448,6 @@
   </script>
 </body>
 </html>
+
 
 
