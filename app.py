@@ -609,9 +609,9 @@ def demo_chat():
         # 1. Try Google Gemini first (if API key available)
         if GOOGLE_API_KEY:
             try:
-                response_text = call_google_gemini('gemini-2.0-flash-exp', messages, timeout=30)
+                response_text = call_google_gemini('gemini-2.5-flash-lite', messages, timeout=30)
                 if not response_text.startswith('Error'):
-                    model_used = 'Gemini 2.5 Flash'
+                    model_used = 'Gemini 2.5 Flash lite'
                 else:
                     response_text = None
             except Exception as e:
@@ -1218,5 +1218,6 @@ if __name__ == '__main__':
     print("=" * 60)
     
     app.run(debug=debug, host='0.0.0.0', port=port)
+
 
 
