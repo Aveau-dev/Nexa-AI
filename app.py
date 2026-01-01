@@ -176,7 +176,7 @@ PLANS = {
 
 # AI Models Configuration
 FREE_MODELS = [
-    {'id': 'gemini-flash', 'name': 'Gemini 2.5 Flash', 'model': 'gemini-2.0-flash-exp', 'provider': 'google', 'vision': True, 'tier': 'free', 'rank': 4, 'description': 'Fast and efficient Gemini Flash model with vision capabilities', 'speed': 'Very Fast', 'context': '1M tokens'},
+    {'id': 'gemini-flash', 'name': 'Gemini 2.5 Flash', 'model': 'gemini-2.5-flash-lite', 'provider': 'google', 'vision': True, 'tier': 'free', 'rank': 4, 'description': 'Fast and efficient Gemini Flash model with vision capabilities', 'speed': 'Very Fast', 'context': '1M tokens'},
     {'id': 'gpt-3.5-turbo', 'name': 'ChatGPT 3.5 Turbo', 'model': 'openai/gpt-3.5-turbo', 'provider': 'openrouter', 'vision': False, 'tier': 'free', 'rank': 5, 'description': 'OpenAI GPT-3.5 Turbo - Fast and reliable', 'speed': 'Fast', 'context': '16K tokens'},
     {'id': 'claude-haiku', 'name': 'Claude 3 Haiku', 'model': 'anthropic/claude-3-haiku', 'provider': 'openrouter', 'vision': True, 'tier': 'free', 'rank': 6, 'description': 'Fast Claude model with vision support', 'speed': 'Very Fast', 'context': '200K tokens'},
     {'id': 'deepseek-chat', 'name': 'DeepSeek Chat', 'model': 'deepseek/deepseek-chat', 'provider': 'openrouter', 'vision': False, 'tier': 'free', 'limit': 50, 'rank': 7, 'description': 'Powerful for code & reasoning (50/day free, unlimited for Pro+)', 'speed': 'Fast', 'context': '64K tokens'}
@@ -1125,3 +1125,4 @@ if __name__ == '__main__':
     print("=" * 60)
     
     app.run(debug=debug, host='0.0.0.0', port=port)
+
