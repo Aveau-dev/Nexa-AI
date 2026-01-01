@@ -569,6 +569,99 @@ def index():
 # ROUTES - AUTHENTICATION
 # ═══════════════════════════════════════════════════════════════════════════
 
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ROUTES - DEMO MODE (PUBLIC, NO LOGIN REQUIRED)
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.route('/demo-login', methods=['POST'])
+def demo_login():
+    """
+    Auto-login endpoint for demo mode.
+    Returns success even without actual login (demo is public).
+    """
+    return jsonify({'success': True, 'demo': True})
+
+
+@app.route('/demo-chat', methods=['POST'])
+def demo_chat():
+    """
+    Public demo chat endpoint - NO image generation, text-only
+    Works without login, uses free AI models
+    """
+    try:
+        data = request.get_json() or {}
+        message = (data.get('message') or '').strip()
+        
+        if not message:
+            return jsonify({'error': 'Message is required'}), 400
+        
+        log.info(f"Demo chat request: {message[:50]}")
+        
+        # Prepare messages for AI
+        messages = [{'role': 'user', 'content': message}]
+        
+        # Try models in order of preference (fallback if one fails)
+        response_text = None
+        model_used = None
+        
+        # 1. Try Google Gemini first (if API key available)
+        if GOOGLE_API_KEY:
+            try:
+                response_text = call_google_gemini('gemini-2.0-flash-exp', messages, timeout=30)
+                if not response_text.startswith('Error'):
+                    model_used = 'Gemini 2.5 Flash'
+                else:
+                    response_text = None
+            except Exception as e:
+                log.warning(f"Gemini failed in demo: {e}")
+                response_text = None
+        
+        # 2. Try OpenRouter DeepSeek as fallback
+        if not response_text and OPENROUTER_API_KEY:
+            try:
+                response_text = call_openrouter('deepseek/deepseek-chat', messages, timeout=30)
+                if not response_text.startswith('Error'):
+                    model_used = 'DeepSeek Chat'
+                else:
+                    response_text = None
+            except Exception as e:
+                log.warning(f"DeepSeek failed in demo: {e}")
+                response_text = None
+        
+        # 3. Try OpenRouter GPT-3.5 as last resort
+        if not response_text and OPENROUTER_API_KEY:
+            try:
+                response_text = call_openrouter('openai/gpt-3.5-turbo', messages, timeout=30)
+                if not response_text.startswith('Error'):
+                    model_used = 'GPT-3.5 Turbo'
+            except Exception as e:
+                log.warning(f"GPT-3.5 failed in demo: {e}")
+        
+        # If all models failed
+        if not response_text or response_text.startswith('Error'):
+            return jsonify({
+                'error': 'AI services temporarily unavailable. Please sign up for full access.',
+                'hint': 'Configure GOOGLE_API_KEY or OPENROUTER_API_KEY in your environment.'
+            }), 503
+        
+        return jsonify({
+            'response': response_text,
+            'demo': True,
+            'model': model_used or 'AI Assistant'
+        })
+    
+    except Exception as e:
+        log.error(f"Demo chat error: {e}")
+        return jsonify({
+            'error': 'Demo chat failed. Please try again or sign up for full access.',
+            'details': str(e)[:100]
+        }), 500
+
+
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     """User login"""
@@ -1125,4 +1218,5 @@ if __name__ == '__main__':
     print("=" * 60)
     
     app.run(debug=debug, host='0.0.0.0', port=port)
+
 
