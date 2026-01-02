@@ -378,6 +378,23 @@ function removeTypingIndicator() {
  * @param {string} text - Text to escape
  * @returns {string} Escaped HTML
  */
+
+
+
+
+// Detects Gemini API errors
+const isQuotaError = errorMsg.includes('quota') || 
+                     errorMsg.includes('rate limit') || 
+                     errorMsg.includes('resource exhausted') ||
+                     errorMsg.includes('429') ||
+                     errorMsg.includes('limit exceeded');
+
+// Auto-retry with shortened message
+if (isQuotaError && retryCount < MAX_RETRIES) {
+  const shortenedMsg = shortenMessage(message);
+  sendMessage(shortenedMsg, true);
+}
+
 function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text == null ? '' : String(text);
