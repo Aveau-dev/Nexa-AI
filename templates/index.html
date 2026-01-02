@@ -6,13 +6,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NexaAI – Modern AI Assistant</title>
 
-  <!-- SEO Meta Tags -->
   <meta name="description" content="NexaAI is a modern, free, multi-model AI assistant platform. Chat with GPT-4, Claude, Gemini, DeepSeek, and more.">
   <meta name="keywords" content="AI, NexaAI, chatbot, GPT-4, Claude, Gemini, DeepSeek, OpenRouter, AI assistant, LLM, FOSS, paywall, chat history, free, ai tools">
   <link rel="canonical" href="https://yoursite.com/">
   <meta name="robots" content="index, follow">
 
-  <!-- Favicon -->
+  <!-- Green shield favicon -->
   <link rel="icon" type="image/svg+xml"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2319c37d' d='M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z'/></svg>">
 
@@ -25,12 +24,12 @@
   <meta property="og:type" content="website" />
   <meta property="og:image" content="https://nexaai.js.org/static/og-image.png" />
 
-  <!-- Markdown + Syntax Highlighting -->
+  <!-- Markdown + syntax highlighting -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 
-  <!-- Polyfills for older browsers -->
+  <!-- Polyfills -->
   <script>
     if (!window.Promise) {
       document.write('<script src="https://cdn.jsdelivr.net/npm/promise-polyfill@8/dist/polyfill.min.js"><\/script>');
@@ -42,14 +41,14 @@
 
   {% if current_user.is_authenticated %}
   <script>
-    // Already logged in → redirect to dashboard
+    // Already logged in → go straight to dashboard
     window.location.href = "{{ url_for('dashboard') }}";
   </script>
   {% endif %}
 </head>
 
 <body class="ds-body">
-  <!-- Top Navigation -->
+  <!-- Nav -->
   <nav class="top-nav">
     <div class="nav-left">
       <div class="logo-container">
@@ -77,26 +76,21 @@
     </div>
   </nav>
 
-  <!-- Main Content Area -->
+  <!-- Main -->
   <div class="landing-shell">
     <main class="landing-main">
       <div class="main-container">
         <div class="center-content">
-
-          <!-- Welcome Section -->
           <div class="welcome-section">
             <h1 class="main-heading">What can I help with?</h1>
           </div>
 
-          <!-- Messages Container -->
           <div id="messages-container"></div>
-
-          <!-- Spacer for fixed input -->
           <div style="height: 120px;"></div>
         </div>
       </div>
 
-      <!-- Fixed Input Area -->
+      <!-- Input -->
       <div class="input-wrapper fixed-input">
         <div class="input-box">
           <div class="input-inner">
@@ -105,13 +99,13 @@
                       rows="1"
                       onkeydown="handleKeyDown(event)"></textarea>
             <button class="send-button" onclick="sendMessage()" id="send-btn">
-              <!-- Send Icon -->
+              <!-- send icon -->
               <span id="send-icon">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                   <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
                 </svg>
               </span>
-              <!-- Stop Icon -->
+              <!-- stop icon -->
               <span id="stop-icon" style="display:none;">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                   <rect x="6" y="6" width="12" height="12" rx="2" ry="2"></rect>
@@ -132,7 +126,7 @@
     </main>
   </div>
 
-  <!-- Terms & Conditions Modal -->
+  <!-- Terms Modal (CORRECTED STRUCTURE) -->
   <div id="terms-modal" class="modal-overlay" style="display:none;">
     <div class="modal-container">
       <div class="modal-header">
@@ -164,15 +158,353 @@
         <strong>Free Account:</strong> 4 AI models, chat history, image generation<br>
         <strong>Pro (Free 6 months):</strong> All models, DeepThink, Web Scraper, unlimited</p>
 
-        <p style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+        <p style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--color-border);">
           By using NexaAI, you agree to these terms. For full Terms of Service and Privacy Policy, 
-          <a href="#" style="color: var(--primary);">visit our documentation</a>.
+          <a href="#" style="color: var(--color-primary);">visit our documentation</a>.
         </p>
       </div>
     </div>
   </div>
 
-  <!-- Main JavaScript -->
-  <script src="{{ url_for('static', filename='js/demo.js') }}"></script>
+  <script>
+    let isResponding = false;
+    let retryCount = 0;
+    const MAX_RETRIES = 2;
+
+    async function autoLoginDemo() {
+      try {
+        const res = await fetch("/demo-login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" }
+        });
+        await res.json().catch(() => ({}));
+      } catch (e) {
+        console.warn("Auto demo login failed", e);
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      autoLoginDemo();
+      const chatInput = document.getElementById('chat-input');
+      if (chatInput) {
+        chatInput.addEventListener('input', function () {
+          this.style.height = 'auto';
+          this.style.height = Math.min(this.scrollHeight, 200) + 'px';
+        });
+      }
+    });
+
+    function handleKeyDown(event) {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendMessage();
+      }
+    }
+
+    function setInputState(locked) {
+      const input = document.getElementById('chat-input');
+      const btn = document.getElementById('send-btn');
+      const sendIcon = document.getElementById('send-icon');
+      const stopIcon = document.getElementById('stop-icon');
+
+      isResponding = locked;
+      if (input) {
+        input.readOnly = locked;
+        input.classList.toggle('input-disabled', locked);
+      }
+      if (btn) {
+        btn.disabled = false;   // still clickable as STOP
+      }
+      if (sendIcon && stopIcon) {
+        sendIcon.style.display = locked ? 'none' : 'inline-flex';
+        stopIcon.style.display = locked ? 'inline-flex' : 'none';
+      }
+    }
+
+    // Shorten message intelligently
+    function shortenMessage(message) {
+      // If message is already short, return as-is
+      if (message.length <= 500) return message;
+
+      // Take first 400 chars and add ellipsis
+      return message.substring(0, 400) + "... (shortened due to API limits)";
+    }
+
+    // Main send function with retry logic
+    function sendMessage(customMessage = null, isRetry = false) {
+      const input = document.getElementById('chat-input');
+
+      // If already responding and button pressed again => STOP
+      if (isResponding && !isRetry) {
+        removeTypingIndicator();
+        setInputState(false);
+        retryCount = 0;
+        return;
+      }
+
+      const message = customMessage || input.value.trim();
+      if (!message) return;
+
+      const welcome = document.querySelector('.welcome-section');
+      if (welcome) welcome.style.display = 'none';
+
+      // Only add user message on first attempt (not retry)
+      if (!isRetry) {
+        addMessage(message, 'user');
+        input.value = '';
+        input.style.height = 'auto';
+        retryCount = 0;
+      }
+
+      showTypingIndicator();
+      setInputState(true);
+
+      // Send to backend
+      fetch('/demo-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message })
+      })
+      .then(res => res.json())
+      .then(data => {
+        removeTypingIndicator();
+        setInputState(false);
+
+        if (data.response) {
+          addMessage(data.response, 'assistant');
+          retryCount = 0; // Reset on success
+        } else if (data.error) {
+          // Check if error is Gemini quota/rate limit
+          const errorMsg = data.error.toLowerCase();
+          const isQuotaError = errorMsg.includes('quota') || 
+                               errorMsg.includes('rate limit') || 
+                               errorMsg.includes('resource exhausted') ||
+                               errorMsg.includes('429') ||
+                               errorMsg.includes('limit exceeded');
+
+          if (isQuotaError && retryCount < MAX_RETRIES) {
+            retryCount++;
+            console.log(`Gemini quota error detected. Retry ${retryCount}/${MAX_RETRIES} with shorter message...`);
+
+            // Show retry message to user
+            addMessage(`⚠️ Message too long for free tier. Retrying with shortened version (${retryCount}/${MAX_RETRIES})...`, 'error');
+
+            // Retry with shortened message
+            setTimeout(() => {
+              const shortenedMsg = shortenMessage(message);
+              sendMessage(shortenedMsg, true);
+            }, 1000);
+          } else {
+            // Show error after max retries or non-quota error
+            if (retryCount >= MAX_RETRIES) {
+              addMessage('❌ Unable to process request after multiple attempts. Please try a much shorter message or sign up for unlimited access.', 'error');
+            } else {
+              addMessage(data.error, 'error');
+            }
+            retryCount = 0;
+          }
+        }
+      })
+      .catch((err) => {
+        removeTypingIndicator();
+        setInputState(false);
+        console.error('Fetch error:', err);
+        addMessage('Error connecting to AI. Please check your connection and try again.', 'error');
+        retryCount = 0;
+      });
+    }
+
+    function formatDemoMessage(text) {
+      if (typeof marked === 'undefined') {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML.replace(/\n/g, '<br>');
+      }
+      marked.setOptions({
+        highlight(code, lang) {
+          if (typeof hljs !== 'undefined' && lang && hljs.getLanguage(lang)) {
+            return hljs.highlight(code, { language: lang }).value;
+          }
+          return (typeof hljs !== 'undefined') ? hljs.highlightAuto(code).value : code;
+        },
+        breaks: true,
+        gfm: true
+      });
+      return marked.parse(text);
+    }
+
+    function addDemoCopyButtons(container) {
+      container.querySelectorAll('pre code').forEach((codeBlock) => {
+        const pre = codeBlock.parentElement;
+        const btn = document.createElement('button');
+        btn.className = 'copy-code-btn';
+        btn.textContent = 'Copy';
+
+        btn.addEventListener('click', () => {
+          navigator.clipboard.writeText(codeBlock.textContent);
+          btn.textContent = 'Copied!';
+          setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+        });
+
+        pre.style.position = 'relative';
+        btn.style.position = 'absolute';
+        btn.style.top = '8px';
+        btn.style.right = '8px';
+        pre.appendChild(btn);
+      });
+    }
+
+    function addMessage(text, role) {
+      const container = document.getElementById('messages-container');
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `message-row ${role}-row`;
+
+      if (role === 'user') {
+        messageDiv.innerHTML = `
+          <div class="message user-message">
+            <div class="message-content">${escapeHtml(text)}</div>
+          </div>`;
+      } else if (role === 'assistant') {
+        messageDiv.innerHTML = `
+          <div class="message assistant-message">
+            <div class="avatar">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"></path>
+              </svg>
+            </div>
+            <div class="message-content markdown-content"></div>
+          </div>`;
+      } else {
+        messageDiv.innerHTML = `
+          <div class="message error-message">
+            <div class="message-content">⚠️ ${escapeHtml(text)}</div>
+          </div>`;
+      }
+
+      if (role === 'assistant') {
+        const contentDiv = messageDiv.querySelector('.markdown-content');
+        contentDiv.innerHTML = formatDemoMessage(text);
+
+        if (typeof hljs !== 'undefined') {
+          contentDiv.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
+        }
+        addDemoCopyButtons(contentDiv);
+
+        // Action bar
+        const actions = document.createElement('div');
+        actions.className = 'message-actions';
+        actions.innerHTML = `
+          <button class="msg-btn" data-action="listen" title="Listen">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            </svg>
+          </button>
+          <button class="msg-btn" data-action="like" title="Like">👍</button>
+          <button class="msg-btn" data-action="dislike" title="Dislike">👎</button>
+          <button class="msg-btn" data-action="share" title="Share">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="18" cy="5" r="3"></circle>
+              <circle cx="6" cy="12" r="3"></circle>
+              <circle cx="18" cy="19" r="3"></circle>
+              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+            </svg>
+          </button>
+        `;
+        actions.addEventListener('click', (e) => {
+          const btn = e.target.closest('.msg-btn');
+          if (btn) handleMessageAction(btn.dataset.action, text, actions);
+        });
+        contentDiv.appendChild(actions);
+      }
+
+      container.appendChild(messageDiv);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function handleMessageAction(action, text, actionsEl) {
+      if (action === 'listen') {
+        try {
+          const utter = new SpeechSynthesisUtterance(text);
+          speechSynthesis.speak(utter);
+        } catch (e) { console.warn(e); }
+      } else if (action === 'like') {
+        actionsEl.classList.add('liked');
+        actionsEl.classList.remove('disliked');
+      } else if (action === 'dislike') {
+        actionsEl.classList.add('disliked');
+        actionsEl.classList.remove('liked');
+      } else if (action === 'share') {
+        if (navigator.share) {
+          navigator.share({ text });
+        } else {
+          navigator.clipboard.writeText(text);
+          alert('Message copied to clipboard');
+        }
+      }
+    }
+
+    function openTermsModal() {
+      const modal = document.getElementById('terms-modal');
+      if (!modal) {
+        console.error('Modal not found!');
+        return;
+      }
+      modal.style.display = 'flex';
+      document.documentElement.style.overflow = 'hidden';
+      document.body.style.overflow = 'hidden';
+      console.log('Modal opened');
+    }
+
+    function closeTermsModal() {
+      const modal = document.getElementById('terms-modal');
+      if (!modal) return;
+      modal.style.display = 'none';
+      document.documentElement.style.overflow = '';
+      document.body.style.overflow = '';
+      console.log('Modal closed');
+    }
+
+    // Close modal on overlay click
+    document.addEventListener('click', (e) => {
+      const modal = document.getElementById('terms-modal');
+      if (modal && e.target === modal) {
+        closeTermsModal();
+      }
+    });
+
+    function showTypingIndicator() {
+      const container = document.getElementById('messages-container');
+      const existing = document.getElementById('typing-indicator');
+      if (existing) existing.remove();
+
+      const typingDiv = document.createElement('div');
+      typingDiv.className = 'message-row assistant-row typing-indicator';
+      typingDiv.id = 'typing-indicator';
+      typingDiv.innerHTML = `
+        <div class="message assistant-message">
+          <div class="avatar">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"></path>
+            </svg>
+          </div>
+          <div class="typing-dots"><span></span><span></span><span></span></div>
+        </div>`;
+      container.appendChild(typingDiv);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function removeTypingIndicator() {
+      const indicator = document.getElementById('typing-indicator');
+      if (indicator) indicator.remove();
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text == null ? '' : String(text);
+      return div.innerHTML;
+    }
+  </script>
 </body>
 </html>
