@@ -3693,3 +3693,41 @@ pre, code {
 
 
 
+
+
+
+
+
+.nav-button span {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  letter-spacing: normal;
+}
+
+.nav-button {
+  gap: 0 !important;
+  white-space: nowrap;
+}
+
+
+.landing-shell {
+  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.input-wrapper {
+  background-color: var(--color-background);
+  margin: 0;
+}
+
+
+@media (min-width: 481px) {
+  .nav-short-text { display: none; }
+}
+@media (max-width: 480px) {
+  .nav-full-text { display: none; }
+}
+
+
