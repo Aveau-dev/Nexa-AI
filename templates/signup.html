@@ -5,144 +5,261 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sign Up - NexaAI</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2319c37d' d='M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z'/></svg>">
-    <link rel="stylesheet" href="{{ url_for('static', filename='Css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-
 <body>
     <div class="auth-page">
         <div class="auth-container">
-            <!-- Left Side - Features -->
+            <!-- Left Side: Features -->
             <div class="auth-features">
-                <div class="feature-item">
-                    <div class="feature-icon">🤖</div>
-                    <div class="feature-text">
-                        <h3>Multi-Model AI Access</h3>
-                        <p>Chat with GPT-4o, Claude, Gemini, DeepSeek, and more - all in one place</p>
-                    </div>
+                <div class="auth-logo">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                        <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
+                    </svg>
+                    <h2>NexaAI</h2>
                 </div>
+
                 <div class="feature-item">
-                    <div class="feature-icon">💾</div>
+                    <div class="feature-icon">🚀</div>
                     <div class="feature-text">
-                        <h3>Save Your Conversations</h3>
-                        <p>Never lose important chats. Access your history anytime, anywhere</p>
-                    </div>
-                </div>
-                <div class="feature-item">
-                    <div class="feature-icon">🎨</div>
-                    <div class="feature-text">
-                        <h3>Generate Images with AI</h3>
-                        <p>Create stunning visuals from text descriptions instantly</p>
+                        <h3>Get Started in Seconds</h3>
+                        <p>Create your account and start chatting with AI instantly</p>
                     </div>
                 </div>
                 <div class="feature-item">
                     <div class="feature-icon">🔒</div>
                     <div class="feature-text">
-                        <h3>Privacy First</h3>
+                        <h3>Secure & Private</h3>
                         <p>Your data is encrypted and never shared with third parties</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">🎁</div>
+                    <div class="feature-text">
+                        <h3>Pro Plan Free Trial</h3>
+                        <p>Get 6 months of Pro access - completely free!</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">🌟</div>
+                    <div class="feature-text">
+                        <h3>Premium Features</h3>
+                        <p>Access to DeepThink AI, Web Scraper, and Pro models</p>
                     </div>
                 </div>
             </div>
 
-            <!-- Right Side - Signup Form -->
+            <!-- Right Side: Signup Form -->
             <div class="auth-box">
                 <div class="auth-header">
-                    <svg class="logo-icon-large" viewBox="0 0 24 24" width="48" height="48">
-                        <path fill="#19c37d" d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
-                    </svg>
-                    <h1>Create Your Account</h1>
-                    <p>Join NexaAI and start chatting with the best AI models</p>
+                    <h1>Create Account</h1>
+                    <p>Join thousands using NexaAI</p>
                 </div>
 
-                {% if error %}
-                <div class="error-message">{{ error }}</div>
-                {% endif %}
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }}" role="alert">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
 
-                <div id="js-error" class="error-message" style="display:none;"></div>
+                <!-- Error Display (JavaScript) -->
+                <div id="error-message" style="display: none;"></div>
+                <div id="success-message" style="display: none;"></div>
 
-                <form id="signup-form" onsubmit="handleSignup(event)">
+                <form method="POST" action="{{ url_for('signup') }}" id="signupForm">
                     <div class="form-group">
                         <label for="name">Full Name</label>
-                        <input type="text" id="name" name="name" class="form-input" placeholder="John Doe" required>
+                        <input 
+                            type="text" 
+                            id="name" 
+                            name="name" 
+                            class="form-control"
+                            placeholder="Enter your full name"
+                            required
+                            autofocus
+                            minlength="2"
+                        >
                     </div>
 
                     <div class="form-group">
                         <label for="email">Email Address</label>
-                        <input type="email" id="email" name="email" class="form-input" placeholder="you@example.com" required>
+                        <input 
+                            type="email" 
+                            id="email" 
+                            name="email" 
+                            class="form-control"
+                            placeholder="your@email.com"
+                            required
+                        >
                     </div>
 
                     <div class="form-group">
                         <label for="password">Password</label>
-                        <input type="password" id="password" name="password" class="form-input" placeholder="At least 6 characters" required minlength="6">
+                        <input 
+                            type="password" 
+                            id="password" 
+                            name="password" 
+                            class="form-control"
+                            placeholder="Create a strong password"
+                            required
+                            minlength="6"
+                        >
+                        <small style="color: var(--color-text-secondary); font-size: 12px; display: block; margin-top: 4px;">
+                            At least 6 characters
+                        </small>
                     </div>
 
-                    <button type="submit" class="auth-button" id="submit-btn">
-                        Create Account
+                    <button type="submit" class="btn btn--primary btn--full-width">
+                        <span id="btn-text">Create Account</span>
                     </button>
 
-                    <p class="terms-text">
-                        By creating an account, you agree to our <a href="javascript:void(0)" style="color:#19c37d;">Terms of Service</a> and <a href="javascript:void(0)" style="color:#19c37d;">Privacy Policy</a>
+                    <p style="font-size: 12px; color: var(--color-text-secondary); text-align: center; margin-top: 12px;">
+                        By signing up, you agree to our 
+                        <a href="/terms" style="color: var(--color-primary);">Terms</a> and 
+                        <a href="/privacy" style="color: var(--color-primary);">Privacy Policy</a>
                     </p>
                 </form>
 
                 <div class="auth-divider">
-                    <span>or</span>
+                    <span>OR</span>
                 </div>
 
                 <div class="auth-footer">
-                    Already have an account? <a href="/login">Log in</a>
+                    Already have an account? <a href="{{ url_for('login') }}">Login</a>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        async function handleSignup(event) {
-            event.preventDefault();
-            
-            const submitBtn = document.getElementById('submit-btn');
-            const errorDiv = document.getElementById('js-error');
-            
+        // ═══════════════════════════════════════════════════════════════
+        // AUTO THEME DETECTION (System Theme)
+        // ═══════════════════════════════════════════════════════════════
+
+        function applySystemTheme() {
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-color-scheme', prefersDark ? 'dark' : 'light');
+            console.log(`🎨 System theme detected: ${prefersDark ? 'dark' : 'light'}`);
+        }
+
+        // Apply theme on load
+        applySystemTheme();
+
+        // Listen for system theme changes
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+            document.documentElement.setAttribute('data-color-scheme', e.matches ? 'dark' : 'light');
+            console.log(`🎨 System theme changed to: ${e.matches ? 'dark' : 'light'}`);
+        });
+
+        // ═══════════════════════════════════════════════════════════════
+        // FORM VALIDATION & SUBMISSION
+        // ═══════════════════════════════════════════════════════════════
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = message;
+            errorDiv.className = 'alert alert-error';
+            errorDiv.style.display = 'block';
+
+            setTimeout(() => {
+                errorDiv.style.opacity = '0';
+                setTimeout(() => errorDiv.style.display = 'none', 300);
+            }, 5000);
+        }
+
+        function showSuccess(message) {
+            const successDiv = document.getElementById('success-message');
+            successDiv.textContent = message;
+            successDiv.className = 'alert alert-success';
+            successDiv.style.display = 'block';
+        }
+
+        function isValidEmail(email) {
+            return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+        }
+
+        document.getElementById('signupForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const name = document.getElementById('name').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            const btn = this.querySelector('button[type="submit"]');
+            const btnText = document.getElementById('btn-text');
+
+            // Client-side validation
+            if (!name || !email || !password) {
+                showError('Please fill in all fields');
+                return;
+            }
+
+            if (name.length < 2) {
+                showError('Name must be at least 2 characters long');
+                return;
+            }
+
+            if (!isValidEmail(email)) {
+                showError('Please enter a valid email address');
+                return;
+            }
+
+            if (password.length < 6) {
+                showError('Password must be at least 6 characters long');
+                return;
+            }
+
             // Disable button
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Creating account...';
-            errorDiv.style.display = 'none';
-            
-            const formData = {
-                name: document.getElementById('name').value.trim(),
-                email: document.getElementById('email').value.trim(),
-                password: document.getElementById('password').value
-            };
+            btn.disabled = true;
+            btnText.textContent = 'Creating Account...';
 
             try {
-                const response = await fetch('/signup', {
+                const response = await fetch('{{ url_for("signup") }}', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify(formData)
+                    body: JSON.stringify({ name, email, password })
                 });
 
                 const data = await response.json();
 
-                if (response.ok && data.success) {
-                    // Success - redirect to login
-                    window.location.href = '/login';
+                if (data.success) {
+                    showSuccess('Account created! Redirecting...');
+                    setTimeout(() => {
+                        window.location.href = data.redirect || '{{ url_for("dashboard") }}';
+                    }, 500);
                 } else {
-                    // Show error
-                    errorDiv.textContent = data.error || 'Signup failed. Please try again.';
-                    errorDiv.style.display = 'block';
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Create Account';
+                    showError(data.error || 'Signup failed. Please try again.');
+                    btn.disabled = false;
+                    btnText.textContent = 'Create Account';
                 }
             } catch (error) {
                 console.error('Signup error:', error);
-                errorDiv.textContent = 'Network error. Please check your connection and try again.';
-                errorDiv.style.display = 'block';
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Create Account';
+                showError('Connection error. Please try again.');
+                btn.disabled = false;
+                btnText.textContent = 'Create Account';
             }
-        }
+        });
+
+        // Password strength indicator (optional visual feedback)
+        document.getElementById('password').addEventListener('input', function() {
+            const password = this.value;
+            let strength = 0;
+
+            if (password.length >= 6) strength++;
+            if (password.length >= 10) strength++;
+            if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
+            if (/\d/.test(password)) strength++;
+            if (/[^a-zA-Z\d]/.test(password)) strength++;
+
+            // You can add visual indicator here if needed
+        });
     </script>
 </body>
 </html>
-
