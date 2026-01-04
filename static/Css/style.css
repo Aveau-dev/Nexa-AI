@@ -4787,3 +4787,57 @@ pre, code {
 /* ═══════════════════════════════════════════════════════════════════════════
    END AUTHENTICATION PAGES
    ═══════════════════════════════════════════════════════════════════════════ */
+
+
+
+
+
+
+
+
+
+/* ===== DEMO MODE TEXT SIZES ===== */
+.demo-mode h1 {
+    font-size: 2.5rem; /* Increased from ~2rem */
+}
+
+.demo-mode h2 {
+    font-size: 2rem; /* Increased from ~1.5rem */
+}
+
+.demo-mode p, .demo-mode .message-text {
+    font-size: 1.1rem; /* Increased from 1rem */
+    line-height: 1.6;
+}
+
+.demo-mode button, .demo-mode .btn {
+    font-size: 1.05rem; /* Slightly larger buttons */
+}
+
+/* ===== DASHBOARD TEXT SIZES ===== */
+.dashboard h1, .dashboard-header h1 {
+    font-size: 2.2rem; /* Increased */
+}
+
+.dashboard h2 {
+    font-size: 1.8rem; /* Increased */
+}
+
+.dashboard p, .dashboard-content p {
+    font-size: 1.1rem; /* Increased from 1rem */
+    line-height: 1.6;
+}
+
+.chat-message, .message-bubble {
+    font-size: 1.05rem; /* Chat messages slightly larger */
+}
+
+.sidebar, .sidebar-text {
+    font-size: 1rem; /* Sidebar text readable */
+}
+
+/* Input fields */
+.dashboard input, .dashboard textarea {
+    font-size: 1.05rem;
+}
+
