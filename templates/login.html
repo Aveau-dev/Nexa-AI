@@ -5,135 +5,210 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - NexaAI</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2319c37d' d='M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z'/></svg>">
-    <link rel="stylesheet" href="{{ url_for('static', filename='Css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-
 <body>
     <div class="auth-page">
         <div class="auth-container">
-            <!-- Left Side - Features -->
+            <!-- Left Side: Features -->
             <div class="auth-features">
+                <div class="auth-logo">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                        <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
+                    </svg>
+                    <h2>NexaAI</h2>
+                </div>
+
+                <div class="feature-item">
+                    <div class="feature-icon">🤖</div>
+                    <div class="feature-text">
+                        <h3>AI-Powered Conversations</h3>
+                        <p>Chat with advanced AI models like GPT-4, Claude, and Gemini</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">🎨</div>
+                    <div class="feature-text">
+                        <h3>Image Generation</h3>
+                        <p>Create stunning visuals with AI-powered image generators</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">💾</div>
+                    <div class="feature-text">
+                        <h3>Chat History</h3>
+                        <p>Never lose your conversations - all saved securely</p>
+                    </div>
+                </div>
                 <div class="feature-item">
                     <div class="feature-icon">⚡</div>
                     <div class="feature-text">
-                        <h3>Fast Responses</h3>
-                        <p>Get instant answers from the world's most advanced AI models</p>
-                    </div>
-                </div>
-                <div class="feature-item">
-                    <div class="feature-icon">🌍</div>
-                    <div class="feature-text">
-                        <h3>Access Anywhere</h3>
-                        <p>Your chats are saved and synced across all your devices</p>
-                    </div>
-                </div>
-                <div class="feature-item">
-                    <div class="feature-icon">💡</div>
-                    <div class="feature-text">
-                        <h3>4 Free AI Models</h3>
-                        <p>Gemini, ChatGPT, Claude, and DeepSeek - no credit card required</p>
-                    </div>
-                </div>
-                <div class="feature-item">
-                    <div class="feature-icon">⭐</div>
-                    <div class="feature-text">
-                        <h3>Upgrade to Premium</h3>
-                        <p>Get access to GPT-4o, Claude 4.5 Sonnet, and unlimited features</p>
+                        <h3>Lightning Fast</h3>
+                        <p>Real-time responses with optimized performance</p>
                     </div>
                 </div>
             </div>
 
-            <!-- Right Side - Login Form -->
+            <!-- Right Side: Login Form -->
             <div class="auth-box">
                 <div class="auth-header">
-                    <svg class="logo-icon-large" viewBox="0 0 24 24" width="48" height="48">
-                        <path fill="#19c37d" d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
-                    </svg>
                     <h1>Welcome Back</h1>
-                    <p>Sign in to continue to NexaAI</p>
+                    <p>Login to continue your AI journey</p>
                 </div>
 
-                {% if error %}
-                <div class="error-message">{{ error }}</div>
-                {% endif %}
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }}" role="alert">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
 
-                <div id="js-error" class="error-message" style="display:none;"></div>
+                <!-- Error Display (JavaScript) -->
+                <div id="error-message" style="display: none;"></div>
+                <div id="success-message" style="display: none;"></div>
 
-                <form id="login-form" onsubmit="handleLogin(event)">
+                <form method="POST" action="{{ url_for('login') }}" id="loginForm">
                     <div class="form-group">
                         <label for="email">Email Address</label>
-                        <input type="email" id="email" name="email" class="form-input" placeholder="you@example.com" required autofocus>
+                        <input 
+                            type="email" 
+                            id="email" 
+                            name="email" 
+                            class="form-control"
+                            placeholder="your@email.com"
+                            required
+                            autofocus
+                        >
                     </div>
 
                     <div class="form-group">
                         <label for="password">Password</label>
-                        <input type="password" id="password" name="password" class="form-input" placeholder="Enter your password" required>
+                        <input 
+                            type="password" 
+                            id="password" 
+                            name="password" 
+                            class="form-control"
+                            placeholder="Enter your password"
+                            required
+                            minlength="6"
+                        >
                     </div>
 
-                    <button type="submit" class="auth-button" id="submit-btn">
-                        Sign In
+                    <button type="submit" class="btn btn--primary btn--full-width">
+                        <span id="btn-text">Login</span>
                     </button>
                 </form>
 
                 <div class="auth-divider">
-                    <span>or</span>
+                    <span>OR</span>
                 </div>
 
                 <div class="auth-footer">
-                    Don't have an account? <a href="/signup">Sign up for free</a>
+                    Don't have an account? <a href="{{ url_for('signup') }}">Sign up</a>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        async function handleLogin(event) {
-            event.preventDefault();
-            
-            const submitBtn = document.getElementById('submit-btn');
-            const errorDiv = document.getElementById('js-error');
-            
+        // ═══════════════════════════════════════════════════════════════
+        // AUTO THEME DETECTION (System Theme)
+        // ═══════════════════════════════════════════════════════════════
+
+        function applySystemTheme() {
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-color-scheme', prefersDark ? 'dark' : 'light');
+            console.log(`🎨 System theme detected: ${prefersDark ? 'dark' : 'light'}`);
+        }
+
+        // Apply theme on load
+        applySystemTheme();
+
+        // Listen for system theme changes
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+            document.documentElement.setAttribute('data-color-scheme', e.matches ? 'dark' : 'light');
+            console.log(`🎨 System theme changed to: ${e.matches ? 'dark' : 'light'}`);
+        });
+
+        // ═══════════════════════════════════════════════════════════════
+        // FORM VALIDATION & SUBMISSION
+        // ═══════════════════════════════════════════════════════════════
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = message;
+            errorDiv.className = 'alert alert-error';
+            errorDiv.style.display = 'block';
+
+            setTimeout(() => {
+                errorDiv.style.opacity = '0';
+                setTimeout(() => errorDiv.style.display = 'none', 300);
+            }, 5000);
+        }
+
+        function showSuccess(message) {
+            const successDiv = document.getElementById('success-message');
+            successDiv.textContent = message;
+            successDiv.className = 'alert alert-success';
+            successDiv.style.display = 'block';
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            const btn = this.querySelector('button[type="submit"]');
+            const btnText = document.getElementById('btn-text');
+
+            // Client-side validation
+            if (!email || !password) {
+                showError('Please fill in all fields');
+                return;
+            }
+
+            if (password.length < 6) {
+                showError('Password must be at least 6 characters long');
+                return;
+            }
+
             // Disable button
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Signing in...';
-            errorDiv.style.display = 'none';
-            
-            const formData = {
-                email: document.getElementById('email').value.trim(),
-                password: document.getElementById('password').value
-            };
+            btn.disabled = true;
+            btnText.textContent = 'Logging in...';
 
             try {
-                const response = await fetch('/login', {
+                const response = await fetch('{{ url_for("login") }}', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify(formData)
+                    body: JSON.stringify({ email, password })
                 });
 
                 const data = await response.json();
 
-                if (response.ok && data.success) {
-                    // Success - redirect to dashboard
-                    window.location.href = '/dashboard';
+                if (data.success) {
+                    showSuccess('Login successful! Redirecting...');
+                    setTimeout(() => {
+                        window.location.href = data.redirect || '{{ url_for("dashboard") }}';
+                    }, 500);
                 } else {
-                    // Show error
-                    errorDiv.textContent = data.error || 'Login failed. Please check your credentials.';
-                    errorDiv.style.display = 'block';
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Sign In';
+                    showError(data.error || 'Login failed. Please try again.');
+                    btn.disabled = false;
+                    btnText.textContent = 'Login';
                 }
             } catch (error) {
                 console.error('Login error:', error);
-                errorDiv.textContent = 'Network error. Please check your connection and try again.';
-                errorDiv.style.display = 'block';
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Sign In';
+                showError('Connection error. Please try again.');
+                btn.disabled = false;
+                btnText.textContent = 'Login';
             }
-        }
+        });
     </script>
 </body>
 </html>
-
-
