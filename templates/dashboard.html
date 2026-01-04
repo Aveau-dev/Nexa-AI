@@ -5,14 +5,11 @@
   <title>NexaAI – Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- Only this CSS, nothing else -->
   <link rel="stylesheet" href="{{ url_for('static', filename='Css/style.css') }}">
 
   <link rel="icon" type="image/svg+xml"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2319c37d' d='M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z'/></svg>">
 
-
-  <!-- Markdown + code highlight (keep these) -->
   <link rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
@@ -22,9 +19,10 @@
     window.NEXAAI = window.NEXAAI || {};
     window.NEXAAI.initialModelKey  = "{{ session.get('selected_model', 'gemini-flash') }}";
     window.NEXAAI.initialModelName = "{{ session.get('selected_model_name', 'Gemini 2.5 Flash') }}";
+    window.NEXAAI.deepseekCount = {{ user.deepseek_count or 0 }};
+    window.NEXAAI.isPremium = {{ 'true' if user.ispremium else 'false' }};
   </script>
 </head>
-
 
 <body class="ds-app">
 
@@ -61,14 +59,14 @@
     </div>
 
     <div class="nav-right">
-      <button class="nav-button" type="button" onclick="Settings.open()">Settings</button>
+      <button class="nav-button" type="button" onclick="openSettings()">Settings</button>
 
       {% if not user.ispremium %}
         <button class="nav-button upgrade-btn" type="button" onclick="location.href='{{ url_for('checkout') }}'">
-          <span>Upgrade</span>
+          <span>Ultimate</span>
         </button>
       {% else %}
-        <div class="premium-badge-nav">Premium</div>
+        <div class="premium-badge-nav">Ultimate</div>
       {% endif %}
 
       <button class="nav-button icon-only" type="button" onclick="toggleUserMenu()">
@@ -130,7 +128,7 @@
         <div class="user-name">{{ user.name }}</div>
         <div class="user-email">{{ user.email }}</div>
         {% if user.ispremium %}
-          <div class="premium-badge-small">Premium Member</div>
+          <div class="premium-badge-small">Ultimate Member</div>
         {% else %}
           <div class="free-badge-small">Free Account</div>
         {% endif %}
@@ -138,7 +136,7 @@
     </div>
     <div class="menu-divider"></div>
     {% if not user.ispremium %}
-      <a href="{{ url_for('checkout') }}" class="menu-item">Upgrade to Premium</a>
+      <a href="{{ url_for('checkout') }}" class="menu-item">Upgrade to Ultimate</a>
       <div class="menu-divider"></div>
     {% endif %}
     <a href="{{ url_for('logout') }}" class="menu-item">Log out</a>
@@ -165,9 +163,9 @@
                   <span class="chat-title">{{ chat.title }}</span>
                   <div class="chat-actions">
                     <button class="icon-btn" title="Rename"
-                            onclick="event.stopPropagation(); window.renameChat('{{ chat.id }}')"></button>
+                            onclick="event.stopPropagation(); window.renameChat('{{ chat.id }}')">✏️</button>
                     <button class="icon-btn" title="Delete"
-                            onclick="event.stopPropagation(); window.deleteChat('{{ chat.id }}')"></button>
+                            onclick="event.stopPropagation(); window.deleteChat('{{ chat.id }}')">🗑️</button>
                   </div>
                 </div>
               {% endfor %}
@@ -182,12 +180,12 @@
             <div class="usage-item">
               <span class="usage-label">DeepSeek Today</span>
               <span class="usage-value">
-                <span id="deepseek-usage">{{ user.deepseek_count }}</span>/50
+                <span id="deepseek-usage">{{ user.deepseek_count or 0 }}</span>/50
               </span>
             </div>
 
             <div class="footer-actions">
-              <button class="nav-button" type="button" onclick="Settings.open()">Settings</button>
+              <button class="nav-button" type="button" onclick="openSettings()">Settings</button>
 
               {% if not user.ispremium %}
                 <div class="upgrade-cta-small">
@@ -210,19 +208,19 @@
 
           <div class="suggestion-cards">
             <div class="suggestion-card" onclick="useSuggestion('Explain quantum computing')">
-              <div class="suggestion-icon"></div>
+              <div class="suggestion-icon">💡</div>
               <div class="suggestion-text">Explain quantum computing</div>
             </div>
             <div class="suggestion-card" onclick="useSuggestion('Help me code something')">
-              <div class="suggestion-icon"></div>
+              <div class="suggestion-icon">💻</div>
               <div class="suggestion-text">Help me code something</div>
             </div>
             <div class="suggestion-card" onclick="useSuggestion('Research AI trends')">
-              <div class="suggestion-icon"></div>
+              <div class="suggestion-icon">🔍</div>
               <div class="suggestion-text">Research AI trends</div>
             </div>
             <div class="suggestion-card" onclick="useSuggestion('Write a creative story')">
-              <div class="suggestion-icon"></div>
+              <div class="suggestion-icon">✨</div>
               <div class="suggestion-text">Creative inspiration</div>
             </div>
           </div>
@@ -239,14 +237,31 @@
                         rows="1"></textarea>
 
               <div class="input-pills">
-                <button id="btn-deepthink" type="button" class="pill-button">DeepThink</button>
-                <button id="btn-web" type="button" class="pill-button">Search</button>
+                <button id="btn-deepthink" type="button" class="pill-button" title="DeepThink Mode">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
+                  </svg>
+                  <span>DeepThink</span>
+                </button>
+                <button id="btn-web" type="button" class="pill-button" title="Web Search">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                  </svg>
+                  <span>Search</span>
+                </button>
               </div>
 
               <button class="send-button" id="send-btn" type="button">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
-                </svg>
+                <span id="send-icon">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
+                  </svg>
+                </span>
+                <span id="stop-icon" style="display:none;">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                    <rect x="6" y="6" width="12" height="12" rx="2" ry="2"></rect>
+                  </svg>
+                </span>
               </button>
             </div>
 
@@ -255,8 +270,8 @@
                 <span id="model-info">{{ session.get('selected_model_name', 'Gemini 2.5 Flash') }}</span>.
                 NexaAI can make mistakes. Verify important info.
               </span>
-              <div id="deepthink-status" style="display:none;">
-                Thinking… <span id="deepthink-seconds">0s</span>
+              <div id="deepthink-status" style="display:none; color: var(--color-primary); font-size: 0.85rem;">
+                🧠 Thinking… <span id="deepthink-seconds">0s</span>
               </div>
             </div>
           </div>
@@ -265,9 +280,21 @@
     </main>
   </div>
 
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="modal-overlay" style="display:none;">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h2>Settings</h2>
+        <button class="modal-close" onclick="closeSettings()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>Settings panel - Add your preferences here</p>
+      </div>
+    </div>
+  </div>
+
   <!-- Scripts -->
   <script src="{{ url_for('static', filename='js/router.js') }}"></script>
-  <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
   <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
   <script src="{{ url_for('static', filename='js/files.js') }}"></script>
   <script src="{{ url_for('static', filename='js/memory.js') }}"></script>
@@ -277,6 +304,22 @@
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 
   <script>
+    function openSettings() {
+      const modal = document.getElementById('settings-modal');
+      if (modal) {
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+      }
+    }
+
+    function closeSettings() {
+      const modal = document.getElementById('settings-modal');
+      if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+      }
+    }
+
     document.addEventListener("DOMContentLoaded", function () {
       if (window.Router && Router.boot) Router.boot();
       if (window.Router && Router.go) Router.go("chat");
@@ -284,4 +327,3 @@
   </script>
 </body>
 </html>
-
