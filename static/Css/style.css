@@ -3711,15 +3711,34 @@ pre, code {
 }
 
 
+/* ✅ NEW - Allows scrolling */
 .landing-shell {
   min-height: 100vh;
-  height: 100vh;
-  overflow: hidden;
+  /* Removed: height and overflow hidden */
+  display: flex;
+  flex-direction: column;
 }
+
+.main-container {
+  overflow-y: auto; /* Scroll here */
+  overflow-x: hidden;
+}
+
+.center-content {
+  overflow-y: auto; /* And here */
+}
+
 
 .input-wrapper {
   background-color: var(--color-background);
   margin: 0;
+}
+
+
+.input-wrapper {
+  position: sticky; /* Better than fixed! */
+  bottom: 0;
+  z-index: 50;
 }
 
 
@@ -3729,5 +3748,6 @@ pre, code {
 @media (max-width: 480px) {
   .nav-full-text { display: none; }
 }
+
 
 
