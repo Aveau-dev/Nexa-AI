@@ -1,10 +1,11 @@
-/* static/js/chat.js */
-(() => {
+/* static/js/chat.js - Complete with Stop/Abort functionality */
+window.Chat = (function () {
   let currentModelKey = (window.NEXAAI && window.NEXAAI.initialModelKey) || "gemini-flash";
   let currentModelName = (window.NEXAAI && window.NEXAAI.initialModelName) || "Gemini 2.5 Flash";
 
   let currentChatId = null;
   let isLoading = false;
+  let abortController = null; // For stopping AI responses
 
   let deepThinkEnabled = false;
   let webEnabled = false;
@@ -12,7 +13,7 @@
   let deepThinkTimer = null;
   let deepThinkStart = 0;
 
-  function $(id){ return document.getElementById(id); }
+  function $(id) { return document.getElementById(id); }
 
   // -----------------------------
   // Theme (data-theme on <html>)
@@ -20,6 +21,7 @@
   function getSavedTheme() {
     return localStorage.getItem("nexa_theme") || "dark";
   }
+
   function applyTheme(theme) {
     const t = (theme === "light") ? "light" : "dark";
     document.documentElement.setAttribute("data-theme", t);
@@ -28,6 +30,7 @@
     const btn = $("btn-theme");
     if (btn) btn.textContent = (t === "light") ? "Theme: Light" : "Theme: Dark";
   }
+
   window.toggleTheme = function () {
     const curr = document.documentElement.getAttribute("data-theme") || getSavedTheme();
     applyTheme(curr === "light" ? "dark" : "light");
@@ -61,6 +64,52 @@
     if (box) box.style.display = "none";
   }
 
+  // ---- Stop AI Response (Perplexity-style) ----
+  function stopAIResponse() {
+    if (!isLoading) return;
+
+    console.log('User stopped AI response');
+
+    // Cancel the fetch request
+    if (abortController) {
+      abortController.abort();
+    }
+
+    hideTypingIndicator();
+    deepThinkStopTimer();
+    addMessage('⏸️ Response stopped by user', 'system');
+
+    // Reset state
+    setInputState(false);
+    isLoading = false;
+    abortController = null;
+  }
+
+  // ---- Input state (lock/unlock) ----
+  function setInputState(locked) {
+    const input = $("chat-input");
+    const btn = $("send-btn");
+    const sendIcon = $("send-icon");
+    const stopIcon = $("stop-icon");
+
+    isLoading = locked;
+
+    if (input) {
+      input.readOnly = locked;
+      input.classList.toggle('input-disabled', locked);
+    }
+
+    if (btn) {
+      btn.disabled = false; // Always clickable for stop
+    }
+
+    // Toggle send/stop icon
+    if (sendIcon && stopIcon) {
+      sendIcon.style.display = locked ? 'none' : 'inline-flex';
+      stopIcon.style.display = locked ? 'inline-flex' : 'none';
+    }
+  }
+
   // -----------------------------
   // Bindings (run after chat view loads)
   // -----------------------------
@@ -88,10 +137,16 @@
       });
     }
 
-    // Send button
+    // Send button (also handles stop)
     if (sendBtn && !sendBtn.dataset.bound) {
       sendBtn.dataset.bound = "1";
-      sendBtn.addEventListener("click", () => window.sendMessage());
+      sendBtn.addEventListener("click", () => {
+        if (isLoading) {
+          stopAIResponse();
+        } else {
+          sendMessage();
+        }
+      });
     }
 
     // Textarea
@@ -101,7 +156,7 @@
       input.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
           e.preventDefault();
-          window.sendMessage();
+          if (!isLoading) sendMessage();
         }
       });
 
@@ -119,11 +174,10 @@
     if (foot) foot.textContent = currentModelName;
   }
 
-  // Router event
-  document.addEventListener("nexa:viewchange", (e) => {
-    const view = (e.detail && e.detail.view) || "chat";
-    if (view === "chat") bindChatViewOnce();
-  });
+  // Called by Router when chat view loads
+  function onViewLoaded() {
+    bindChatViewOnce();
+  }
 
   // ---- global UI funcs used by dashboard.html ----
   window.toggleSidebar = function () {
@@ -131,8 +185,9 @@
     const main = $("main-content");
     if (!sidebar || !main) return;
 
-    if (window.innerWidth < 1024) sidebar.classList.toggle("show");
-    else {
+    if (window.innerWidth < 1024) {
+      sidebar.classList.toggle("show");
+    } else {
       sidebar.classList.toggle("collapsed");
       main.classList.toggle("sidebar-collapsed");
     }
@@ -203,10 +258,11 @@
     if (w) w.style.display = visible ? "block" : "none";
   }
 
-  // addMessage now supports meta (thought time + web flag)
   function addMessage(text, role, modelNameForBadge, reasoningText = null, meta = null) {
     const container = $("messages-container");
     if (!container) return;
+
+    setWelcomeVisible(false);
 
     const row = document.createElement("div");
     row.className = `message-row ${role}-row`;
@@ -216,6 +272,7 @@
         <div class="message user-message">
           <div class="message-content">${escapeHtml(text)}</div>
         </div>`;
+
     } else if (role === "assistant") {
       row.innerHTML = `
         <div class="message assistant-message">
@@ -237,7 +294,6 @@
         </div>
       `;
 
-      // meta line
       const metaEl = row.querySelector(".assistant-meta");
       if (metaEl && meta?.thoughtSeconds) {
         const s = Number(meta.thoughtSeconds).toFixed(1);
@@ -255,7 +311,19 @@
       if (typeof hljs !== "undefined") {
         contentDiv.querySelectorAll("pre code").forEach(b => hljs.highlightElement(b));
       }
+
+      // Add action buttons (like, listen, share)
+      addMessageActions(contentDiv, text);
+
+    } else if (role === "system") {
+      // System message (stop notification)
+      row.innerHTML = `
+        <div class="message system-message">
+          <div class="message-content">${escapeHtml(text)}</div>
+        </div>`;
+
     } else {
+      // Error message
       row.innerHTML = `
         <div class="message error-message">
           <div class="message-content">${escapeHtml(text)}</div>
@@ -264,6 +332,71 @@
 
     container.appendChild(row);
     container.scrollTop = container.scrollHeight;
+  }
+
+  // ---- Add action buttons to assistant messages ----
+  function addMessageActions(contentDiv, text) {
+    const actions = document.createElement('div');
+    actions.className = 'message-actions';
+    actions.innerHTML = `
+      <button class="msg-btn" data-action="listen" title="Listen">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+        </svg>
+      </button>
+      <button class="msg-btn" data-action="like" title="Like">👍</button>
+      <button class="msg-btn" data-action="dislike" title="Dislike">👎</button>
+      <button class="msg-btn" data-action="copy" title="Copy">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+        </svg>
+      </button>
+    `;
+
+    actions.addEventListener('click', (e) => {
+      const btn = e.target.closest('.msg-btn');
+      if (btn) handleMessageAction(btn.dataset.action, text, actions);
+    });
+
+    contentDiv.appendChild(actions);
+  }
+
+  // ---- Handle message action buttons ----
+  function handleMessageAction(action, text, actionsEl) {
+    if (action === 'listen') {
+      try {
+        const utter = new SpeechSynthesisUtterance(text);
+        speechSynthesis.speak(utter);
+      } catch (e) {
+        console.warn('Text-to-speech not supported', e);
+      }
+
+    } else if (action === 'like') {
+      actionsEl.classList.add('liked');
+      actionsEl.classList.remove('disliked');
+
+    } else if (action === 'dislike') {
+      actionsEl.classList.add('disliked');
+      actionsEl.classList.remove('liked');
+
+    } else if (action === 'copy') {
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = actionsEl.querySelector('[data-action="copy"]');
+        if (btn) {
+          btn.textContent = '✓';
+          setTimeout(() => {
+            btn.innerHTML = `
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            `;
+          }, 1500);
+        }
+      });
+    }
   }
 
   function showTypingIndicator() {
@@ -283,121 +416,65 @@
         <div class="typing-dots"><span></span><span></span><span></span></div>
       </div>
     `;
+
     container.appendChild(typingDiv);
     container.scrollTop = container.scrollHeight;
   }
 
-  function removeTypingIndicator() {
-    const el = $("typing-indicator");
-    if (el) el.remove();
+  function hideTypingIndicator() {
+    const t = $("typing-indicator");
+    if (t) t.remove();
   }
 
-  function setActiveChatInSidebar(chatId) {
-    document.querySelectorAll(".chat-item[data-chat-id]").forEach(el => el.classList.remove("active"));
-    const active = document.querySelector(`.chat-item[data-chat-id="${chatId}"]`);
-    if (active) active.classList.add("active");
-  }
-
-  function upsertChatInSidebar(chatId, title, prepend) {
-    const history = $("chat-history");
-    if (!history) return;
-
-    const empty = history.querySelector(".empty-state");
-    if (empty) empty.remove();
-
-    let item = history.querySelector(`.chat-item[data-chat-id="${chatId}"]`);
-    if (!item) {
-      item = document.createElement("div");
-      item.className = "chat-item";
-      item.setAttribute("data-chat-id", chatId);
-      item.onclick = () => window.loadChat(chatId);
-
-      item.innerHTML = `
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-          <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"></path>
-        </svg>
-        <span class="chat-title"></span>
-        <div class="chat-actions">
-          <button class="icon-btn" title="Rename"></button>
-          <button class="icon-btn" title="Delete"></button>
-        </div>
-      `;
-
-      const buttons = item.querySelectorAll("button.icon-btn");
-      buttons[0].onclick = (e) => { e.stopPropagation(); window.renameChat(chatId); };
-      buttons[1].onclick = (e) => { e.stopPropagation(); window.deleteChat(chatId); };
-
-      if (prepend && history.firstChild) history.insertBefore(item, history.firstChild);
-      else history.appendChild(item);
-    }
-
-    const t = item.querySelector(".chat-title");
-    if (t) t.textContent = title || "New Chat";
-  }
-
-  async function apiJson(url, options) {
-    const res = await fetch(url, options);
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
-    return data;
-  }
-
-  // ---- chat CRUD ----
+  // ---- Chat actions ----
   window.newChat = async function () {
-    if (isLoading) return;
-    isLoading = true;
+    currentChatId = null;
+    const container = $("messages-container");
+    if (container) container.innerHTML = "";
+    setWelcomeVisible(true);
+
+    document.querySelectorAll(".chat-item").forEach(c => c.classList.remove("active"));
 
     try {
-      if (window.Router && Router.go) await Router.go("chat");
-
-      const data = await apiJson("/chat/new", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" }
-      });
-
-      currentChatId = data.chatid;
-
-      const container = $("messages-container");
-      if (container) container.innerHTML = "";
-      setWelcomeVisible(true);
-
-      upsertChatInSidebar(currentChatId, data.title || "New Chat", true);
-      setActiveChatInSidebar(currentChatId);
-      bindChatViewOnce();
-    } catch (e) {
-      addMessage(e.message || "Failed to create new chat.", "error");
-    } finally {
-      isLoading = false;
+      const res = await fetch("/new-chat", { method: "POST" });
+      const data = await res.json();
+      if (data.chat_id) {
+        currentChatId = data.chat_id;
+        await refreshChatHistory();
+      }
+    } catch (err) {
+      console.error("newChat error:", err);
     }
   };
 
   window.loadChat = async function (chatId) {
-    if (isLoading) return;
-    isLoading = true;
+    currentChatId = chatId;
+    const container = $("messages-container");
+    if (container) container.innerHTML = "";
+    setWelcomeVisible(false);
+
+    document.querySelectorAll(".chat-item").forEach(c => {
+      c.classList.toggle("active", c.dataset.chatId === chatId);
+    });
 
     try {
-      if (window.Router && Router.go) await Router.go("chat");
+      const res = await fetch(`/get-chat/${chatId}`);
+      const data = await res.json();
 
-      const data = await apiJson(`/chat/${chatId}/messages`, { method: "GET" });
-      currentChatId = chatId;
-
-      const container = $("messages-container");
-      if (container) container.innerHTML = "";
-      setWelcomeVisible(false);
-
-      (data.messages || []).forEach(m => addMessage(m.content, m.role, m.model));
-      setActiveChatInSidebar(chatId);
-
-      bindChatViewOnce();
-
-      if (window.innerWidth < 1024) {
-        const sidebar = $("sidebar");
-        if (sidebar) sidebar.classList.remove("show");
+      if (data.messages && data.messages.length > 0) {
+        data.messages.forEach(msg => {
+          addMessage(
+            msg.content,
+            msg.role,
+            msg.role === "assistant" ? currentModelName : null,
+            msg.reasoning_content || null,
+            msg.meta || null
+          );
+        });
       }
-    } catch (e) {
-      addMessage(e.message || "Failed to load chat.", "error");
-    } finally {
-      isLoading = false;
+    } catch (err) {
+      console.error("loadChat error:", err);
+      addMessage("Failed to load chat.", "error");
     }
   };
 
@@ -406,130 +483,163 @@
     if (!newTitle || !newTitle.trim()) return;
 
     try {
-      await apiJson(`/chat/${chatId}/rename`, {
+      await fetch(`/rename-chat/${chatId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: newTitle.trim() })
       });
-      upsertChatInSidebar(chatId, newTitle.trim(), false);
-    } catch (e) {
-      addMessage(e.message || "Failed to rename chat.", "error");
+      await refreshChatHistory();
+    } catch (err) {
+      console.error("renameChat error:", err);
     }
   };
 
   window.deleteChat = async function (chatId) {
-    const ok = confirm("Delete this chat? This cannot be undone.");
-    if (!ok) return;
+    if (!confirm("Delete this chat?")) return;
 
     try {
-      await apiJson(`/chat/${chatId}/delete`, { method: "DELETE" });
-
-      const item = document.querySelector(`.chat-item[data-chat-id="${chatId}"]`);
-      if (item) item.remove();
+      await fetch(`/delete-chat/${chatId}`, { method: "POST" });
 
       if (currentChatId === chatId) {
-        currentChatId = null;
-        const container = $("messages-container");
-        if (container) container.innerHTML = "";
-        setWelcomeVisible(true);
+        await window.newChat();
+      } else {
+        await refreshChatHistory();
       }
-    } catch (e) {
-      addMessage(e.message || "Failed to delete chat.", "error");
+    } catch (err) {
+      console.error("deleteChat error:", err);
     }
   };
 
-  // ---- send ----
-  window.sendMessage = async function () {
-    if (isLoading) return;
+  async function refreshChatHistory() {
+    try {
+      const res = await fetch("/get-chats");
+      const data = await res.json();
 
+      const historyDiv = $("chat-history");
+      if (!historyDiv) return;
+
+      if (!data.chats || data.chats.length === 0) {
+        historyDiv.innerHTML = '<div class="empty-state">No chats yet. Start a new conversation!</div>';
+        return;
+      }
+
+      historyDiv.innerHTML = data.chats.map(chat => `
+        <div class="chat-item ${chat.id === currentChatId ? 'active' : ''}"
+             data-chat-id="${chat.id}"
+             onclick="window.loadChat('${chat.id}')">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"></path>
+          </svg>
+          <span class="chat-title">${escapeHtml(chat.title)}</span>
+          <div class="chat-actions">
+            <button class="icon-btn" title="Rename"
+                    onclick="event.stopPropagation(); window.renameChat('${chat.id}')">✏️</button>
+            <button class="icon-btn" title="Delete"
+                    onclick="event.stopPropagation(); window.deleteChat('${chat.id}')">🗑️</button>
+          </div>
+        </div>
+      `).join("");
+    } catch (err) {
+      console.error("refreshChatHistory error:", err);
+    }
+  }
+
+  // ---- Send message with abort support ----
+  async function sendMessage() {
     const input = $("chat-input");
-    const message = (input && input.value ? input.value : "").trim();
-    if (!message) return;
+    if (!input || isLoading) return;
 
-    isLoading = true;
-    setWelcomeVisible(false);
-    addMessage(message, "user");
+    const text = input.value.trim();
+    if (!text) return;
 
     input.value = "";
     input.style.height = "auto";
 
-    showTypingIndicator();
-    if (deepThinkEnabled) deepThinkStartTimer();
+    if (!currentChatId) {
+      const res = await fetch("/new-chat", { method: "POST" });
+      const data = await res.json();
+      if (data.chat_id) {
+        currentChatId = data.chat_id;
+        await refreshChatHistory();
+      }
+    }
 
-    const t0 = performance.now();
+    addMessage(text, "user");
+    showTypingIndicator();
+    setInputState(true);
+
+    if (deepThinkEnabled) {
+      deepThinkStartTimer();
+    }
+
+    // Create new AbortController for this request
+    abortController = new AbortController();
 
     try {
-      const payload = {
-        message,
-        model: currentModelKey,
-        chatid: currentChatId,
-        deepthink: deepThinkEnabled,
-        web: webEnabled,
-        web_search: webEnabled
-      };
-
-      const data = await apiJson("/chat", {
+      const res = await fetch("/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          message: text,
+          chat_id: currentChatId,
+          model: currentModelKey,
+          deepthink: deepThinkEnabled,
+          web: webEnabled
+        }),
+        signal: abortController.signal // Add abort signal
       });
 
-      const seconds = Math.max(0.1, (performance.now() - t0) / 1000);
+      const data = await res.json();
 
-      removeTypingIndicator();
+      hideTypingIndicator();
       deepThinkStopTimer();
+      setInputState(false);
+      abortController = null;
 
-      const reasoning = data.reasoning || data.think || data.deepthink || null;
+      if (data.error) {
+        addMessage(data.error, "error");
+      } else {
+        addMessage(
+          data.response,
+          "assistant",
+          currentModelName,
+          data.reasoning_content || null,
+          data.meta || null
+        );
 
-      addMessage(data.response, "assistant", data.model, reasoning, {
-        thoughtSeconds: seconds,
-        webEnabled: webEnabled
-      });
+        if (data.deepseek_count !== undefined) {
+          const usage = $("deepseek-usage");
+          if (usage) usage.textContent = data.deepseek_count;
+        }
 
-      if (data.chatid) currentChatId = data.chatid;
-      if (data.chattitle && currentChatId) upsertChatInSidebar(currentChatId, data.chattitle, true);
-
-      if (data.deepseekremaining != null) {
-        const used = 50 - Number(data.deepseekremaining);
-        const usage = $("deepseek-usage");
-        if (usage) usage.textContent = used;
+        await refreshChatHistory();
       }
-    } catch (e) {
-      removeTypingIndicator();
+    } catch (err) {
+      // Check if request was aborted by user
+      if (err.name === 'AbortError') {
+        console.log('Request aborted by user');
+        return; // Don't show error - we already showed stop message
+      }
+
+      hideTypingIndicator();
       deepThinkStopTimer();
-      addMessage(e.message || "Error connecting to AI.", "error");
-    } finally {
-      isLoading = false;
+      setInputState(false);
+      abortController = null;
+      console.error("sendMessage error:", err);
+      addMessage("Network error. Please try again.", "error");
     }
-  };
+  }
 
-  window.useSuggestion = async function (text) {
-    if (window.Router && Router.go) await Router.go("chat");
-    bindChatViewOnce();
-
+  window.useSuggestion = function (text) {
     const input = $("chat-input");
-    if (!input) return;
-
-    input.value = text;
-    input.focus();
-    window.sendMessage();
+    if (input) {
+      input.value = text;
+      input.focus();
+    }
   };
 
-  // Close dropdowns on outside click
-  document.addEventListener("click", (e) => {
-    const menu = $("user-menu");
-    const userBtn = e.target.closest(".user-avatar");
-    if (menu && menu.style.display === "block" && !userBtn && !menu.contains(e.target)) {
-      menu.style.display = "none";
-    }
-
-    const selector = $("model-selector");
-    const modelBtn = e.target.closest(".model-selector-btn");
-    if (selector && selector.style.display === "block" && !modelBtn && !selector.contains(e.target)) {
-      selector.style.display = "none";
-    }
-  });
-
-  // Initial bind for non-router loads
-  bindChatViewOnce();
+  // ---- Export public API for Router ----
+  return {
+    onViewLoaded
+  };
 })();
