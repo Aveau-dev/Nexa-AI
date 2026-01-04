@@ -3751,3 +3751,76 @@ pre, code {
 
 
 
+
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SYSTEM MESSAGE STYLING (for Stop notifications)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* System message (stop notifications, warnings, etc.) */
+.system-message {
+  background: rgba(var(--color-slate-500-rgb), 0.1);
+  border: 1px solid rgba(var(--color-slate-500-rgb), 0.3);
+  padding: var(--space-12) var(--space-16);
+  border-radius: var(--radius-base);
+  text-align: center;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.system-message .message-content {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-style: italic;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-8);
+}
+
+/* System row centering */
+.system-row {
+  justify-content: center;
+  margin: var(--space-8) 0;
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .system-message {
+    background: rgba(var(--color-gray-400-rgb), 0.1);
+    border-color: rgba(var(--color-gray-400-rgb), 0.25);
+  }
+}
+
+[data-color-scheme="dark"] .system-message {
+  background: rgba(var(--color-gray-400-rgb), 0.1);
+  border-color: rgba(var(--color-gray-400-rgb), 0.25);
+}
+
+/* Stop button animation (pulsing effect when active) */
+#stop-icon {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+/* Hover effect for stop button */
+.send-button:hover #stop-icon {
+  animation: none;
+  transform: scale(1.1);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   END OF SYSTEM MESSAGE STYLING
+   ═══════════════════════════════════════════════════════════════════════════ */
+
