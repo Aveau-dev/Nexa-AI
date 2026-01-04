@@ -1,3 +1,4 @@
+/* static/js/canvas.js */
 window.Canvas = (function () {
   let ctx = null;
   let drawing = false;
