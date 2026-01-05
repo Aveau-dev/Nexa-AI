@@ -1,8 +1,9 @@
 """
-NexaAI - Advanced AI Chat Platform
-Complete Fixed Version with ALL Features Working
+NexaAI - Advanced AI Chat Platform with Demo Mode
+Complete Production Version with Supabase Support & Local AI
 Author: Aarav
-Date: 2026-01-04
+Date: 2026-01-05
+Version: 3.0 - Production Ready with Demo Routes
 """
 
 import os
@@ -10,8 +11,11 @@ import logging
 import base64
 import urllib.parse
 import requests
+import hashlib
 from datetime import datetime, timedelta
 from io import BytesIO
+from functools import wraps
+from collections import defaultdict
 
 from flask import (
     Flask, render_template, request, redirect, url_for, jsonify,
@@ -26,7 +30,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 from PIL import Image
-from sqlalchemy import desc
+from sqlalchemy import desc, exc
 
 # Google Generative AI
 import google.generativeai as genai
@@ -54,24 +58,45 @@ log = logging.getLogger(__name__)
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'nexaai-secret-key-2025-change-in-production')
 app.config['JSON_AS_ASCII'] = False
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
 
-# Database Configuration
+# ═══════════════════════════════════════════════════════════════════════════
+# SUPABASE DATABASE CONFIGURATION - FIXED
+# ═══════════════════════════════════════════════════════════════════════════
+
 database_url = os.getenv('DATABASE_URL') or os.getenv('DATABASE_URI')
+
 if database_url:
+    # Fix postgres:// to postgresql://
     if database_url.startswith('postgres://'):
         database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
+    # ⚠️ CRITICAL: Add SSL mode for Supabase
+    if 'supabase' in database_url.lower():
+        if '?' not in database_url:
+            database_url += '?sslmode=require'
+        elif 'sslmode' not in database_url:
+            database_url += '&sslmode=require'
+
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-    log.info("🐘 Using PostgreSQL database")
+    log.info(f"🐘 Using Supabase PostgreSQL")
 else:
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///nexaai.db'
-    log.info("📁 Using SQLite database")
+    log.info("📁 Using SQLite database (fallback)")
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# ✅ SUPABASE-OPTIMIZED CONNECTION POOL SETTINGS
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_pre_ping': True,
-    'pool_recycle': 300,
-    'pool_size': 10,
-    'max_overflow': 20
+    'pool_recycle': 280,
+    'pool_size': 5,
+    'max_overflow': 10,
+    'pool_timeout': 30,
+    'connect_args': {
+        'connect_timeout': 10,
+        'options': '-c statement_timeout=30000'
+    }
 }
 
 # File Upload Configuration
@@ -111,7 +136,42 @@ if OPENROUTER_API_KEY:
 else:
     log.warning("⚠️ OPENROUTER_API_KEY not set")
 
+# Nexa AI Configuration (Local AI)
+NEXA_API_URL = os.getenv('NEXA_API_URL', 'http://localhost:8000/v1')
+NEXA_ENABLED = os.getenv('NEXA_ENABLED', 'false').lower() == 'true'
+
+if NEXA_ENABLED:
+    log.info(f"✅ Nexa AI Local Server configured: {NEXA_API_URL}")
+else:
+    log.info("⚠️ Nexa AI disabled (set NEXA_ENABLED=true in .env to enable)")
+
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf'}
+
+# ═══════════════════════════════════════════════════════════════════════════
+# RATE LIMITING FOR DEMO MODE
+# ═══════════════════════════════════════════════════════════════════════════
+
+demo_rate_limit = defaultdict(list)
+DEMO_RATE_LIMIT = 10  # messages per hour
+DEMO_RATE_WINDOW = 3600  # 1 hour in seconds
+
+def check_demo_rate_limit(ip_address):
+    """Check if demo user has exceeded rate limit"""
+    now = datetime.utcnow().timestamp()
+
+    # Clean old entries
+    demo_rate_limit[ip_address] = [
+        ts for ts in demo_rate_limit[ip_address]
+        if now - ts < DEMO_RATE_WINDOW
+    ]
+
+    # Check limit
+    if len(demo_rate_limit[ip_address]) >= DEMO_RATE_LIMIT:
+        return False
+
+    # Add current request
+    demo_rate_limit[ip_address].append(now)
+    return True
 
 # ═══════════════════════════════════════════════════════════════════════════
 # AI MODELS CONFIGURATION
@@ -126,9 +186,24 @@ FREE_MODELS = [
         'vision': True,
         'tier': 'free',
         'rank': 1,
-        'description': 'Fast and efficient Gemini Flash model with vision',
+        'description': '⚡ Fast and efficient with vision',
         'speed': 'Very Fast',
-        'context': '1M tokens'
+        'context': '1M tokens',
+        'demo_enabled': True
+    },
+    {
+        'id': 'nexa-llama',
+        'name': 'Nexa Llama 3.2 (Local)',
+        'model': 'llama-3.2-1b-instruct',
+        'provider': 'nexa',
+        'vision': False,
+        'tier': 'free',
+        'rank': 2,
+        'description': '🖥️ Private local AI - No API key needed',
+        'speed': 'Fast',
+        'context': '128K tokens',
+        'requires_nexa': True,
+        'demo_enabled': False
     },
     {
         'id': 'gpt-3.5-turbo',
@@ -137,10 +212,11 @@ FREE_MODELS = [
         'provider': 'openrouter',
         'vision': False,
         'tier': 'free',
-        'rank': 2,
-        'description': 'OpenAI GPT-3.5 Turbo - Fast and reliable',
+        'rank': 3,
+        'description': '🤖 OpenAI GPT-3.5 - Fast and reliable',
         'speed': 'Fast',
-        'context': '16K tokens'
+        'context': '16K tokens',
+        'demo_enabled': False
     },
     {
         'id': 'claude-haiku',
@@ -149,10 +225,11 @@ FREE_MODELS = [
         'provider': 'openrouter',
         'vision': True,
         'tier': 'free',
-        'rank': 3,
-        'description': 'Fast Claude model with vision support',
+        'rank': 4,
+        'description': '🎨 Fast Claude with vision support',
         'speed': 'Very Fast',
-        'context': '200K tokens'
+        'context': '200K tokens',
+        'demo_enabled': False
     },
     {
         'id': 'deepseek-chat',
@@ -162,10 +239,11 @@ FREE_MODELS = [
         'vision': False,
         'tier': 'free',
         'limit': 50,
-        'rank': 4,
-        'description': 'Powerful for code & reasoning (50/day free)',
+        'rank': 5,
+        'description': '💡 Powerful for code & reasoning (50/day)',
         'speed': 'Fast',
-        'context': '64K tokens'
+        'context': '64K tokens',
+        'demo_enabled': False
     }
 ]
 
@@ -177,8 +255,8 @@ PREMIUM_MODELS = [
         'provider': 'openrouter',
         'vision': True,
         'tier': 'pro',
-        'rank': 5,
-        'description': 'Efficient GPT-4 level performance',
+        'rank': 6,
+        'description': '⚡ Efficient GPT-4 level performance',
         'speed': 'Fast',
         'context': '128K tokens'
     },
@@ -189,8 +267,8 @@ PREMIUM_MODELS = [
         'provider': 'google',
         'vision': True,
         'tier': 'pro',
-        'rank': 6,
-        'description': 'Advanced multimodal AI with vision',
+        'rank': 7,
+        'description': '🎯 Advanced multimodal AI',
         'speed': 'Medium',
         'context': '2M tokens'
     },
@@ -201,7 +279,7 @@ PREMIUM_MODELS = [
         'provider': 'openrouter',
         'vision': True,
         'tier': 'max',
-        'rank': 7,
+        'rank': 8,
         'description': '🏆 Most capable GPT-4 model',
         'speed': 'Medium',
         'context': '128K tokens'
@@ -213,7 +291,7 @@ PREMIUM_MODELS = [
         'provider': 'openrouter',
         'vision': True,
         'tier': 'max',
-        'rank': 8,
+        'rank': 9,
         'description': '🏆 Best for coding & analysis',
         'speed': 'Medium',
         'context': '200K tokens'
@@ -249,7 +327,7 @@ class User(UserMixin, db.Model):
     chats = db.relationship('Chat', backref='user', lazy=True, cascade='all, delete-orphan')
 
     @property
-    def ispremium(self):
+    def is_premium(self):
         return self.plan in ['pro', 'max']
 
     def __repr__(self):
@@ -260,15 +338,17 @@ class Chat(db.Model):
     __tablename__ = 'chats'
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True, index=True)
     title = db.Column(db.String(200), default='New Chat')
+    is_demo = db.Column(db.Boolean, default=False)
+    session_id = db.Column(db.String(100), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     messages = db.relationship('Message', backref='chat', lazy=True, cascade='all, delete-orphan', order_by='Message.created_at')
 
     def __repr__(self):
-        return f'<Chat {self.id}: {self.title}>'
+        return f'<Chat {self.id}: {self.title} (Demo: {self.is_demo})>'
 
 
 class Message(db.Model):
@@ -291,6 +371,41 @@ class Message(db.Model):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# DATABASE ERROR HANDLING
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.errorhandler(exc.SQLAlchemyError)
+def handle_db_error(error):
+    """Handle all database errors"""
+    log.error(f"❌ Database error: {error}")
+    db.session.rollback()
+
+    error_msg = str(error).lower()
+
+    if 'timeout' in error_msg or 'timed out' in error_msg:
+        return jsonify({'error': 'Database connection timeout. Please try again.'}), 503
+    elif 'ssl' in error_msg:
+        return jsonify({'error': 'Database SSL connection failed. Please contact support.'}), 500
+    elif 'authentication' in error_msg or 'password' in error_msg:
+        return jsonify({'error': 'Database authentication failed. Please contact support.'}), 500
+    elif 'connection' in error_msg:
+        return jsonify({'error': 'Cannot connect to database. Please try again later.'}), 503
+    else:
+        return jsonify({'error': 'Database error occurred. Please try again.'}), 500
+
+
+@app.teardown_appcontext
+def shutdown_session(exception=None):
+    """Remove database session after each request"""
+    try:
+        if exception:
+            db.session.rollback()
+        db.session.remove()
+    except Exception as e:
+        log.error(f"Session cleanup error: {e}")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # LOGIN MANAGER
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -300,6 +415,7 @@ def load_user(user_id):
         return db.session.get(User, int(user_id))
     except Exception as e:
         log.error(f"Error loading user {user_id}: {e}")
+        db.session.rollback()
         return None
 
 
@@ -307,20 +423,38 @@ def load_user(user_id):
 # HELPER FUNCTIONS
 # ═══════════════════════════════════════════════════════════════════════════
 
-def get_available_models(user):
+def get_demo_session_id():
+    """Get or create demo session ID"""
+    if 'demo_session_id' not in session:
+        session['demo_session_id'] = hashlib.md5(
+            f"{request.remote_addr}_{datetime.utcnow().timestamp()}".encode()
+        ).hexdigest()
+    return session['demo_session_id']
+
+
+def get_available_models(user=None):
     """Get list of models available to user based on their plan"""
-    plan = user.plan if user.ispremium else 'basic'
+    if user and user.is_premium:
+        plan = user.plan
+    else:
+        plan = 'basic'
+
+    # Filter out Nexa models if not enabled
+    available_free = [m for m in FREE_MODELS if not m.get('requires_nexa') or NEXA_ENABLED]
 
     if plan == 'basic':
-        return FREE_MODELS
+        return available_free
     elif plan == 'pro':
-        return FREE_MODELS + PREMIUM_MODELS[:2]  # Include first 2 premium
+        return available_free + PREMIUM_MODELS[:2]
     else:  # max
-        return FREE_MODELS + PREMIUM_MODELS
+        return available_free + PREMIUM_MODELS
 
 
 def check_deepseek_limit(user):
     """Check and reset daily DeepSeek limit"""
+    if not user:
+        return False
+
     today = datetime.utcnow().strftime('%Y-%m-%d')
 
     if user.deepseek_date != today:
@@ -328,7 +462,7 @@ def check_deepseek_limit(user):
         user.deepseek_date = today
         db.session.commit()
 
-    if user.ispremium:
+    if user.is_premium:
         return True
 
     return user.deepseek_count < 50
@@ -336,6 +470,9 @@ def check_deepseek_limit(user):
 
 def increment_deepseek_count(user):
     """Increment daily DeepSeek usage counter"""
+    if not user:
+        return
+
     today = datetime.utcnow().strftime('%Y-%m-%d')
 
     if user.deepseek_date != today:
@@ -366,6 +503,59 @@ def generate_image_url(prompt):
 # AI MODEL API CALLS
 # ═══════════════════════════════════════════════════════════════════════════
 
+def call_nexa_ai(model_path, messages, timeout=60):
+    """Call Nexa AI Local Server (OpenAI-compatible API)"""
+    try:
+        if not NEXA_ENABLED:
+            raise Exception("Nexa AI is not enabled. Set NEXA_ENABLED=true in .env")
+
+        headers = {"Content-Type": "application/json"}
+
+        formatted_msgs = []
+        for msg in messages:
+            content = msg.get('content', '')
+            if isinstance(content, list):
+                for item in content:
+                    if isinstance(item, dict) and item.get('type') == 'text':
+                        content = item.get('text', '')
+                        break
+
+            formatted_msgs.append({
+                "role": msg.get('role', 'user'),
+                "content": str(content)
+            })
+
+        payload = {
+            "model": model_path,
+            "messages": formatted_msgs,
+            "temperature": 0.7,
+            "max_tokens": 2000
+        }
+
+        response = requests.post(
+            f"{NEXA_API_URL}/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=timeout
+        )
+
+        if response.status_code == 200:
+            data = response.json()
+            return data['choices'][0]['message']['content']
+        else:
+            error_msg = f"Nexa AI error: {response.status_code}"
+            log.error(error_msg)
+            raise Exception(error_msg)
+
+    except requests.exceptions.ConnectionError:
+        return "Error: Cannot connect to Nexa AI local server. Make sure it's running."
+    except requests.exceptions.Timeout:
+        return "Error: Nexa AI request timed out."
+    except Exception as e:
+        log.error(f"Nexa AI error: {str(e)}")
+        return f"Error: {str(e)[:150]}"
+
+
 def call_google_gemini(model_path, messages, image_data=None, timeout=90):
     """Call Google Gemini API"""
     try:
@@ -390,8 +580,9 @@ def call_google_gemini(model_path, messages, image_data=None, timeout=90):
         if image_data:
             try:
                 image_bytes = base64.b64decode(image_data)
-                img = Image.open(BytesIO(image_bytes))
-                content_parts.append(img)
+                with Image.open(BytesIO(image_bytes)) as img:
+                    img.load()
+                    content_parts.append(img)
                 log.info("Image attached to Gemini request")
             except Exception as e:
                 log.warning(f"Failed to process image: {e}")
@@ -500,11 +691,14 @@ def call_ai_model(model_id, messages, image_data=None):
             return call_google_gemini(model_path, messages, image_data)
         elif provider == 'openrouter':
             return call_openrouter(model_path, messages, image_data)
+        elif provider == 'nexa':
+            return call_nexa_ai(model_path, messages)
         else:
             return f"Error: Unknown provider '{provider}'"
     except Exception as e:
         log.error(f"AI model call failed: {e}")
         return f"Error calling AI: {str(e)[:100]}"
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # ROUTES - PUBLIC
@@ -512,10 +706,86 @@ def call_ai_model(model_id, messages, image_data=None):
 
 @app.route('/')
 def index():
-    """Landing page"""
+    """Landing page with demo mode"""
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
     return render_template('index.html')
+
+
+@app.route('/demo')
+def demo():
+    """Demo mode page - No login required"""
+    return render_template('index.html')
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ROUTES - DEMO MODE (NO LOGIN REQUIRED)
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.route('/demo-login', methods=['POST'])
+def demo_login():
+    """Auto-login for demo mode (creates temporary session)"""
+    try:
+        session['is_demo'] = True
+        session['demo_session_id'] = get_demo_session_id()
+        log.info(f"Demo session created: {session['demo_session_id']}")
+        return jsonify({'success': True})
+    except Exception as e:
+        log.error(f"Demo login error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/demo-chat', methods=['POST'])
+def demo_chat():
+    """Demo chat endpoint - Rate limited, Gemini only"""
+    try:
+        # Check rate limit
+        ip_address = request.remote_addr
+        if not check_demo_rate_limit(ip_address):
+            return jsonify({
+                'error': '⏰ Demo rate limit reached (10 messages/hour). Please sign up for unlimited access!'
+            }), 429
+
+        data = request.get_json() or {}
+        message = (data.get('message') or '').strip()
+
+        if not message:
+            return jsonify({'error': 'Message cannot be empty'}), 400
+
+        # Limit message length for demo
+        if len(message) > 500:
+            message = message[:500]
+            log.info(f"Demo message truncated to 500 chars")
+
+        # Only use Gemini Flash for demo (fastest & free)
+        model_config = next((m for m in FREE_MODELS if m['id'] == 'gemini-flash'), None)
+
+        if not model_config or not GOOGLE_API_KEY:
+            return jsonify({
+                'error': 'Demo mode temporarily unavailable. Please try again later or sign up for full access.'
+            }), 503
+
+        # Simple conversation history (last message only for demo)
+        messages_history = [{'role': 'user', 'content': message}]
+
+        # Call Gemini API
+        ai_response = call_google_gemini(
+            model_config['model'],
+            messages_history,
+            timeout=30  # Shorter timeout for demo
+        )
+
+        log.info(f"Demo chat completed for IP: {ip_address}")
+
+        return jsonify({
+            'success': True,
+            'response': ai_response,
+            'model': model_config['name']
+        })
+
+    except Exception as e:
+        log.error(f"Demo chat error: {e}")
+        return jsonify({'error': 'An error occurred. Please try again.'}), 500
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -524,7 +794,7 @@ def index():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    """User login"""
+    """User login - FIXED"""
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
 
@@ -537,28 +807,40 @@ def login():
             if not email or not password:
                 return jsonify(success=False, error="Email and password required"), 400
 
-            user = User.query.filter_by(email=email).first()
+            user = db.session.query(User).filter_by(email=email).first()
 
             if user and check_password_hash(user.password, password):
                 login_user(user, remember=True)
                 user.last_login = datetime.utcnow()
-                db.session.commit()
+
+                try:
+                    db.session.commit()
+                except exc.SQLAlchemyError as e:
+                    db.session.rollback()
+                    log.error(f"Login commit error: {e}")
+
                 log.info(f"✅ User logged in: {email}")
                 return jsonify(success=True, redirect=url_for('dashboard'))
 
             log.warning(f"⚠️ Failed login attempt: {email}")
             return jsonify(success=False, error="Invalid email or password"), 401
 
+        except exc.OperationalError as e:
+            db.session.rollback()
+            log.error(f"❌ Database connection error during login: {e}")
+            return jsonify(success=False, error="Database connection error. Please try again."), 503
+
         except Exception as e:
-            log.error(f"Login error: {e}")
-            return jsonify(success=False, error="Login failed"), 500
+            db.session.rollback()
+            log.error(f"❌ Login error: {e}")
+            return jsonify(success=False, error="Login failed. Please try again."), 500
 
     return render_template('login.html')
 
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
-    """User registration"""
+    """User registration - FIXED"""
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
 
@@ -575,21 +857,31 @@ def signup():
             if len(password) < 6:
                 return jsonify(success=False, error="Password must be at least 6 characters"), 400
 
-            if User.query.filter_by(email=email).first():
+            existing_user = db.session.query(User).filter_by(email=email).first()
+            if existing_user:
                 return jsonify(success=False, error="Email already registered"), 409
 
             new_user = User(
                 email=email,
                 password=generate_password_hash(password),
                 name=name,
-                plan="pro",  # Free Pro trial
+                plan="pro",
                 plan_started_at=datetime.utcnow(),
                 subscription_status='trial',
                 deepseek_date=datetime.utcnow().strftime('%Y-%m-%d')
             )
 
             db.session.add(new_user)
-            db.session.commit()
+
+            try:
+                db.session.commit()
+            except exc.IntegrityError:
+                db.session.rollback()
+                return jsonify(success=False, error="Email already registered"), 409
+            except exc.OperationalError as e:
+                db.session.rollback()
+                log.error(f"❌ Database connection error during signup: {e}")
+                return jsonify(success=False, error="Database connection error. Please try again."), 503
 
             login_user(new_user, remember=True)
             log.info(f"✅ New user registered: {email} (Pro trial)")
@@ -598,8 +890,8 @@ def signup():
 
         except Exception as e:
             db.session.rollback()
-            log.error(f"Signup error: {e}")
-            return jsonify(success=False, error="Registration failed"), 500
+            log.error(f"❌ Signup error: {e}")
+            return jsonify(success=False, error="Registration failed. Please try again."), 500
 
     return render_template('signup.html')
 
@@ -622,10 +914,13 @@ def logout():
 def dashboard():
     """Main dashboard"""
     try:
-        chats = Chat.query.filter_by(user_id=current_user.id).order_by(desc(Chat.updated_at)).limit(50).all()
+        chats = Chat.query.filter_by(
+            user_id=current_user.id,
+            is_demo=False
+        ).order_by(desc(Chat.updated_at)).limit(50).all()
+
         available_models = get_available_models(current_user)
 
-        # Set default model in session
         if 'selected_model' not in session:
             session['selected_model'] = 'gemini-flash'
             session['selected_model_name'] = 'Gemini 2.5 Flash'
@@ -634,11 +929,12 @@ def dashboard():
             'dashboard.html',
             user=current_user,
             chats=chats,
-            models={m['id']: m for m in available_models}
+            models={m['id']: m for m in available_models},
+            is_demo=False
         )
     except Exception as e:
         log.error(f"Dashboard error: {e}")
-        return render_template('dashboard.html', user=current_user, chats=[], models={})
+        return render_template('dashboard.html', user=current_user, chats=[], models={}, is_demo=False)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -646,7 +942,6 @@ def dashboard():
 # ═══════════════════════════════════════════════════════════════════════════
 
 @app.route('/set-model', methods=['POST'])
-@login_required
 def set_model():
     """Set selected model in session"""
     try:
@@ -657,7 +952,7 @@ def set_model():
         session['selected_model'] = model_id
         session['selected_model_name'] = model_name
 
-        log.info(f"User {current_user.email} selected model: {model_id}")
+        log.info(f"Model selected: {model_id}")
         return jsonify({
             'success': True,
             'model': model_id,
@@ -667,23 +962,27 @@ def set_model():
         log.error(f"Set model error: {e}")
         return jsonify({'error': str(e)}), 500
 
+
 # ═══════════════════════════════════════════════════════════════════════════
-# ROUTES - CHAT MANAGEMENT (FIXED)
+# ROUTES - CHAT MANAGEMENT (WORKS FOR BOTH AUTH & DEMO)
 # ═══════════════════════════════════════════════════════════════════════════
 
 @app.route('/new-chat', methods=['POST'])
-@login_required
 def new_chat():
-    """Create new chat - FIXED"""
+    """Create new chat - Works for both authenticated and demo users"""
     try:
+        is_demo = not current_user.is_authenticated
+
         chat = Chat(
-            user_id=current_user.id,
-            title='New Chat'
+            user_id=current_user.id if not is_demo else None,
+            title='New Chat',
+            is_demo=is_demo,
+            session_id=get_demo_session_id() if is_demo else None
         )
         db.session.add(chat)
         db.session.commit()
 
-        log.info(f"New chat created: {chat.id} for user {current_user.email}")
+        log.info(f"New chat created: {chat.id} (Demo: {is_demo})")
         return jsonify({
             'success': True,
             'chat_id': chat.id,
@@ -696,14 +995,21 @@ def new_chat():
 
 
 @app.route('/get-chats', methods=['GET'])
-@login_required
 def get_chats():
-    """Get all chats for user - FIXED"""
+    """Get all chats - Works for both authenticated and demo users"""
     try:
-        chats = Chat.query.filter_by(user_id=current_user.id)\
-            .order_by(desc(Chat.updated_at))\
-            .limit(50)\
-            .all()
+        is_demo = not current_user.is_authenticated
+
+        if is_demo:
+            chats = Chat.query.filter_by(
+                is_demo=True,
+                session_id=get_demo_session_id()
+            ).order_by(desc(Chat.updated_at)).limit(10).all()
+        else:
+            chats = Chat.query.filter_by(
+                user_id=current_user.id,
+                is_demo=False
+            ).order_by(desc(Chat.updated_at)).limit(50).all()
 
         chats_data = [{
             'id': chat.id,
@@ -722,14 +1028,22 @@ def get_chats():
 
 
 @app.route('/get-chat/<int:chat_id>', methods=['GET'])
-@login_required
 def get_chat(chat_id):
-    """Get specific chat with messages - FIXED"""
+    """Get specific chat with messages"""
     try:
-        chat = Chat.query.filter_by(
-            id=chat_id,
-            user_id=current_user.id
-        ).first()
+        is_demo = not current_user.is_authenticated
+
+        if is_demo:
+            chat = Chat.query.filter_by(
+                id=chat_id,
+                is_demo=True,
+                session_id=get_demo_session_id()
+            ).first()
+        else:
+            chat = Chat.query.filter_by(
+                id=chat_id,
+                user_id=current_user.id
+            ).first()
 
         if not chat:
             return jsonify({'error': 'Chat not found'}), 404
@@ -756,9 +1070,8 @@ def get_chat(chat_id):
 
 
 @app.route('/rename-chat/<int:chat_id>', methods=['POST'])
-@login_required
 def rename_chat(chat_id):
-    """Rename chat - FIXED"""
+    """Rename chat"""
     try:
         data = request.get_json() or {}
         new_title = (data.get('title') or '').strip()
@@ -766,10 +1079,19 @@ def rename_chat(chat_id):
         if not new_title:
             return jsonify({'error': 'Title required'}), 400
 
-        chat = Chat.query.filter_by(
-            id=chat_id,
-            user_id=current_user.id
-        ).first()
+        is_demo = not current_user.is_authenticated
+
+        if is_demo:
+            chat = Chat.query.filter_by(
+                id=chat_id,
+                is_demo=True,
+                session_id=get_demo_session_id()
+            ).first()
+        else:
+            chat = Chat.query.filter_by(
+                id=chat_id,
+                user_id=current_user.id
+            ).first()
 
         if not chat:
             return jsonify({'error': 'Chat not found'}), 404
@@ -790,14 +1112,22 @@ def rename_chat(chat_id):
 
 
 @app.route('/delete-chat/<int:chat_id>', methods=['POST', 'DELETE'])
-@login_required
 def delete_chat(chat_id):
-    """Delete chat - FIXED"""
+    """Delete chat"""
     try:
-        chat = Chat.query.filter_by(
-            id=chat_id,
-            user_id=current_user.id
-        ).first()
+        is_demo = not current_user.is_authenticated
+
+        if is_demo:
+            chat = Chat.query.filter_by(
+                id=chat_id,
+                is_demo=True,
+                session_id=get_demo_session_id()
+            ).first()
+        else:
+            chat = Chat.query.filter_by(
+                id=chat_id,
+                user_id=current_user.id
+            ).first()
 
         if not chat:
             return jsonify({'error': 'Chat not found'}), 404
@@ -805,7 +1135,7 @@ def delete_chat(chat_id):
         db.session.delete(chat)
         db.session.commit()
 
-        log.info(f"Chat {chat_id} deleted by user {current_user.email}")
+        log.info(f"Chat {chat_id} deleted (Demo: {is_demo})")
         return jsonify({
             'success': True,
             'message': 'Chat deleted successfully'
@@ -817,13 +1147,12 @@ def delete_chat(chat_id):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# ROUTES - CHAT MESSAGING
+# ROUTES - CHAT MESSAGING (WORKS FOR BOTH AUTH & DEMO)
 # ═══════════════════════════════════════════════════════════════════════════
 
 @app.route('/chat', methods=['POST'])
-@login_required
 def chat_route():
-    """Main chat endpoint - FIXED"""
+    """Main chat endpoint - Works for both authenticated and demo users"""
     try:
         data = request.get_json() or {}
         message = (data.get('message') or '').strip()
@@ -836,20 +1165,39 @@ def chat_route():
         if not message:
             return jsonify({'error': 'Message cannot be empty'}), 400
 
-        log.info(f"Chat request: user={current_user.email}, model={model_id}, chat_id={chat_id}")
+        is_demo = not current_user.is_authenticated
+
+        log.info(f"Chat request: model={model_id}, chat_id={chat_id}, demo={is_demo}")
+
+        # Demo mode limitations
+        if is_demo:
+            return jsonify({
+                'error': '⚠️ Demo mode only supports simple chat. Please sign up for full features!',
+                'upgrade_required': True
+            }), 403
 
         # Get or create chat
         if chat_id:
-            chat = Chat.query.filter_by(
-                id=chat_id,
-                user_id=current_user.id
-            ).first()
+            if is_demo:
+                chat = Chat.query.filter_by(
+                    id=chat_id,
+                    is_demo=True,
+                    session_id=get_demo_session_id()
+                ).first()
+            else:
+                chat = Chat.query.filter_by(
+                    id=chat_id,
+                    user_id=current_user.id
+                ).first()
+
             if not chat:
                 return jsonify({'error': 'Chat not found'}), 404
         else:
             chat = Chat(
-                user_id=current_user.id,
-                title=message[:50]
+                user_id=current_user.id if not is_demo else None,
+                title=message[:50],
+                is_demo=is_demo,
+                session_id=get_demo_session_id() if is_demo else None
             )
             db.session.add(chat)
             db.session.flush()
@@ -859,18 +1207,16 @@ def chat_route():
         if any(kw in message.lower() for kw in img_keywords):
             img_url = generate_image_url(message)
 
-            # Save user message
             db.session.add(Message(
                 chat_id=chat.id,
                 role='user',
                 content=message
             ))
 
-            # Save AI response with image
             db.session.add(Message(
                 chat_id=chat.id,
                 role='assistant',
-                content="I've generated the image for you!",
+                content="I've generated the image for you! 🎨",
                 model='Pollinations AI',
                 has_image=True,
                 image_url=img_url
@@ -894,20 +1240,33 @@ def chat_route():
         if not model_config:
             return jsonify({'error': 'Invalid model selected'}), 400
 
-        # Check model access
-        if model_config['tier'] != 'free' and not current_user.ispremium:
+        # Check model access for authenticated users
+        if not is_demo and model_config['tier'] != 'free' and not current_user.is_premium:
             return jsonify({
                 'error': 'This model requires Ultimate plan. Please upgrade.',
                 'upgrade_required': True
             }), 403
 
         # Check DeepSeek limit
-        if 'deepseek' in model_id and not check_deepseek_limit(current_user):
+        if 'deepseek' in model_id:
+            if is_demo:
+                return jsonify({
+                    'error': 'DeepSeek requires an account. Please sign up!',
+                    'upgrade_required': True
+                }), 403
+            elif not check_deepseek_limit(current_user):
+                return jsonify({
+                    'error': 'Daily DeepSeek limit reached (50/day). Upgrade to Ultimate for unlimited access.',
+                    'upgrade_required': True,
+                    'deepseek_count': current_user.deepseek_count
+                }), 429
+
+        # Check Nexa AI availability
+        if model_config.get('requires_nexa') and not NEXA_ENABLED:
             return jsonify({
-                'error': 'Daily DeepSeek limit reached (50/day). Upgrade to Ultimate for unlimited access.',
-                'upgrade_required': True,
-                'deepseek_count': current_user.deepseek_count
-            }), 429
+                'error': 'Nexa AI local server is not running. Start it with: nexa server start',
+                'nexa_setup_required': True
+            }), 503
 
         # Save user message
         user_msg = Message(
@@ -922,9 +1281,9 @@ def chat_route():
 
         # Get chat history (last 10 messages)
         history = Message.query.filter_by(chat_id=chat.id)\
-            .order_by(Message.created_at)\
+            .order_by(desc(Message.created_at))\
             .limit(10)\
-            .all()
+            .all()[::-1]
 
         messages_history = [
             {'role': m.role, 'content': m.content}
@@ -950,24 +1309,29 @@ def chat_route():
         chat.updated_at = datetime.utcnow()
 
         # Increment DeepSeek counter if needed
-        if 'deepseek' in model_id:
+        if not is_demo and 'deepseek' in model_id:
             increment_deepseek_count(current_user)
 
         db.session.commit()
 
-        return jsonify({
+        response_data = {
             'success': True,
             'chat_id': chat.id,
             'response': ai_response,
             'model': model_config['name'],
-            'title': chat.title,
-            'deepseek_count': current_user.deepseek_count
-        })
+            'title': chat.title
+        }
+
+        if not is_demo and current_user:
+            response_data['deepseek_count'] = current_user.deepseek_count
+
+        return jsonify(response_data)
 
     except Exception as e:
         db.session.rollback()
         log.error(f"Chat error: {e}")
         return jsonify({'error': str(e)[:200]}), 500
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # ROUTES - SETTINGS & CHECKOUT
@@ -988,7 +1352,6 @@ def upgrade():
         data = request.get_json() or {}
         plan = data.get('plan', 'pro')
 
-        # In production, integrate with Stripe/Razorpay here
         current_user.plan = plan
         current_user.subscription_status = 'active'
         db.session.commit()
@@ -1049,6 +1412,19 @@ def forbidden(e):
 # DATABASE INITIALIZATION
 # ═══════════════════════════════════════════════════════════════════════════
 
+def test_db_connection():
+    """Test database connection at startup"""
+    try:
+        with app.app_context():
+            db.session.execute('SELECT 1')
+            log.info("✅ Database connection successful")
+            return True
+    except Exception as e:
+        log.error(f"❌ Database connection failed: {e}")
+        log.error("Please check your DATABASE_URL in .env file")
+        return False
+
+
 def init_db():
     """Initialize database"""
     with app.app_context():
@@ -1059,13 +1435,38 @@ def init_db():
             log.error(f"❌ Database initialization failed: {e}")
 
 
+def validate_api_keys():
+    """Validate API keys at startup"""
+    issues = []
+    if not GOOGLE_API_KEY:
+        issues.append("GOOGLE_API_KEY not set")
+    if not OPENROUTER_API_KEY:
+        issues.append("OPENROUTER_API_KEY not set")
+
+    if issues:
+        log.warning(f"⚠️ API Configuration Issues: {', '.join(issues)}")
+        log.warning("Some AI models may not work")
+    else:
+        log.info("✅ All API keys configured")
+
+    return len(issues) == 0
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # MAIN ENTRY POINT
 # ═══════════════════════════════════════════════════════════════════════════
 
 if __name__ == '__main__':
-    # Initialize database
+    # Test database connection first
+    if not test_db_connection():
+        log.error("⚠️ Starting app without database connection!")
+        log.error("Login/Signup will NOT work until DATABASE_URL is fixed")
+
+    # Initialize database tables
     init_db()
+
+    # Validate API keys
+    validate_api_keys()
 
     # Get port from environment
     port = int(os.getenv('PORT', 5000))
@@ -1073,7 +1474,9 @@ if __name__ == '__main__':
 
     log.info(f"🚀 Starting NexaAI on port {port}")
     log.info(f"🔧 Debug mode: {debug}")
-    log.info(f"📊 Database: {app.config['SQLALCHEMY_DATABASE_URI'][:30]}...")
+    log.info(f"🎭 Demo mode: Available at /demo and /")
+    log.info(f"🤖 Nexa AI Local: {'Enabled' if NEXA_ENABLED else 'Disabled'}")
+    log.info(f"📊 Demo rate limit: {DEMO_RATE_LIMIT} messages per hour")
 
     app.run(
         host='0.0.0.0',
