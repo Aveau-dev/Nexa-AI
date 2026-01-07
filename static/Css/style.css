@@ -1,3 +1,4 @@
+
 :root {
   /* Primitive Color Tokens */
   --color-white: rgba(255, 255, 255, 1);
@@ -3705,8 +3706,15 @@ pre, code {
   letter-spacing: normal;
 }
 
+/* Navigation buttons base */
 .nav-button {
-  gap: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 14px;
   white-space: nowrap;
 }
 
@@ -4841,3 +4849,25 @@ pre, code {
     font-size: 1.05rem;
 }
 
+
+
+/* ===== Nav buttons mobile tweak ===== */
+@media (max-width: 480px) {
+  .top-nav {
+    padding-inline: 8px;
+  }
+
+  .nav-right {
+    gap: 4px;
+  }
+
+  .nav-button {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+
+  /* Optional: hide first letter span so buttons just show full word text */
+  .nav-button > span:first-child {
+    display: none;
+  }
+}
