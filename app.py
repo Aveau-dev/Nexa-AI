@@ -785,14 +785,12 @@ def demo_chat():
         def generate():
             # Meta event
             meta_json = json.dumps({"messages_analyzed": messages_analyzed, "model": "Claude 3 Haiku (Free)"})
-yield f"event: meta\\ndata: {meta_json}\\n\\n"
-
-"
+            yield 'event: meta\n' + 'data: ' + meta_json + '\n\n'
 
             try:
                 url = "https://openrouter.ai/api/v1/chat/completions"
                 headers = {
-                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "Authorization": "Bearer " + OPENROUTER_API_KEY,
                     "Content-Type": "application/json",
                     "HTTP-Referer": "https://nexaai.com",
                     "X-Title": "NexaAI Demo"
@@ -808,11 +806,8 @@ yield f"event: meta\\ndata: {meta_json}\\n\\n"
                 resp = requests.post(url, headers=headers, json=payload, stream=True, timeout=45)
 
                 if resp.status_code != 200:
-                    error_json = json.dumps({"error": f"Demo API error ({resp.status_code}). Please sign up."})
-                    yield f"event: error
-data: {error_json}
-
-"
+                    error_json = json.dumps({"error": "Demo API error (" + str(resp.status_code) + "). Please sign up."})
+                    yield 'event: error\n' + 'data: ' + error_json + '\n\n'
                     return
 
                 for line in resp.iter_lines():
@@ -821,10 +816,7 @@ data: {error_json}
                         if line_str.startswith("data: "):
                             chunk = line_str[6:].strip()
                             if chunk == "[DONE]":
-                                yield "event: done
-data: {}
-
-"
+                                yield 'event: done\n' + 'data: {}\n\n'
                                 break
 
                             try:
@@ -832,42 +824,32 @@ data: {}
                                 delta = chunk_data.get("choices", [{}])[0].get("delta", {}).get("content", "")
                                 if delta:
                                     token_json = json.dumps({"delta": delta})
-                                    yield f"event: token
-data: {token_json}
-
-"
+                                    yield 'event: token\n' + 'data: ' + token_json + '\n\n'
                             except json.JSONDecodeError:
                                 continue
 
             except requests.exceptions.Timeout:
                 error_json = json.dumps({"error": "Request timeout. Please try a shorter message."})
-                yield f"event: error
-data: {error_json}
-
-"
+                yield 'event: error\n' + 'data: ' + error_json + '\n\n'
             except requests.exceptions.RequestException as e:
                 err_str = str(e).lower()
                 if any(x in err_str for x in ["quota", "rate limit", "429", "too many"]):
                     error_json = json.dumps({"error": "Demo limit reached. Please sign up!"})
                 else:
                     error_json = json.dumps({"error": "Demo service unavailable."})
-                yield f"event: error
-data: {error_json}
-
-"
+                yield 'event: error\n' + 'data: ' + error_json + '\n\n'
             except Exception as e:
-                log.error(f"Demo stream error: {e}")
+                log.error("Demo stream error: " + str(e))
                 error_json = json.dumps({"error": "An error occurred."})
-                yield f"event: error
-data: {error_json}
-
-"
+                yield 'event: error\n' + 'data: ' + error_json + '\n\n'
 
         return Response(stream_with_context(generate()), mimetype="text/event-stream")
 
     except Exception as e:
-        log.error(f"Demo chat fatal error: {e}")
+        log.error("Demo chat fatal error: " + str(e))
         return jsonify({'error': 'Server error. Please try again.'}), 500
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     """User login - FIXED"""
@@ -1559,5 +1541,6 @@ if __name__ == '__main__':
         port=port,
         debug=debug
     )
+
 
 
