@@ -741,43 +741,33 @@ def demo_login():
 
 
 
-
 @app.route("/demo-chat", methods=["POST"])
 def demo_chat():
-    """Demo chat endpoint - Claude 3 Haiku via OpenRouter + Streaming + Memory"""
+    """Demo chat endpoint - Claude 3 Haiku via OpenRouter SSE Streaming"""
     try:
+        from flask import Response, stream_with_context
+        import json
+
         ip_address = request.remote_addr
 
         # Rate limit check
         if not check_demo_rate_limit(ip_address):
-            def _limit_stream():
-                yield 'event: error
-data: {"error":"⏰ You have reached your demo mode limit (10 messages/hour). Please sign up for unlimited access!"} 
-
-'
-            return Response(stream_with_context(_limit_stream()), mimetype="text/event-stream")
+            return jsonify({
+                'error': '⏰ You have reached your demo mode limit (10 messages/hour). Please sign up for unlimited access!'
+            }), 429
 
         data = request.get_json() or {}
         message = (data.get("message") or "").strip()
-        context = data.get("context", [])  # Memory support
+        context = data.get("context", [])
 
         if not message:
-            def _empty_stream():
-                yield 'event: error
-data: {"error":"Message cannot be empty"} 
-
-'
-            return Response(stream_with_context(_empty_stream()), mimetype="text/event-stream")
+            return jsonify({'error': 'Message cannot be empty'}), 400
 
         # Check OpenRouter API key
-        OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY', "")
         if not OPENROUTER_API_KEY:
-            def _no_key():
-                yield 'event: error
-data: {"error":"Demo mode requires OpenRouter API key. Please sign up for full access."} 
-
-'
-            return Response(stream_with_context(_no_key()), mimetype="text/event-stream")
+            return jsonify({
+                'error': 'Demo mode requires OpenRouter API key. Please sign up for full access.'
+            }), 503
 
         # Build conversation history with context (last 6 messages)
         messages_history = []
@@ -790,21 +780,22 @@ data: {"error":"Demo mode requires OpenRouter API key. Please sign up for full a
         messages_history.append({"role": "user", "content": message})
         messages_analyzed = len(messages_history)
 
-        model = "anthropic/claude-3-haiku:free"  # Claude 3 Haiku FREE tier
+        model = "anthropic/claude-3-haiku:free"
 
-        def generate_stream():
-            # Meta event first (for "Analyzing X messages...")
-            yield f'event: meta
-data: {{"messages_analyzed":{messages_analyzed},"model":"Claude 3 Haiku (Free)"}}
+        def generate():
+            # Meta event
+            meta_json = json.dumps({"messages_analyzed": messages_analyzed, "model": "Claude 3 Haiku (Free)"})
+            yield f"event: meta
+data: {meta_json}
 
-'
+"
 
             try:
                 url = "https://openrouter.ai/api/v1/chat/completions"
                 headers = {
                     "Authorization": f"Bearer {OPENROUTER_API_KEY}",
                     "Content-Type": "application/json",
-                    "HTTP-Referer": "https://nexa-ai-2d8d.onrender.com",
+                    "HTTP-Referer": "https://nexaai.com",
                     "X-Title": "NexaAI Demo"
                 }
                 payload = {
@@ -818,11 +809,11 @@ data: {{"messages_analyzed":{messages_analyzed},"model":"Claude 3 Haiku (Free)"}
                 resp = requests.post(url, headers=headers, json=payload, stream=True, timeout=45)
 
                 if resp.status_code != 200:
-                    error_msg = f"Demo API error ({resp.status_code})"
-                    yield f'event: error
-data: {{"error":"{error_msg}. Please sign up for full access."}}
+                    error_json = json.dumps({"error": f"Demo API error ({resp.status_code}). Please sign up."})
+                    yield f"event: error
+data: {error_json}
 
-'
+"
                     return
 
                 for line in resp.iter_lines():
@@ -831,54 +822,53 @@ data: {{"error":"{error_msg}. Please sign up for full access."}}
                         if line_str.startswith("data: "):
                             chunk = line_str[6:].strip()
                             if chunk == "[DONE]":
-                                yield 'event: done
+                                yield "event: done
 data: {}
 
-'
+"
                                 break
 
                             try:
-                                data = json.loads(chunk)
-                                delta = data.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                                chunk_data = json.loads(chunk)
+                                delta = chunk_data.get("choices", [{}])[0].get("delta", {}).get("content", "")
                                 if delta:
-                                    yield f'event: token
-data: {{"delta":"{delta}"}}
+                                    token_json = json.dumps({"delta": delta})
+                                    yield f"event: token
+data: {token_json}
 
-'
+"
                             except json.JSONDecodeError:
                                 continue
 
             except requests.exceptions.Timeout:
-                yield 'event: error
-data: {"error":"Request timeout. Please try a shorter message or sign up."} 
+                error_json = json.dumps({"error": "Request timeout. Please try a shorter message."})
+                yield f"event: error
+data: {error_json}
 
-'
+"
             except requests.exceptions.RequestException as e:
                 err_str = str(e).lower()
                 if any(x in err_str for x in ["quota", "rate limit", "429", "too many"]):
-                    yield 'event: error
-data: {"error":"You reached your demo mode limits. Please sign up for unlimited access!"} 
-
-'
+                    error_json = json.dumps({"error": "Demo limit reached. Please sign up!"})
                 else:
-                    yield 'event: error
-data: {"error":"Demo service unavailable. Please sign up for full access."} 
+                    error_json = json.dumps({"error": "Demo service unavailable."})
+                yield f"event: error
+data: {error_json}
 
-'
+"
+            except Exception as e:
+                log.error(f"Demo stream error: {e}")
+                error_json = json.dumps({"error": "An error occurred."})
+                yield f"event: error
+data: {error_json}
 
-        return Response(stream_with_context(generate_stream()), mimetype="text/event-stream")
+"
+
+        return Response(stream_with_context(generate()), mimetype="text/event-stream")
 
     except Exception as e:
         log.error(f"Demo chat fatal error: {e}")
-        def _fatal():
-            yield 'event: error
-data: {"error":"Server error. Please try again."} 
-
-'
-        return Response(stream_with_context(_fatal()), mimetype="text/event-stream")
-
-
-
+        return jsonify({'error': 'Server error. Please try again.'}), 500
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     """User login - FIXED"""
@@ -1570,5 +1560,4 @@ if __name__ == '__main__':
         port=port,
         debug=debug
     )
-
 
