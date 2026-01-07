@@ -1,3 +1,4 @@
+
 """
 NexaAI - Advanced AI Chat Platform with Demo Mode
 Complete Production Version with Supabase Support & Local AI
@@ -740,117 +741,142 @@ def demo_login():
 
 
 
-@app.route('/demo-chat', methods=['POST'])
+
+@app.route("/demo-chat", methods=["POST"])
 def demo_chat():
-    """Demo chat endpoint - With context support - UPDATED"""
+    """Demo chat endpoint - Claude 3 Haiku via OpenRouter + Streaming + Memory"""
     try:
-        # Check rate limit
         ip_address = request.remote_addr
+
+        # Rate limit check
         if not check_demo_rate_limit(ip_address):
-            return jsonify({
-                'error': '⏰ You have reached your demo mode limit (10 messages/hour). Please sign up for unlimited access!'
-            }), 429
+            def _limit_stream():
+                yield 'event: error
+data: {"error":"⏰ You have reached your demo mode limit (10 messages/hour). Please sign up for unlimited access!"} 
+
+'
+            return Response(stream_with_context(_limit_stream()), mimetype="text/event-stream")
 
         data = request.get_json() or {}
-        message = (data.get('message') or '').strip()
-        context = data.get('context', [])  # Get conversation history
+        message = (data.get("message") or "").strip()
+        context = data.get("context", [])  # Memory support
 
         if not message:
-            return jsonify({'error': 'Message cannot be empty'}), 400
+            def _empty_stream():
+                yield 'event: error
+data: {"error":"Message cannot be empty"} 
 
-        # ✅ CRITICAL FIX: Check if API key is available
-        if not GOOGLE_API_KEY:
-            log.error("❌ GOOGLE_API_KEY not configured for demo mode")
-            return jsonify({
-                'error': 'Demo mode is temporarily unavailable. The AI service is not configured. Please sign up for full access.'
-            }), 503
+'
+            return Response(stream_with_context(_empty_stream()), mimetype="text/event-stream")
 
-        # Get Gemini Flash model config
-        model_config = next((m for m in FREE_MODELS if m['id'] == 'gemini-flash'), None)
+        # Check OpenRouter API key
+        OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY', "")
+        if not OPENROUTER_API_KEY:
+            def _no_key():
+                yield 'event: error
+data: {"error":"Demo mode requires OpenRouter API key. Please sign up for full access."} 
 
-        if not model_config:
-            log.error("❌ Gemini Flash model not found in FREE_MODELS")
-            return jsonify({
-                'error': 'Demo mode configuration error. Please sign up for full access.'
-            }), 500
+'
+            return Response(stream_with_context(_no_key()), mimetype="text/event-stream")
 
-        # 🧠 Build conversation history with context
+        # Build conversation history with context (last 6 messages)
         messages_history = []
+        for ctx_msg in context[-6:]:
+            if isinstance(ctx_msg, dict) and 'role' in ctx_msg and 'content' in ctx_msg:
+                messages_history.append({
+                    "role": ctx_msg['role'],
+                    "content": ctx_msg['content']
+                })
+        messages_history.append({"role": "user", "content": message})
+        messages_analyzed = len(messages_history)
 
-        # Add context messages if provided
-        if context and isinstance(context, list):
-            for ctx_msg in context:
-                if isinstance(ctx_msg, dict) and 'role' in ctx_msg and 'content' in ctx_msg:
-                    messages_history.append({
-                        'role': ctx_msg['role'],
-                        'content': ctx_msg['content']
-                    })
-            log.info(f"📚 Using {len(messages_history)} messages from context")
+        model = "anthropic/claude-3-haiku:free"  # Claude 3 Haiku FREE tier
 
-        # Add current message
-        messages_history.append({'role': 'user', 'content': message})
+        def generate_stream():
+            # Meta event first (for "Analyzing X messages...")
+            yield f'event: meta
+data: {{"messages_analyzed":{messages_analyzed},"model":"Claude 3 Haiku (Free)"}}
 
-        # ✅ IMPROVED: Call Gemini API with conversation context
-        try:
-            model = genai.GenerativeModel(model_config['model'])
+'
 
-            # Build prompt with conversation history
-            if len(messages_history) > 1:
-                # Include context for better responses
-                conversation_text = ""
-                for msg in messages_history[:-1]:  # All except last
-                    role = "User" if msg['role'] == 'user' else "Assistant"
-                    conversation_text += f"{role}: {msg['content']}\n\n"
+            try:
+                url = "https://openrouter.ai/api/v1/chat/completions"
+                headers = {
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://nexaai.com",
+                    "X-Title": "NexaAI Demo"
+                }
+                payload = {
+                    "model": model,
+                    "messages": messages_history,
+                    "stream": True,
+                    "temperature": 0.7,
+                    "max_tokens": 3000
+                }
 
-                # Add current question
-                full_prompt = f"Previous conversation:\n{conversation_text}User: {message}\n\nAssistant:"
-                log.info(f"🧠 Sending with conversation context ({len(messages_history)} messages)")
-            else:
-                full_prompt = message
-                log.info("📝 Sending first message without context")
+                resp = requests.post(url, headers=headers, json=payload, stream=True, timeout=45)
 
-            response = model.generate_content(
-                full_prompt,
-                request_options={'timeout': 30}
-            )
+                if resp.status_code != 200:
+                    error_msg = f"Demo API error ({resp.status_code})"
+                    yield f'event: error
+data: {{"error":"{error_msg}. Please sign up for full access."}}
 
-            if response and response.text:
-                ai_response = response.text
-            else:
-                ai_response = "I apologize, but I couldn't generate a response. Please try again."
+'
+                    return
 
-        except Exception as gemini_error:
-            log.error(f"❌ Gemini API error in demo: {gemini_error}")
-            error_str = str(gemini_error).lower()
+                for line in resp.iter_lines():
+                    if line:
+                        line_str = line.decode("utf-8")
+                        if line_str.startswith("data: "):
+                            chunk = line_str[6:].strip()
+                            if chunk == "[DONE]":
+                                yield 'event: done
+data: {}
 
-            if 'api key' in error_str or 'invalid' in error_str or 'authentication' in error_str:
-                return jsonify({
-                    'error': 'API configuration issue. Please sign up for reliable access to all AI models.'
-                }), 503
-            elif 'quota' in error_str or 'rate limit' in error_str or '429' in error_str or 'resource exhausted' in error_str:
-                return jsonify({
-                    'error': 'You have reached your demo mode limit. Please sign up for unlimited access!'
-                }), 429
-            elif 'timeout' in error_str:
-                return jsonify({
-                    'error': 'Request timed out. Please try a shorter message or sign up.'
-                }), 408
-            else:
-                return jsonify({
-                    'error': f'An error occurred. Please sign up for better support.'
-                }), 500
+'
+                                break
 
-        log.info(f"✅ Demo chat completed for IP: {ip_address}")
+                            try:
+                                data = json.loads(chunk)
+                                delta = data.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                                if delta:
+                                    yield f'event: token
+data: {{"delta":"{delta}"}}
 
-        return jsonify({
-            'success': True,
-            'response': ai_response,
-            'model': model_config['name']
-        })
+'
+                            except json.JSONDecodeError:
+                                continue
+
+            except requests.exceptions.Timeout:
+                yield 'event: error
+data: {"error":"Request timeout. Please try a shorter message or sign up."} 
+
+'
+            except requests.exceptions.RequestException as e:
+                err_str = str(e).lower()
+                if any(x in err_str for x in ["quota", "rate limit", "429", "too many"]):
+                    yield 'event: error
+data: {"error":"You reached your demo mode limits. Please sign up for unlimited access!"} 
+
+'
+                else:
+                    yield 'event: error
+data: {"error":"Demo service unavailable. Please sign up for full access."} 
+
+'
+
+        return Response(stream_with_context(generate_stream()), mimetype="text/event-stream")
 
     except Exception as e:
-        log.error(f"❌ Demo chat error: {e}")
-        return jsonify({'error': 'An error occurred. Please try again or sign up.'}), 500
+        log.error(f"Demo chat fatal error: {e}")
+        def _fatal():
+            yield 'event: error
+data: {"error":"Server error. Please try again."} 
+
+'
+        return Response(stream_with_context(_fatal()), mimetype="text/event-stream")
+
 
 
 @app.route('/login', methods=['GET', 'POST'])
