@@ -804,7 +804,7 @@ data: {{"messages_analyzed":{messages_analyzed},"model":"Claude 3 Haiku (Free)"}
                 headers = {
                     "Authorization": f"Bearer {OPENROUTER_API_KEY}",
                     "Content-Type": "application/json",
-                    "HTTP-Referer": "https://nexaai.com",
+                    "HTTP-Referer": "https://nexa-ai-2d8d.onrender.com",
                     "X-Title": "NexaAI Demo"
                 }
                 payload = {
@@ -1570,4 +1570,5 @@ if __name__ == '__main__':
         port=port,
         debug=debug
     )
+
 
