@@ -121,29 +121,33 @@ log.info("🔑 Configuring API Keys...")
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 if GOOGLE_API_KEY:
     try:
-        genai.configure(api_key=GOOGLE_API_KEY.strip())
-        log.info("✅ Google Generative AI configured")
+        # Strip whitespace and quotes
+        GOOGLE_API_KEY = GOOGLE_API_KEY.strip().strip('"').strip("'")
+
+        if len(GOOGLE_API_KEY) < 10:
+            log.error(f"❌ GOOGLE_API_KEY is too short: {len(GOOGLE_API_KEY)} chars")
+            GOOGLE_API_KEY = None
+        else:
+            genai.configure(api_key=GOOGLE_API_KEY)
+            log.info("✅ Google Generative AI configured successfully")
+            log.info(f"   API Key length: {len(GOOGLE_API_KEY)} chars")
+            log.info(f"   API Key prefix: {GOOGLE_API_KEY[:10]}...")
     except Exception as e:
         log.error(f"❌ Google AI configuration failed: {e}")
         GOOGLE_API_KEY = None
 else:
-    log.warning("⚠️ GOOGLE_API_KEY not set")
+    log.error("❌ GOOGLE_API_KEY not set in environment variables")
+    log.error("   Demo mode will NOT work without this key!")
+    log.error("   Please add GOOGLE_API_KEY to your .env file")
+    GOOGLE_API_KEY = None
 
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
 if OPENROUTER_API_KEY:
-    OPENROUTER_API_KEY = OPENROUTER_API_KEY.strip()
+    OPENROUTER_API_KEY = OPENROUTER_API_KEY.strip().strip('"').strip("'")
     log.info("✅ OpenRouter API configured")
+    log.info(f"   API Key length: {len(OPENROUTER_API_KEY)} chars")
 else:
     log.warning("⚠️ OPENROUTER_API_KEY not set")
-
-# Nexa AI Configuration (Local AI)
-NEXA_API_URL = os.getenv('NEXA_API_URL', 'http://localhost:8000/v1')
-NEXA_ENABLED = os.getenv('NEXA_ENABLED', 'false').lower() == 'true'
-
-if NEXA_ENABLED:
-    log.info(f"✅ Nexa AI Local Server configured: {NEXA_API_URL}")
-else:
-    log.info("⚠️ Nexa AI disabled (set NEXA_ENABLED=true in .env to enable)")
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf'}
 
@@ -737,7 +741,7 @@ def demo_login():
 
 @app.route('/demo-chat', methods=['POST'])
 def demo_chat():
-    """Demo chat endpoint - Rate limited, Gemini only"""
+    """Demo chat endpoint - Rate limited, Gemini only - FIXED"""
     try:
         # Check rate limit
         ip_address = request.remote_addr
@@ -757,25 +761,62 @@ def demo_chat():
             message = message[:500]
             log.info(f"Demo message truncated to 500 chars")
 
-        # Only use Gemini Flash for demo (fastest & free)
+        # ✅ CRITICAL FIX: Check if API key is available
+        if not GOOGLE_API_KEY:
+            log.error("❌ GOOGLE_API_KEY not configured for demo mode")
+            return jsonify({
+                'error': '⚠️ Demo mode is temporarily unavailable. The AI service is not configured. Please try again later or sign up for full access.',
+                'api_error': True
+            }), 503
+
+        # Get Gemini Flash model config
         model_config = next((m for m in FREE_MODELS if m['id'] == 'gemini-flash'), None)
 
-        if not model_config or not GOOGLE_API_KEY:
+        if not model_config:
+            log.error("❌ Gemini Flash model not found in FREE_MODELS")
             return jsonify({
-                'error': 'Demo mode temporarily unavailable. Please try again later or sign up for full access.'
-            }), 503
+                'error': 'Demo mode configuration error. Please contact support or sign up.'
+            }), 500
 
         # Simple conversation history (last message only for demo)
         messages_history = [{'role': 'user', 'content': message}]
 
-        # Call Gemini API
-        ai_response = call_google_gemini(
-            model_config['model'],
-            messages_history,
-            timeout=30  # Shorter timeout for demo
-        )
+        # ✅ IMPROVED: Call Gemini API with better error handling
+        try:
+            model = genai.GenerativeModel(model_config['model'])
 
-        log.info(f"Demo chat completed for IP: {ip_address}")
+            response = model.generate_content(
+                message,
+                request_options={'timeout': 30}
+            )
+
+            if response and response.text:
+                ai_response = response.text
+            else:
+                ai_response = "I apologize, but I couldn't generate a response. Please try again."
+
+        except Exception as gemini_error:
+            log.error(f"❌ Gemini API error in demo: {gemini_error}")
+            error_str = str(gemini_error).lower()
+
+            if 'api key' in error_str or 'invalid' in error_str or 'authentication' in error_str:
+                return jsonify({
+                    'error': '⚠️ API configuration issue. Please sign up for reliable access to all AI models.'
+                }), 503
+            elif 'quota' in error_str or 'rate limit' in error_str or '429' in error_str:
+                return jsonify({
+                    'error': '⏰ Demo quota exceeded. Please sign up for unlimited access!'
+                }), 429
+            elif 'timeout' in error_str:
+                return jsonify({
+                    'error': '⏱️ Request timed out. Please try a shorter message or sign up.'
+                }), 408
+            else:
+                return jsonify({
+                    'error': f'❌ An error occurred: {str(gemini_error)[:100]}. Please sign up for better support.'
+                }), 500
+
+        log.info(f"✅ Demo chat completed for IP: {ip_address}")
 
         return jsonify({
             'success': True,
@@ -784,13 +825,9 @@ def demo_chat():
         })
 
     except Exception as e:
-        log.error(f"Demo chat error: {e}")
-        return jsonify({'error': 'An error occurred. Please try again.'}), 500
+        log.error(f"❌ Demo chat error: {e}")
+        return jsonify({'error': 'An error occurred. Please try again or sign up.'}), 500
 
-
-# ═══════════════════════════════════════════════════════════════════════════
-# ROUTES - AUTHENTICATION
-# ═══════════════════════════════════════════════════════════════════════════
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
