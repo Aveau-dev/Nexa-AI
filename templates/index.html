@@ -10,8 +10,8 @@
     <meta name="description"
         content="NexaAI is a modern, free, multi-model AI assistant platform. Chat with GPT-4, Claude, Gemini, DeepSeek, and more.">
     <meta name="keywords"
-        content="AI, NexaAI, chatbot, GPT-4, Claude, Gemini, DeepSeek, OpenRouter, AI assistant, LLM, FOSS, paywall, chat history, free, ai tools">
-    <link rel="canonical" href="https://yoursite.com/">
+        content="AI, NexaAI, chatbot, GPT-4, Claude, Gemini, DeepSeek, OpenRouter, AI assistant, LLM, FOSS, chat history, free, ai tools">
+    <link rel="canonical" href="https://nexa-ai.onrender.com/">
     <meta name="robots" content="index, follow">
 
     <!-- Green shield favicon -->
@@ -26,7 +26,7 @@
     <meta property="og:description"
         content="A smart, free AI chat dashboard supporting GPT-4, Claude, Gemini, and more." />
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://nexaai.js.org/static/og-image.png" />
+    <meta property="og:image" content="https://nexa-ai.onrender.com/static/og-image.png" />
 
     <!-- Markdown + syntax highlighting -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -69,7 +69,7 @@
             <button class="nav-button primary" onclick="location.href='{{ url_for('signup') }}'">
                 <span>S</span><span class="nav-full-text">ign up</span>
             </button>
-            <button class="nav-button icon-only" type="button" onclick="openTermsModal()">
+            <button class="nav-button icon-only" type="button" onclick="openTermsModal()" title="Help">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="10" />
                     <path d="M12 8a2 2 0 0 1 2 2c0 1-1 1.5-1.5 1.8-.4.3-.5.5-.5 1.2" />
@@ -84,8 +84,14 @@
         <main class="landing-main">
             <div class="main-container">
                 <div class="center-content">
-                    <div class="welcome-section">
+                    <div class="welcome-section" id="welcome-section">
                         <h1 class="main-heading">What can I help with?</h1>
+                        <p style="color: var(--text-secondary); margin-top: 0.5rem; font-size: 0.9rem;">
+                            💡 Try asking: "Explain quantum computing" or "Write a Python function"
+                        </p>
+                        <p style="color: var(--text-tertiary); margin-top: 0.25rem; font-size: 0.8rem;">
+                            🧠 Demo has temporary memory - I remember our conversation until you refresh
+                        </p>
                     </div>
 
                     <div id="messages-container"></div>
@@ -97,9 +103,8 @@
             <div class="input-wrapper fixed-input">
                 <div class="input-box">
                     <div class="input-inner">
-                        <textarea id="chat-input" placeholder="Ask anything" rows="1"
-                            onkeydown="handleKeyDown(event)"></textarea>
-                        <button class="send-button" onclick="sendMessage()" id="send-btn">
+                        <textarea id="chat-input" placeholder="Ask anything..." rows="1"></textarea>
+                        <button class="send-button" id="send-btn" title="Send message">
                             <!-- send icon -->
                             <span id="send-icon">
                                 <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
@@ -116,10 +121,10 @@
                     </div>
                     <div class="input-footer">
                         <span class="demo-notice">
-                            🎁 Demo Mode – Limited, no Vision support.
+                            🎁 Demo Mode – <span id="message-counter">10 messages left</span> · Temporary memory ·
                             <a href="javascript:void(0)" onclick="openTermsModal()"
-                                style="text-decoration:underline;cursor:pointer;">Terms &amp; Policies</a> ·
-                            <a href="{{ url_for('signup') }}">Sign up</a> for full access
+                                style="text-decoration:underline;cursor:pointer;">Terms</a> ·
+                            <a href="{{ url_for('signup') }}" style="font-weight: 600;">Sign up free</a>
                         </span>
                     </div>
                 </div>
@@ -127,7 +132,7 @@
         </main>
     </div>
 
-    <!-- Terms Modal (CORRECTED STRUCTURE) -->
+    <!-- Terms Modal -->
     <div id="terms-modal" class="modal-overlay" style="display:none;">
         <div class="modal-container">
             <div class="modal-header">
@@ -136,8 +141,8 @@
             </div>
             <div class="modal-body">
                 <h3>🔒 Privacy & Data Use</h3>
-                <p>This is a demo mode with limited features. Your conversations are <strong>not saved</strong> in demo
-                    mode. Sign up for a free account to save chat history and access premium AI models.</p>
+                <p>Demo mode has <strong>temporary memory</strong> - your conversation is remembered until you refresh 
+                   the page. Conversations are <strong>not saved</strong> to our servers. Sign up for permanent chat history.</p>
 
                 <h3>⚠️ AI Limitations</h3>
                 <ul>
@@ -156,34 +161,57 @@
                 </ul>
 
                 <h3>🎁 Demo vs Full Access</h3>
-                <p><strong>Demo:</strong> Text-only chat, no history, rate-limited<br>
-                    <strong>Free Account:</strong> 4 AI models, chat history, image generation<br>
-                    <strong>Pro (Free 6 months):</strong> All models, DeepThink, Web Scraper, unlimited
-                </p>
+                <table style="width: 100%; border-collapse: collapse; margin-top: 0.5rem;">
+                    <tr style="border-bottom: 1px solid var(--color-border);">
+                        <td style="padding: 0.5rem;"><strong>Demo</strong></td>
+                        <td style="padding: 0.5rem;">10 msg/hour, temporary memory, text-only</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--color-border);">
+                        <td style="padding: 0.5rem;"><strong>Free Account</strong></td>
+                        <td style="padding: 0.5rem;">4 AI models, permanent history, image gen</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.5rem;"><strong>Pro (Free trial)</strong></td>
+                        <td style="padding: 0.5rem;">All 9 models, DeepThink, Web, unlimited</td>
+                    </tr>
+                </table>
 
-                <p style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--color-border);">
-                    By using NexaAI, you agree to these terms. For full Terms of Service and Privacy Policy,
-                    <a href="#" style="color: var(--color-primary);">visit our documentation</a>.
+                <p style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--color-border); font-size: 0.9rem;">
+                    By using NexaAI, you agree to these terms. We respect your privacy and never sell your data.
                 </p>
             </div>
         </div>
     </div>
 
+    <!-- Demo Chat Script with Temporary Memory -->
     <script>
         /**
-         * NexaAI Demo Page JavaScript - WITH STOP FUNCTIONALITY
-         * Handles chat functionality with AI response interruption
+         * NexaAI Demo Page - With Temporary Memory
+         * Features: Context-aware responses, Stop functionality, Rate limiting
+         * Author: Aarav
+         * Date: 2026-01-07
+         * Version: 5.0 - Temporary Memory Edition
          */
 
-        // Global state
+        'use strict';
+
+        // ═══════════════════════════════════════════════════════════════════
+        // STATE MANAGEMENT WITH TEMPORARY MEMORY
+        // ═══════════════════════════════════════════════════════════════════
+
         let isResponding = false;
-        let abortController = null; // For canceling fetch requests
-        let retryCount = 0;
-        const MAX_RETRIES = 2;
+        let abortController = null;
+        let messageCount = 0;
+        const MAX_MESSAGES_DEMO = 10;
 
-        /**
-         * Auto-login for demo mode
-         */
+        // 🧠 TEMPORARY MEMORY - Stores conversation history (cleared on refresh)
+        let conversationHistory = [];
+        const MAX_HISTORY_LENGTH = 10; // Keep last 10 messages for context
+
+        // ═══════════════════════════════════════════════════════════════════
+        // INITIALIZATION
+        // ═══════════════════════════════════════════════════════════════════
+
         async function autoLoginDemo() {
             try {
                 const res = await fetch("/demo-login", {
@@ -191,39 +219,83 @@
                     headers: { "Content-Type": "application/json" }
                 });
                 await res.json().catch(() => ({}));
+                console.log('✅ Demo session initialized');
             } catch (e) {
                 console.warn("Auto demo login failed", e);
             }
         }
 
-        /**
-         * Initialize the app when DOM is ready
-         */
         document.addEventListener("DOMContentLoaded", () => {
             autoLoginDemo();
+            updateMessageCounter();
 
+            // Setup textarea auto-resize
             const chatInput = document.getElementById('chat-input');
             if (chatInput) {
                 chatInput.addEventListener('input', function () {
                     this.style.height = 'auto';
                     this.style.height = Math.min(this.scrollHeight, 200) + 'px';
                 });
+
+                // Setup Enter key handler
+                chatInput.addEventListener('keydown', handleKeyDown);
             }
+
+            // Setup send button
+            const sendBtn = document.getElementById('send-btn');
+            if (sendBtn) {
+                sendBtn.addEventListener('click', handleSendClick);
+            }
+
+            console.log('🚀 NexaAI Demo loaded with temporary memory');
+            console.log('🧠 Memory will persist until page refresh');
         });
 
-        /**
-         * Handle Enter key to send message
-         */
+        // ═══════════════════════════════════════════════════════════════════
+        // MESSAGE COUNTER
+        // ═══════════════════════════════════════════════════════════════════
+
+        function updateMessageCounter() {
+            const counter = document.getElementById('message-counter');
+            if (!counter) return;
+
+            const remaining = MAX_MESSAGES_DEMO - messageCount;
+
+            if (remaining <= 0) {
+                counter.textContent = 'Limit reached';
+                counter.style.color = 'var(--color-error, #ff4444)';
+            } else if (remaining <= 3) {
+                counter.textContent = `${remaining} messages left`;
+                counter.style.color = 'var(--color-warning, #ffaa00)';
+            } else {
+                counter.textContent = `${remaining} messages left`;
+                counter.style.color = 'var(--text-secondary)';
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // EVENT HANDLERS
+        // ═══════════════════════════════════════════════════════════════════
+
         function handleKeyDown(event) {
             if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault();
+                handleSendClick();
+            }
+        }
+
+        function handleSendClick() {
+            if (isResponding) {
+                stopAIResponse();
+            } else {
                 sendMessage();
             }
         }
 
-        /**
-         * Lock/unlock input during AI response
-         */
+        // ═══════════════════════════════════════════════════════════════════
+        // INPUT STATE MANAGEMENT
+        // ═══════════════════════════════════════════════════════════════════
+
         function setInputState(locked) {
             const input = document.getElementById('chat-input');
             const btn = document.getElementById('send-btn');
@@ -235,144 +307,263 @@
             if (input) {
                 input.readOnly = locked;
                 input.classList.toggle('input-disabled', locked);
+                if (!locked) input.focus();
             }
 
             if (btn) {
-                btn.disabled = false; // Always clickable (for stop)
+                btn.disabled = false;
+                btn.title = locked ? 'Stop response' : 'Send message';
             }
 
-            // Toggle send/stop icon
             if (sendIcon && stopIcon) {
                 sendIcon.style.display = locked ? 'none' : 'inline-flex';
                 stopIcon.style.display = locked ? 'inline-flex' : 'none';
             }
         }
 
-        /**
-         * Stop AI response (like Perplexity)
-         */
+        // ═══════════════════════════════════════════════════════════════════
+        // STOP AI RESPONSE
+        // ═══════════════════════════════════════════════════════════════════
+
         function stopAIResponse() {
             if (!isResponding) return;
 
-            console.log('User stopped AI response');
+            console.log('🛑 User stopped AI response');
 
-            // Cancel the fetch request
             if (abortController) {
                 abortController.abort();
             }
 
-            // Remove typing indicator
             removeTypingIndicator();
-
-            // Add "stopped" message
             addMessage('⏸️ Response stopped by user', 'system');
 
-            // Reset state
             setInputState(false);
             isResponding = false;
-            retryCount = 0;
             abortController = null;
         }
 
-        /**
-         * Main send function with retry logic and stop functionality
-         */
-        function sendMessage(customMessage = null, isRetry = false) {
-            const input = document.getElementById('chat-input');
+        // ═══════════════════════════════════════════════════════════════════
+        // TEMPORARY MEMORY MANAGEMENT
+        // ═══════════════════════════════════════════════════════════════════
 
-            // If responding and clicked again => STOP
-            if (isResponding && !isRetry) {
-                stopAIResponse();
+        function addToMemory(role, content) {
+            conversationHistory.push({
+                role: role,
+                content: content,
+                timestamp: Date.now()
+            });
+
+            // Keep only last MAX_HISTORY_LENGTH messages
+            if (conversationHistory.length > MAX_HISTORY_LENGTH) {
+                conversationHistory = conversationHistory.slice(-MAX_HISTORY_LENGTH);
+            }
+
+            console.log(`🧠 Memory updated: ${conversationHistory.length} messages stored`);
+        }
+
+        function getContextForAPI() {
+            // Return last 6 messages for API context (3 exchanges)
+            const recentHistory = conversationHistory.slice(-6);
+            return recentHistory.map(msg => ({
+                role: msg.role,
+                content: msg.content
+            }));
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // SEND MESSAGE WITH MEMORY
+        // ═══════════════════════════════════════════════════════════════════
+
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input ? input.value.trim() : '';
+
+            if (!message) return;
+
+            // Check message count limit
+            if (messageCount >= MAX_MESSAGES_DEMO) {
+                showLimitReachedMessage();
                 return;
             }
 
-            const message = customMessage || input.value.trim();
-            if (!message) return;
-
-            const welcome = document.querySelector('.welcome-section');
-            if (welcome) welcome.style.display = 'none';
-
-            // Only add user message on first attempt
-            if (!isRetry) {
-                addMessage(message, 'user');
-                input.value = '';
-                input.style.height = 'auto';
-                retryCount = 0;
+            // Hide welcome on first message
+            const welcome = document.getElementById('welcome-section');
+            if (welcome) {
+                welcome.style.display = 'none';
             }
 
+            // Add user message to UI
+            addMessage(message, 'user');
+
+            // Add to memory
+            addToMemory('user', message);
+
+            // Clear input
+            if (input) {
+                input.value = '';
+                input.style.height = 'auto';
+            }
+
+            // Increment counter
+            messageCount++;
+            updateMessageCounter();
+
+            // Show typing
             showTypingIndicator();
             setInputState(true);
 
-            // Create new AbortController for this request
+            // Create abort controller
             abortController = new AbortController();
 
-            // Send to backend
-            fetch('/demo-chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message }),
-                signal: abortController.signal // Add abort signal
-            })
-                .then(res => res.json())
-                .then(data => {
-                    removeTypingIndicator();
-                    setInputState(false);
-                    abortController = null;
+            try {
+                // Get conversation context
+                const context = getContextForAPI();
+                console.log(`📤 Sending with ${context.length} messages of context`);
 
-                    if (data.response) {
-                        addMessage(data.response, 'assistant');
-                        retryCount = 0;
-                    } else if (data.error) {
-                        const errorMsg = data.error.toLowerCase();
-                        const isQuotaError = errorMsg.includes('quota') ||
-                            errorMsg.includes('rate limit') ||
-                            errorMsg.includes('resource exhausted') ||
-                            errorMsg.includes('429') ||
-                            errorMsg.includes('limit exceeded');
-
-                        if (isQuotaError && retryCount < MAX_RETRIES) {
-                            retryCount++;
-                            console.log(`Gemini quota error. Retry ${retryCount}/${MAX_RETRIES}...`);
-                            addMessage(`⚠️ Message too long. Retrying (${retryCount}/${MAX_RETRIES})...`, 'error');
-
-                            setTimeout(() => {
-                                const shortenedMsg = shortenMessage(message);
-                                sendMessage(shortenedMsg, true);
-                            }, 1000);
-                        } else {
-                            if (retryCount >= MAX_RETRIES) {
-                                addMessage('❌ Unable to process. Try a shorter message or sign up.', 'error');
-                            } else {
-                                addMessage(data.error, 'error');
-                            }
-                            retryCount = 0;
-                        }
-                    }
-                })
-                .catch((err) => {
-                    // Check if request was aborted by user
-                    if (err.name === 'AbortError') {
-                        console.log('Request aborted by user');
-                        return; // Don't show error - we already showed stop message
-                    }
-
-                    removeTypingIndicator();
-                    setInputState(false);
-                    abortController = null;
-                    console.error('Fetch error:', err);
-                    addMessage('❌ Error connecting to AI. Please try again.', 'error');
-                    retryCount = 0;
+                const res = await fetch('/demo-chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        message: message,
+                        context: context // Send conversation history for context
+                    }),
+                    signal: abortController.signal
                 });
+
+                const data = await res.json();
+
+                removeTypingIndicator();
+                setInputState(false);
+                abortController = null;
+
+                if (data.response) {
+                    addMessage(data.response, 'assistant', data.model);
+
+                    // Add AI response to memory
+                    addToMemory('assistant', data.response);
+
+                    console.log('✅ Response received and stored in memory');
+
+                } else if (data.error) {
+                    handleError(data.error);
+                }
+
+            } catch (err) {
+                if (err.name === 'AbortError') {
+                    console.log('Request aborted by user');
+                    return;
+                }
+
+                removeTypingIndicator();
+                setInputState(false);
+                abortController = null;
+
+                console.error('Fetch error:', err);
+                addMessage('❌ Network error. Please check your connection and try again.', 'error');
+            }
         }
 
-        /**
-         * Format message with Markdown and syntax highlighting
-         */
+        // ═══════════════════════════════════════════════════════════════════
+        // ERROR HANDLING
+        // ═══════════════════════════════════════════════════════════════════
+
+        function handleError(errorMsg) {
+            const errorLower = errorMsg.toLowerCase();
+
+            // Check for rate limit / quota errors
+            if (errorLower.includes('rate limit') || 
+                errorLower.includes('quota') ||
+                errorLower.includes('429') ||
+                errorLower.includes('limit exceeded') ||
+                errorLower.includes('too many requests')) {
+
+                showLimitReachedMessage();
+                return;
+            }
+
+            // Check for API configuration errors
+            if (errorLower.includes('api') || 
+                errorLower.includes('configuration') ||
+                errorLower.includes('unavailable')) {
+
+                const container = document.getElementById('messages-container');
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message-row error-row';
+                messageDiv.innerHTML = `
+                    <div class="message error-message">
+                        <div class="message-content">
+                            ⚠️ Demo mode is temporarily unavailable. 
+                            <a href="{{ url_for('signup') }}" style="color: var(--color-primary); text-decoration: underline;">
+                                Sign up free
+                            </a> for reliable access to all AI models!
+                        </div>
+                    </div>
+                `;
+                container.appendChild(messageDiv);
+                container.scrollTop = container.scrollHeight;
+                return;
+            }
+
+            // Generic error with signup link
+            const container = document.getElementById('messages-container');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message-row error-row';
+            messageDiv.innerHTML = `
+                <div class="message error-message">
+                    <div class="message-content">⚠️ ${escapeHtml(errorMsg)}</div>
+                </div>
+            `;
+            container.appendChild(messageDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function showLimitReachedMessage() {
+            const container = document.getElementById('messages-container');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message-row error-row';
+            messageDiv.innerHTML = `
+                <div class="message error-message" style="text-align: center; padding: 1.5rem;">
+                    <div class="message-content">
+                        <h3 style="margin: 0 0 0.5rem 0; color: var(--color-error);">
+                            🚫 Demo Limit Reached
+                        </h3>
+                        <p style="margin: 0.5rem 0; color: var(--text-secondary);">
+                            You've used all ${MAX_MESSAGES_DEMO} messages in demo mode. 
+                            Sign up for a free account to continue with unlimited access!
+                        </p>
+                        <div style="margin-top: 1rem;">
+                            <a href="{{ url_for('signup') }}" 
+                               style="display: inline-block; padding: 0.75rem 1.5rem; 
+                                      background: var(--color-primary); color: white; 
+                                      border-radius: 6px; text-decoration: none; 
+                                      font-weight: 600; transition: transform 0.2s;">
+                                🚀 Sign Up Free - Get Pro Trial
+                            </a>
+                        </div>
+                        <p style="margin: 1rem 0 0 0; font-size: 0.85rem; color: var(--text-tertiary);">
+                            ✨ Free account includes: 4 AI models, chat history, image generation<br>
+                            🎁 Pro trial: All 9 models, DeepThink, Web search, unlimited messages
+                        </p>
+                    </div>
+                </div>
+            `;
+            container.appendChild(messageDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // MESSAGE FORMATTING
+        // ═══════════════════════════════════════════════════════════════════
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text == null ? '' : String(text);
+            return div.innerHTML;
+        }
+
         function formatDemoMessage(text) {
             if (typeof marked === 'undefined') {
-                const div = document.createElement('div');
-                div.textContent = text;
-                return div.innerHTML.replace(/\n/g, '<br>');
+                return escapeHtml(text).replace(/\n/g, '<br>');
             }
 
             marked.setOptions({
@@ -389,20 +580,21 @@
             return marked.parse(text);
         }
 
-        /**
-         * Add copy buttons to code blocks
-         */
         function addDemoCopyButtons(container) {
             container.querySelectorAll('pre code').forEach((codeBlock) => {
                 const pre = codeBlock.parentElement;
+
+                if (pre.querySelector('.copy-code-btn')) return;
+
                 const btn = document.createElement('button');
                 btn.className = 'copy-code-btn';
                 btn.textContent = 'Copy';
 
                 btn.addEventListener('click', () => {
-                    navigator.clipboard.writeText(codeBlock.textContent);
-                    btn.textContent = 'Copied!';
-                    setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+                    navigator.clipboard.writeText(codeBlock.textContent).then(() => {
+                        btn.textContent = 'Copied!';
+                        setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+                    });
                 });
 
                 pre.style.position = 'relative';
@@ -413,50 +605,39 @@
             });
         }
 
-        /**
-         * Add a message to the chat
-         * @param {string} text - Message content
-         * @param {string} role - 'user', 'assistant', 'error', or 'system'
-         */
-        function addMessage(text, role) {
+        // ═══════════════════════════════════════════════════════════════════
+        // ADD MESSAGE TO UI
+        // ═══════════════════════════════════════════════════════════════════
+
+        function addMessage(text, role, modelName = null) {
             const container = document.getElementById('messages-container');
+            if (!container) return;
+
             const messageDiv = document.createElement('div');
             messageDiv.className = `message-row ${role}-row`;
 
             if (role === 'user') {
                 messageDiv.innerHTML = `
-      <div class="message user-message">
-        <div class="message-content">${escapeHtml(text)}</div>
-      </div>`;
+                    <div class="message user-message">
+                        <div class="message-content">${escapeHtml(text)}</div>
+                    </div>
+                `;
 
             } else if (role === 'assistant') {
                 messageDiv.innerHTML = `
-      <div class="message assistant-message">
-        <div class="avatar">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-            <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"></path>
-          </svg>
-        </div>
-        <div class="message-content markdown-content"></div>
-      </div>`;
+                    <div class="message assistant-message">
+                        <div class="avatar">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                                <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"></path>
+                            </svg>
+                        </div>
+                        <div class="message-content">
+                            ${modelName ? `<div class="model-badge">${escapeHtml(modelName)}</div>` : ''}
+                            <div class="markdown-content"></div>
+                        </div>
+                    </div>
+                `;
 
-            } else if (role === 'system') {
-                // System message (for stop notifications)
-                messageDiv.innerHTML = `
-      <div class="message system-message">
-        <div class="message-content">${escapeHtml(text)}</div>
-      </div>`;
-
-            } else {
-                // Error message
-                messageDiv.innerHTML = `
-      <div class="message error-message">
-        <div class="message-content">⚠️ ${escapeHtml(text)}</div>
-      </div>`;
-            }
-
-            // Format assistant messages with Markdown
-            if (role === 'assistant') {
                 const contentDiv = messageDiv.querySelector('.markdown-content');
                 contentDiv.innerHTML = formatDemoMessage(text);
 
@@ -465,50 +646,68 @@
                 }
 
                 addDemoCopyButtons(contentDiv);
+                addMessageActions(contentDiv, text);
 
-                // Add action buttons
-                const actions = document.createElement('div');
-                actions.className = 'message-actions';
-                actions.innerHTML = `
-      <button class="msg-btn" data-action="listen" title="Listen">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-        </svg>
-      </button>
-      <button class="msg-btn" data-action="like" title="Like">👍</button>
-      <button class="msg-btn" data-action="dislike" title="Dislike">👎</button>
-      <button class="msg-btn" data-action="share" title="Share">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="18" cy="5" r="3"></circle>
-          <circle cx="6" cy="12" r="3"></circle>
-          <circle cx="18" cy="19" r="3"></circle>
-          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-        </svg>
-      </button>
-    `;
+            } else if (role === 'system') {
+                messageDiv.innerHTML = `
+                    <div class="message system-message">
+                        <div class="message-content">${escapeHtml(text)}</div>
+                    </div>
+                `;
 
-                actions.addEventListener('click', (e) => {
-                    const btn = e.target.closest('.msg-btn');
-                    if (btn) handleMessageAction(btn.dataset.action, text, actions);
-                });
-
-                contentDiv.appendChild(actions);
+            } else {
+                messageDiv.innerHTML = `
+                    <div class="message error-message">
+                        <div class="message-content">⚠️ ${escapeHtml(text)}</div>
+                    </div>
+                `;
             }
 
             container.appendChild(messageDiv);
             container.scrollTop = container.scrollHeight;
         }
 
-        /**
-         * Handle message action button clicks
-         */
+        // ═══════════════════════════════════════════════════════════════════
+        // MESSAGE ACTIONS
+        // ═══════════════════════════════════════════════════════════════════
+
+        function addMessageActions(contentDiv, text) {
+            const actions = document.createElement('div');
+            actions.className = 'message-actions';
+            actions.innerHTML = `
+                <button class="msg-btn" data-action="listen" title="Listen">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                    </svg>
+                </button>
+                <button class="msg-btn" data-action="like" title="Like">👍</button>
+                <button class="msg-btn" data-action="dislike" title="Dislike">👎</button>
+                <button class="msg-btn" data-action="copy" title="Copy">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                </button>
+            `;
+
+            actions.addEventListener('click', (e) => {
+                const btn = e.target.closest('.msg-btn');
+                if (btn) handleMessageAction(btn.dataset.action, text, actions);
+            });
+
+            contentDiv.appendChild(actions);
+        }
+
         function handleMessageAction(action, text, actionsEl) {
             if (action === 'listen') {
                 try {
+                    if (speechSynthesis.speaking) {
+                        speechSynthesis.cancel();
+                    }
                     const utter = new SpeechSynthesisUtterance(text);
                     speechSynthesis.speak(utter);
+                    console.log('🔊 Text-to-speech started');
                 } catch (e) {
                     console.warn('Text-to-speech not supported', e);
                 }
@@ -521,33 +720,61 @@
                 actionsEl.classList.add('disliked');
                 actionsEl.classList.remove('liked');
 
-            } else if (action === 'share') {
-                if (navigator.share) {
-                    navigator.share({ text });
-                } else {
-                    navigator.clipboard.writeText(text);
-                    alert('Message copied to clipboard');
-                }
+            } else if (action === 'copy') {
+                navigator.clipboard.writeText(text).then(() => {
+                    const btn = actionsEl.querySelector('[data-action="copy"]');
+                    if (btn) {
+                        const originalHTML = btn.innerHTML;
+                        btn.textContent = '✓';
+                        setTimeout(() => { btn.innerHTML = originalHTML; }, 1500);
+                    }
+                });
             }
         }
 
-        /**
-         * Open Terms & Policies modal
-         */
+        // ═══════════════════════════════════════════════════════════════════
+        // TYPING INDICATOR
+        // ═══════════════════════════════════════════════════════════════════
+
+        function showTypingIndicator() {
+            const container = document.getElementById('messages-container');
+            if (!container || document.getElementById('typing-indicator')) return;
+
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'message-row assistant-row typing-indicator';
+            typingDiv.id = 'typing-indicator';
+            typingDiv.innerHTML = `
+                <div class="message assistant-message">
+                    <div class="avatar">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                            <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"></path>
+                        </svg>
+                    </div>
+                    <div class="typing-dots"><span></span><span></span><span></span></div>
+                </div>
+            `;
+
+            container.appendChild(typingDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function removeTypingIndicator() {
+            const indicator = document.getElementById('typing-indicator');
+            if (indicator) indicator.remove();
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // MODAL HANDLERS
+        // ═══════════════════════════════════════════════════════════════════
+
         function openTermsModal() {
             const modal = document.getElementById('terms-modal');
-            if (!modal) {
-                console.error('Modal not found!');
-                return;
-            }
+            if (!modal) return;
             modal.style.display = 'flex';
             document.documentElement.style.overflow = 'hidden';
             document.body.style.overflow = 'hidden';
         }
 
-        /**
-         * Close Terms & Policies modal
-         */
         function closeTermsModal() {
             const modal = document.getElementById('terms-modal');
             if (!modal) return;
@@ -556,7 +783,6 @@
             document.body.style.overflow = '';
         }
 
-        // Close modal on overlay click
         document.addEventListener('click', (e) => {
             const modal = document.getElementById('terms-modal');
             if (modal && e.target === modal) {
@@ -564,50 +790,25 @@
             }
         });
 
-        /**
-         * Show typing indicator
-         */
-        function showTypingIndicator() {
-            const container = document.getElementById('messages-container');
-            const existing = document.getElementById('typing-indicator');
-            if (existing) existing.remove();
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                if (isResponding) {
+                    stopAIResponse();
+                }
+                closeTermsModal();
+            }
+        });
 
-            const typingDiv = document.createElement('div');
-            typingDiv.className = 'message-row assistant-row typing-indicator';
-            typingDiv.id = 'typing-indicator';
-            typingDiv.innerHTML = `
-    <div class="message assistant-message">
-      <div class="avatar">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-          <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"></path>
-        </svg>
-      </div>
-      <div class="typing-dots"><span></span><span></span><span></span></div>
-    </div>`;
+        // ═══════════════════════════════════════════════════════════════════
+        // DEBUG INFO
+        // ═══════════════════════════════════════════════════════════════════
 
-            container.appendChild(typingDiv);
-            container.scrollTop = container.scrollHeight;
-        }
-
-        /**
-         * Remove typing indicator
-         */
-        function removeTypingIndicator() {
-            const indicator = document.getElementById('typing-indicator');
-            if (indicator) indicator.remove();
-        }
-
-        /**
-         * Escape HTML to prevent XSS
-         */
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text == null ? '' : String(text);
-            return div.innerHTML;
-        }
+        window.addEventListener('beforeunload', () => {
+            console.log('🧹 Page refreshing - memory will be cleared');
+            console.log(`📊 Session stats: ${messageCount} messages sent, ${conversationHistory.length} in memory`);
+        });
 
     </script>
 </body>
 
 </html>
-
