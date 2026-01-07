@@ -785,8 +785,7 @@ def demo_chat():
         def generate():
             # Meta event
             meta_json = json.dumps({"messages_analyzed": messages_analyzed, "model": "Claude 3 Haiku (Free)"})
-            yield f"event: meta
-data: {meta_json}
+yield f"event: meta\\ndata: {meta_json}\\n\\n"
 
 "
 
@@ -1560,4 +1559,5 @@ if __name__ == '__main__':
         port=port,
         debug=debug
     )
+
 
