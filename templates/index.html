@@ -275,14 +275,6 @@
         }
 
         /**
-         * Shorten message intelligently
-         */
-        function shortenMessage(message) {
-            if (message.length <= 500) return message;
-            return message.substring(0, 400) + "... (shortened due to API limits)";
-        }
-
-        /**
          * Main send function with retry logic and stop functionality
          */
         function sendMessage(customMessage = null, isRetry = false) {
@@ -618,3 +610,4 @@
 </body>
 
 </html>
+
