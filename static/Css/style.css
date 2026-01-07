@@ -4871,3 +4871,27 @@ pre, code {
     display: none;
   }
 }
+
+
+.analysis-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  padding: 6px 16px 0 16px;
+}
+
+.analysis-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-primary);
+  animation: analysisPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes analysisPulse {
+  0%, 100 { opacity: 0.4; transform: scale(0.9); }
+  50%     { opacity: 1;   transform: scale(1.1); }
+}
+
