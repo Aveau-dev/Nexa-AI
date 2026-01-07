@@ -739,34 +739,30 @@ def demo_login():
         return jsonify({'error': str(e)}), 500
 
 
+
 @app.route('/demo-chat', methods=['POST'])
 def demo_chat():
-    """Demo chat endpoint - Rate limited, Gemini only - FIXED"""
+    """Demo chat endpoint - With context support - UPDATED"""
     try:
         # Check rate limit
         ip_address = request.remote_addr
         if not check_demo_rate_limit(ip_address):
             return jsonify({
-                'error': '⏰ Demo rate limit reached (10 messages/hour). Please sign up for unlimited access!'
+                'error': '⏰ You have reached your demo mode limit (10 messages/hour). Please sign up for unlimited access!'
             }), 429
 
         data = request.get_json() or {}
         message = (data.get('message') or '').strip()
+        context = data.get('context', [])  # Get conversation history
 
         if not message:
             return jsonify({'error': 'Message cannot be empty'}), 400
-
-        # Limit message length for demo
-        if len(message) > 500:
-            message = message[:500]
-            log.info(f"Demo message truncated to 500 chars")
 
         # ✅ CRITICAL FIX: Check if API key is available
         if not GOOGLE_API_KEY:
             log.error("❌ GOOGLE_API_KEY not configured for demo mode")
             return jsonify({
-                'error': '⚠️ Demo mode is temporarily unavailable. The AI service is not configured. Please try again later or sign up for full access.',
-                'api_error': True
+                'error': 'Demo mode is temporarily unavailable. The AI service is not configured. Please sign up for full access.'
             }), 503
 
         # Get Gemini Flash model config
@@ -775,18 +771,46 @@ def demo_chat():
         if not model_config:
             log.error("❌ Gemini Flash model not found in FREE_MODELS")
             return jsonify({
-                'error': 'Demo mode configuration error. Please contact support or sign up.'
+                'error': 'Demo mode configuration error. Please sign up for full access.'
             }), 500
 
-        # Simple conversation history (last message only for demo)
-        messages_history = [{'role': 'user', 'content': message}]
+        # 🧠 Build conversation history with context
+        messages_history = []
 
-        # ✅ IMPROVED: Call Gemini API with better error handling
+        # Add context messages if provided
+        if context and isinstance(context, list):
+            for ctx_msg in context:
+                if isinstance(ctx_msg, dict) and 'role' in ctx_msg and 'content' in ctx_msg:
+                    messages_history.append({
+                        'role': ctx_msg['role'],
+                        'content': ctx_msg['content']
+                    })
+            log.info(f"📚 Using {len(messages_history)} messages from context")
+
+        # Add current message
+        messages_history.append({'role': 'user', 'content': message})
+
+        # ✅ IMPROVED: Call Gemini API with conversation context
         try:
             model = genai.GenerativeModel(model_config['model'])
 
+            # Build prompt with conversation history
+            if len(messages_history) > 1:
+                # Include context for better responses
+                conversation_text = ""
+                for msg in messages_history[:-1]:  # All except last
+                    role = "User" if msg['role'] == 'user' else "Assistant"
+                    conversation_text += f"{role}: {msg['content']}\n\n"
+
+                # Add current question
+                full_prompt = f"Previous conversation:\n{conversation_text}User: {message}\n\nAssistant:"
+                log.info(f"🧠 Sending with conversation context ({len(messages_history)} messages)")
+            else:
+                full_prompt = message
+                log.info("📝 Sending first message without context")
+
             response = model.generate_content(
-                message,
+                full_prompt,
                 request_options={'timeout': 30}
             )
 
@@ -801,19 +825,19 @@ def demo_chat():
 
             if 'api key' in error_str or 'invalid' in error_str or 'authentication' in error_str:
                 return jsonify({
-                    'error': '⚠️ API configuration issue. Please sign up for reliable access to all AI models.'
+                    'error': 'API configuration issue. Please sign up for reliable access to all AI models.'
                 }), 503
-            elif 'quota' in error_str or 'rate limit' in error_str or '429' in error_str:
+            elif 'quota' in error_str or 'rate limit' in error_str or '429' in error_str or 'resource exhausted' in error_str:
                 return jsonify({
-                    'error': '⏰ Demo quota exceeded. Please sign up for unlimited access!'
+                    'error': 'You have reached your demo mode limit. Please sign up for unlimited access!'
                 }), 429
             elif 'timeout' in error_str:
                 return jsonify({
-                    'error': '⏱️ Request timed out. Please try a shorter message or sign up.'
+                    'error': 'Request timed out. Please try a shorter message or sign up.'
                 }), 408
             else:
                 return jsonify({
-                    'error': f'❌ An error occurred: {str(gemini_error)[:100]}. Please sign up for better support.'
+                    'error': f'An error occurred. Please sign up for better support.'
                 }), 500
 
         log.info(f"✅ Demo chat completed for IP: {ip_address}")
@@ -1520,3 +1544,4 @@ if __name__ == '__main__':
         port=port,
         debug=debug
     )
+
