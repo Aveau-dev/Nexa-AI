@@ -4831,6 +4831,29 @@ pre, code {
     font-size: 1.8rem; /* Increased */
 }
 
+
+
+
+.landing-main {
+    padding-top: 80px !important;  /* Reduced from default */
+}
+
+.main-container {
+    padding-top: 20px;  /* Minimal top padding */
+}
+
+.center-content {
+    padding-top: 0;  /* Remove extra padding */
+}
+
+.welcome-section {
+    padding-top: 0;  /* Start immediately below nav */
+}
+
+#messages-container {
+    margin-top: 1rem;  /* Minimal gap */
+}
+
 .dashboard p, .dashboard-content p {
     font-size: 1.1rem; /* Increased from 1rem */
     line-height: 1.6;
@@ -4894,4 +4917,5 @@ pre, code {
   0%, 100 { opacity: 0.4; transform: scale(0.9); }
   50%     { opacity: 1;   transform: scale(1.1); }
 }
+
 
