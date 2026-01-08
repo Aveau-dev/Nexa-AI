@@ -738,6 +738,16 @@ def call_ai_model(model_id, messages, image_data=None):
 # ROUTES - PUBLIC
 # ═══════════════════════════════════════════════════════════════════════════
 
+@app.before_first_request
+def create_tables():
+    """Create database tables automatically on first request"""
+    try:
+        db.create_all()
+        log.info("✅ Database tables created successfully")
+    except Exception as e:
+        log.error(f"❌ Failed to create database tables: {e}")
+
+
 @app.route('/')
 def index():
     """Landing page with demo mode"""
@@ -1586,6 +1596,7 @@ if __name__ == '__main__':
         port=port,
         debug=debug
     )
+
 
 
 
