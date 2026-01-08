@@ -36,10 +36,10 @@
     <!-- Polyfills -->
     <script>
         if (!window.Promise) {
-            document.write('<script src="https://cdn.jsdelivr.net/npm/promise-polyfill@8/dist/polyfill.min.js"></script>');
+            document.write('<script src="https://cdn.jsdelivr.net/npm/promise-polyfill@8/dist/polyfill.min.js"><\/script>');
         }
         if (!window.fetch) {
-            document.write('<script src="https://cdn.jsdelivr.net/npm/whatwg-fetch@3.6.2/dist/fetch.umd.js"></script>');
+            document.write('<script src="https://cdn.jsdelivr.net/npm/whatwg-fetch@3.6.2/dist/fetch.umd.js"><\/script>');
         }
     </script>
 
@@ -52,7 +52,7 @@
 </head>
 
 <body class="ds-body">
-    <!-- Nav -->
+    <!-- Nav - FIXED: Clean text without spacing -->
     <nav class="top-nav">
         <div class="nav-left">
             <div class="logo-container">
@@ -63,11 +63,11 @@
             </div>
         </div>
         <div class="nav-right">
-            <button class="nav-button secondary" onclick="location.href='{{ url_for('login') }}'">
-                <span>L</span><span class="nav-full-text">ogin</span>
+            <button class="nav-button secondary" onclick="location.href='{{ url_for(\'login\') }}'">
+                Login
             </button>
-            <button class="nav-button primary" onclick="location.href='{{ url_for('signup') }}'">
-                <span>S</span><span class="nav-full-text">ign up</span>
+            <button class="nav-button primary" onclick="location.href='{{ url_for(\'signup\') }}'">
+                Sign up
             </button>
             <button class="nav-button icon-only" type="button" onclick="openTermsModal()" title="Help">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
@@ -90,7 +90,7 @@
                             💡 Try asking: "Explain quantum computing" or "Write a Python function"
                         </p>
                         <p style="color: var(--text-tertiary); margin-top: 0.25rem; font-size: 0.8rem;">
-                            🧠 Demo has temporary memory - I remember our conversation until you refresh
+                            ⚡ Pure demo mode - No data saved, fresh on every refresh
                         </p>
                     </div>
 
@@ -121,10 +121,10 @@
                     </div>
                     <div class="input-footer">
                         <span class="demo-notice">
-                            🎁 Demo Mode – Unlimited · Temporary memory ·
+                            🎁 Demo Mode – Unlimited · No history saved ·
                             <a href="javascript:void(0)" onclick="openTermsModal()"
                                 style="text-decoration:underline;cursor:pointer;">Terms</a> ·
-                            <a href="{{ url_for('signup') }}" style="font-weight: 600;">Sign up for permanent history</a>
+                            <a href="{{ url_for(\'signup\') }}" style="font-weight: 600;">Sign up for permanent history</a>
                         </span>
                     </div>
                 </div>
@@ -141,8 +141,8 @@
             </div>
             <div class="modal-body">
                 <h3>🔒 Privacy & Data Use</h3>
-                <p>Demo mode has <strong>temporary memory</strong> - your conversation is remembered until you refresh 
-                   the page. Conversations are <strong>not saved</strong> to our servers. Sign up for permanent chat history.</p>
+                <p>Demo mode has <strong>NO data persistence</strong> - your conversation is lost when you refresh 
+                   or close the page. Nothing is saved to our servers. Sign up for permanent chat history.</p>
 
                 <h3>⚠️ AI Limitations</h3>
                 <ul>
@@ -164,7 +164,7 @@
                 <table style="width: 100%; border-collapse: collapse; margin-top: 0.5rem;">
                     <tr style="border-bottom: 1px solid var(--color-border);">
                         <td style="padding: 0.5rem;"><strong>Demo</strong></td>
-                        <td style="padding: 0.5rem;">Unlimited, temporary memory, DeepSeek R1</td>
+                        <td style="padding: 0.5rem;">Unlimited, no history, DeepSeek R1</td>
                     </tr>
                     <tr style="border-bottom: 1px solid var(--color-border);">
                         <td style="padding: 0.5rem;"><strong>Free Account</strong></td>
@@ -183,98 +183,27 @@
         </div>
     </div>
 
-    <!-- 🚀 FIXED DEMO CHAT SCRIPT - NO RAM MEMORY USAGE -->
-    <!-- ✅ Uses IndexedDB (persistent, low RAM, auto-clears on Render restart) -->
+    <!-- ✅ PURE DEMO SCRIPT - NO MEMORY/INDEXEDDB -->
     <script>
         /**
-         * NexaAI Demo Page - LOW RAM VERSION (IndexedDB)
-         * ✅ No RAM memory leaks (fixes Render free plan crashes)
-         * ✅ No duplicate responses
-         * ✅ No model badge
-         * ✅ Response starts at logo level
-         * ✅ Retry button on errors
-         * ✅ Auto-clears on Render restart
+         * NexaAI Demo Page - ZERO PERSISTENCE VERSION
+         * ✅ No IndexedDB
+         * ✅ No localStorage
+         * ✅ No cookies
+         * ✅ Fresh on every page load
+         * ✅ Clean navigation text
+         * ✅ Professional error UI
          */
 
         'use strict';
 
         // ═══════════════════════════════════════════════════════════════════
-        // STATE MANAGEMENT - LOW RAM VERSION
+        // STATE MANAGEMENT - ZERO PERSISTENCE
         // ═══════════════════════════════════════════════════════════════════
 
         let isResponding = false;
         let abortController = null;
         let lastUserMessage = '';
-        const DB_NAME = 'NexaAIDemoDB';
-        const DB_VERSION = 1;
-        const STORE_NAME = 'messages';
-        let db = null;
-
-        // ═══════════════════════════════════════════════════════════════════
-        // INDEXEDDB SETUP (Zero RAM usage)
-        // ═══════════════════════════════════════════════════════════════════
-
-        async function initDB() {
-            return new Promise((resolve, reject) => {
-                const request = indexedDB.open(DB_NAME, DB_VERSION);
-                
-                request.onerror = () => reject(request.error);
-                request.onsuccess = () => {
-                    db = request.result;
-                    resolve(db);
-                };
-                
-                request.onupgradeneeded = (event) => {
-                    db = event.target.result;
-                    if (!db.objectStoreNames.contains(STORE_NAME)) {
-                        db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
-                    }
-                };
-            });
-        }
-
-        async function getAllMessages() {
-            if (!db) return [];
-            return new Promise((resolve) => {
-                const transaction = db.transaction([STORE_NAME], 'readonly');
-                const store = transaction.objectStore(STORE_NAME);
-                const request = store.getAll();
-                request.onsuccess = () => resolve(request.result);
-            });
-        }
-
-        async function addMessage(role, content) {
-            if (!db) return;
-            const transaction = db.transaction([STORE_NAME], 'readwrite');
-            const store = transaction.objectStore(STORE_NAME);
-            await store.add({ role, content, timestamp: Date.now() });
-            
-            // ✅ Auto-prune to 10 messages max (low memory)
-            const all = await getAllMessages();
-            if (all.length > 10) {
-                const transaction2 = db.transaction([STORE_NAME], 'readwrite');
-                const store2 = transaction2.objectStore(STORE_NAME);
-                for (let i = 0; i < all.length - 10; i++) {
-                    store2.delete(all[i].id);
-                }
-            }
-        }
-
-        async function getContextForAPI() {
-            const all = await getAllMessages();
-            return all.slice(-6).map(msg => ({
-                role: msg.role,
-                content: msg.content
-            }));
-        }
-
-        async function clearMemory() {
-            if (!db) return;
-            const transaction = db.transaction([STORE_NAME], 'readwrite');
-            const store = transaction.objectStore(STORE_NAME);
-            const request = store.clear();
-            await new Promise(r => request.onsuccess = r);
-        }
 
         // ═══════════════════════════════════════════════════════════════════
         // INITIALIZATION
@@ -287,14 +216,13 @@
                     headers: { "Content-Type": "application/json" }
                 });
                 await res.json().catch(() => ({}));
-                console.log('✅ Demo session initialized - LOW RAM MODE');
+                console.log('✅ Demo session initialized - ZERO PERSISTENCE MODE');
             } catch (e) {
                 console.warn("Auto demo login failed", e);
             }
         }
 
         document.addEventListener("DOMContentLoaded", async () => {
-            await initDB(); // ✅ Initialize IndexedDB (zero RAM)
             await autoLoginDemo();
 
             const chatInput = document.getElementById('chat-input');
@@ -311,7 +239,7 @@
                 sendBtn.addEventListener('click', handleSendClick);
             }
 
-            console.log('🚀 NexaAI Demo loaded - INDEXEDDB (LOW RAM)');
+            console.log('🚀 NexaAI Demo - PURE SESSION MODE (No memory)');
         });
 
         // ═══════════════════════════════════════════════════════════════════
@@ -384,7 +312,7 @@
         }
 
         // ═══════════════════════════════════════════════════════════════════
-        // SEND MESSAGE - LOW RAM VERSION
+        // SEND MESSAGE - NO MEMORY VERSION
         // ═══════════════════════════════════════════════════════════════════
 
         async function sendMessage(retryMessage = null) {
@@ -393,7 +321,7 @@
 
             if (!message) return;
 
-            // ✅ Store for retry
+            // ✅ Store for retry only (not persisted)
             lastUserMessage = message;
 
             // Hide welcome
@@ -402,9 +330,8 @@
                 welcome.style.display = 'none';
             }
 
-            // Add user message to UI & DB
+            // Add user message to UI ONLY (no storage)
             addMessageUI(message, 'user');
-            await addMessage('user', message);
 
             // Clear input
             if (input && !retryMessage) {
@@ -420,16 +347,10 @@
             abortController = new AbortController();
 
             try {
-                const context = await getContextForAPI();
-                console.log(`📤 Sending with ${context.length} context messages`);
-
                 const res = await fetch('/demo-chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        message: message,
-                        context: context
-                    }),
+                    body: JSON.stringify({ message: message }),
                     signal: abortController.signal
                 });
 
@@ -443,7 +364,6 @@
 
                     if (data.response) {
                         addMessageUI(data.response, 'assistant');
-                        await addMessage('assistant', data.response);
                     } else if (data.error) {
                         handleError(data.error, data.retryable);
                     }
@@ -451,7 +371,6 @@
 
             } catch (err) {
                 if (err.name === 'AbortError') {
-                    console.log('Request aborted');
                     return;
                 }
 
@@ -460,12 +379,12 @@
                 abortController = null;
 
                 console.error('Fetch error:', err);
-                handleError('❌ Network error. Please check your connection.', true);
+                handleError('Network error. Please check your connection.', true);
             }
         }
 
         // ═══════════════════════════════════════════════════════════════════
-        // SSE STREAMING - FIXED (No Duplicates)
+        // SSE STREAMING
         // ═══════════════════════════════════════════════════════════════════
 
         async function handleSSEStream(response) {
@@ -492,11 +411,7 @@
                             const event = line.substring(6).trim();
 
                             if (event === 'done') {
-                                // ✅ Stream complete - save to DB only
                                 removeTypingIndicator();
-                                if (fullResponse) {
-                                    await addMessage('assistant', fullResponse);
-                                }
                                 setInputState(false);
                                 abortController = null;
                                 return;
@@ -532,7 +447,6 @@
                 removeTypingIndicator();
                 if (fullResponse && !hasCreatedMessage) {
                     addMessageUI(fullResponse, 'assistant');
-                    await addMessage('assistant', fullResponse);
                 }
                 setInputState(false);
                 abortController = null;
@@ -546,7 +460,7 @@
         }
 
         // ═══════════════════════════════════════════════════════════════════
-        // UI FUNCTIONS (No RAM issues)
+        // UI FUNCTIONS
         // ═══════════════════════════════════════════════════════════════════
 
         function createStreamingMessage() {
@@ -638,37 +552,46 @@
         }
 
         // ═══════════════════════════════════════════════════════════════════
-        // ERROR HANDLING WITH RETRY
+        // ERROR HANDLING - PROFESSIONAL UI
         // ═══════════════════════════════════════════════════════════════════
 
         function handleError(errorMsg, retryable = false) {
             const container = document.getElementById('messages-container');
+            if (!container) return;
+
             const messageDiv = document.createElement('div');
-            messageDiv.className = 'message-row error-row';
-            
+            messageDiv.className = 'message-row assistant-row';
+
             let errorHTML = `
-                <div class="message error-message">
+                <div class="message assistant-message" style="background: rgba(239, 68, 68, 0.1); border-left: 3px solid #ef4444;">
+                    <div class="avatar" style="color: #ef4444;">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                        </svg>
+                    </div>
                     <div class="message-content">
-                        <div>⚠️ ${escapeHtml(errorMsg)}</div>
+                        <div style="color: #fca5a5; font-weight: 500; margin-bottom: 8px;">⚠️ Error</div>
+                        <div style="color: #fecaca; margin-bottom: 12px;">${escapeHtml(errorMsg)}</div>
             `;
-            
+
             if (retryable && lastUserMessage) {
                 errorHTML += `
-                        <button class="retry-btn" onclick="retryLastMessage()" style="
-                            margin-top: 10px;
+                        <button onclick="retryLastMessage()" style="
                             padding: 8px 16px;
-                            background: var(--primary-color);
+                            background: #ef4444;
                             color: white;
                             border: none;
-                            border-radius: 6px;
+                            border-radius: 8px;
                             cursor: pointer;
                             font-size: 0.9rem;
+                            font-weight: 500;
                             display: inline-flex;
                             align-items: center;
-                            gap: 6px;
-                            transition: background 0.2s;
-                        " onmouseover="this.style.background='var(--primary-hover)'" 
-                           onmouseout="this.style.background='var(--primary-color)'">
+                            gap: 8px;
+                            transition: all 0.2s;
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                        " onmouseover="this.style.background='#dc2626'; this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.3)'" 
+                           onmouseout="this.style.background='#ef4444'; this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 4px rgba(0,0,0,0.2)'">
                             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                                 <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
                             </svg>
@@ -676,18 +599,17 @@
                         </button>
                 `;
             }
-            
+
             errorHTML += `
                     </div>
                 </div>
             `;
-            
+
             messageDiv.innerHTML = errorHTML;
             container.appendChild(messageDiv);
             container.scrollTop = container.scrollHeight;
         }
 
-        // ✅ Global retry function
         window.retryLastMessage = async function() {
             if (!lastUserMessage) return;
             console.log('🔄 Retrying last message');
@@ -868,22 +790,6 @@
                     stopAIResponse();
                 }
                 closeTermsModal();
-            }
-        });
-
-        // ═══════════════════════════════════════════════════════════════════
-        // RENDER RESTART HANDLER (Auto-clear)
-        // ═══════════════════════════════════════════════════════════════════
-
-        window.addEventListener('beforeunload', async () => {
-            // ✅ IndexedDB auto-clears on Render restart anyway
-            console.log('🧹 Demo memory will auto-clear on Render restart');
-        });
-
-        // ✅ Clear on page visibility change (low RAM)
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                // Optional: Clear heavy resources
             }
         });
     </script>
