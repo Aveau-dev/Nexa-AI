@@ -743,7 +743,7 @@ def demo_login():
 
 @app.route("/demo-chat", methods=["POST"])
 def demo_chat():
-    """Demo chat endpoint - Claude 3 Haiku via OpenRouter SSE Streaming"""
+    """Demo chat endpoint - Gemma 3 Nano via OpenRouter SSE Streaming"""
     try:
         from flask import Response, stream_with_context
         import json
@@ -783,8 +783,8 @@ def demo_chat():
         model = "google/gemma-3n-e2b-it:free"
 
         def generate():
-            # Meta event
-            meta_json = json.dumps({"messages_analyzed": messages_analyzed, "model": "Gemma 3 Nano"})
+            # ✅ REMOVED model name from meta - won't show badge
+            meta_json = json.dumps({"messages_analyzed": messages_analyzed})
             yield 'event: meta\n' + 'data: ' + meta_json + '\n\n'
 
             try:
@@ -806,7 +806,10 @@ def demo_chat():
                 resp = requests.post(url, headers=headers, json=payload, stream=True, timeout=45)
 
                 if resp.status_code != 200:
-                    error_json = json.dumps({"error": "Demo API error (" + str(resp.status_code) + "). Please sign up."})
+                    error_json = json.dumps({
+                        "error": "Demo API error (" + str(resp.status_code) + "). Please sign up.",
+                        "retryable": True  # ✅ Mark as retryable
+                    })
                     yield 'event: error\n' + 'data: ' + error_json + '\n\n'
                     return
 
@@ -829,18 +832,30 @@ def demo_chat():
                                 continue
 
             except requests.exceptions.Timeout:
-                error_json = json.dumps({"error": "Request timeout. Please try a shorter message."})
+                error_json = json.dumps({
+                    "error": "Request timeout. Please try a shorter message.",
+                    "retryable": True
+                })
                 yield 'event: error\n' + 'data: ' + error_json + '\n\n'
             except requests.exceptions.RequestException as e:
                 err_str = str(e).lower()
                 if any(x in err_str for x in ["quota", "rate limit", "429", "too many"]):
-                    error_json = json.dumps({"error": "Demo limit reached. Please sign up!"})
+                    error_json = json.dumps({
+                        "error": "Demo limit reached. Please sign up!",
+                        "retryable": False
+                    })
                 else:
-                    error_json = json.dumps({"error": "Demo service unavailable."})
+                    error_json = json.dumps({
+                        "error": "Demo service unavailable.",
+                        "retryable": True
+                    })
                 yield 'event: error\n' + 'data: ' + error_json + '\n\n'
             except Exception as e:
                 log.error("Demo stream error: " + str(e))
-                error_json = json.dumps({"error": "An error occurred."})
+                error_json = json.dumps({
+                    "error": "An error occurred.",
+                    "retryable": True
+                })
                 yield 'event: error\n' + 'data: ' + error_json + '\n\n'
 
         return Response(stream_with_context(generate()), mimetype="text/event-stream")
@@ -848,6 +863,7 @@ def demo_chat():
     except Exception as e:
         log.error("Demo chat fatal error: " + str(e))
         return jsonify({'error': 'Server error. Please try again.'}), 500
+
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -1541,6 +1557,7 @@ if __name__ == '__main__':
         port=port,
         debug=debug
     )
+
 
 
 
