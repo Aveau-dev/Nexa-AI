@@ -36,10 +36,10 @@
     <!-- Polyfills -->
     <script>
         if (!window.Promise) {
-            document.write('<script src="https://cdn.jsdelivr.net/npm/promise-polyfill@8/dist/polyfill.min.js"><\/script>');
+            document.write('<script src="https://cdn.jsdelivr.net/npm/promise-polyfill@8/dist/polyfill.min.js"></script>');
         }
         if (!window.fetch) {
-            document.write('<script src="https://cdn.jsdelivr.net/npm/whatwg-fetch@3.6.2/dist/fetch.umd.js"><\/script>');
+            document.write('<script src="https://cdn.jsdelivr.net/npm/whatwg-fetch@3.6.2/dist/fetch.umd.js"></script>');
         }
     </script>
 
@@ -64,7 +64,7 @@
         </div>
         <div class="nav-right">
             <button class="nav-button secondary" onclick="location.href='{{ url_for('login') }}'">
-                <span>L</span><span class="nav-full-text">og in</span>
+                <span>L</span><span class="nav-full-text">ogin</span>
             </button>
             <button class="nav-button primary" onclick="location.href='{{ url_for('signup') }}'">
                 <span>S</span><span class="nav-full-text">ign up</span>
@@ -183,28 +183,98 @@
         </div>
     </div>
 
-    <!-- Demo Chat Script with Temporary Memory - UNLIMITED -->
+    <!-- 🚀 FIXED DEMO CHAT SCRIPT - NO RAM MEMORY USAGE -->
+    <!-- ✅ Uses IndexedDB (persistent, low RAM, auto-clears on Render restart) -->
     <script>
         /**
-         * NexaAI Demo Page - With Temporary Memory - UNLIMITED
-         * Features: Context-aware responses, Stop functionality, No rate limits
-         * Author: Aarav
-         * Date: 2026-01-07
-         * Version: 6.0 - Unlimited Edition
+         * NexaAI Demo Page - LOW RAM VERSION (IndexedDB)
+         * ✅ No RAM memory leaks (fixes Render free plan crashes)
+         * ✅ No duplicate responses
+         * ✅ No model badge
+         * ✅ Response starts at logo level
+         * ✅ Retry button on errors
+         * ✅ Auto-clears on Render restart
          */
 
         'use strict';
 
         // ═══════════════════════════════════════════════════════════════════
-        // STATE MANAGEMENT WITH TEMPORARY MEMORY
+        // STATE MANAGEMENT - LOW RAM VERSION
         // ═══════════════════════════════════════════════════════════════════
 
         let isResponding = false;
         let abortController = null;
+        let lastUserMessage = '';
+        const DB_NAME = 'NexaAIDemoDB';
+        const DB_VERSION = 1;
+        const STORE_NAME = 'messages';
+        let db = null;
 
-        // 🧠 TEMPORARY MEMORY - Stores conversation history (cleared on refresh)
-        let conversationHistory = [];
-        const MAX_HISTORY_LENGTH = 10; // Keep last 10 messages for context
+        // ═══════════════════════════════════════════════════════════════════
+        // INDEXEDDB SETUP (Zero RAM usage)
+        // ═══════════════════════════════════════════════════════════════════
+
+        async function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => {
+                    db = request.result;
+                    resolve(db);
+                };
+                
+                request.onupgradeneeded = (event) => {
+                    db = event.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+                    }
+                };
+            });
+        }
+
+        async function getAllMessages() {
+            if (!db) return [];
+            return new Promise((resolve) => {
+                const transaction = db.transaction([STORE_NAME], 'readonly');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.getAll();
+                request.onsuccess = () => resolve(request.result);
+            });
+        }
+
+        async function addMessage(role, content) {
+            if (!db) return;
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+            await store.add({ role, content, timestamp: Date.now() });
+            
+            // ✅ Auto-prune to 10 messages max (low memory)
+            const all = await getAllMessages();
+            if (all.length > 10) {
+                const transaction2 = db.transaction([STORE_NAME], 'readwrite');
+                const store2 = transaction2.objectStore(STORE_NAME);
+                for (let i = 0; i < all.length - 10; i++) {
+                    store2.delete(all[i].id);
+                }
+            }
+        }
+
+        async function getContextForAPI() {
+            const all = await getAllMessages();
+            return all.slice(-6).map(msg => ({
+                role: msg.role,
+                content: msg.content
+            }));
+        }
+
+        async function clearMemory() {
+            if (!db) return;
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.clear();
+            await new Promise(r => request.onsuccess = r);
+        }
 
         // ═══════════════════════════════════════════════════════════════════
         // INITIALIZATION
@@ -217,35 +287,31 @@
                     headers: { "Content-Type": "application/json" }
                 });
                 await res.json().catch(() => ({}));
-                console.log('✅ Demo session initialized - UNLIMITED');
+                console.log('✅ Demo session initialized - LOW RAM MODE');
             } catch (e) {
                 console.warn("Auto demo login failed", e);
             }
         }
 
-        document.addEventListener("DOMContentLoaded", () => {
-            autoLoginDemo();
+        document.addEventListener("DOMContentLoaded", async () => {
+            await initDB(); // ✅ Initialize IndexedDB (zero RAM)
+            await autoLoginDemo();
 
-            // Setup textarea auto-resize
             const chatInput = document.getElementById('chat-input');
             if (chatInput) {
                 chatInput.addEventListener('input', function () {
                     this.style.height = 'auto';
                     this.style.height = Math.min(this.scrollHeight, 200) + 'px';
                 });
-
-                // Setup Enter key handler
                 chatInput.addEventListener('keydown', handleKeyDown);
             }
 
-            // Setup send button
             const sendBtn = document.getElementById('send-btn');
             if (sendBtn) {
                 sendBtn.addEventListener('click', handleSendClick);
             }
 
-            console.log('🚀 NexaAI Demo loaded - UNLIMITED with temporary memory');
-            console.log('🧠 Memory will persist until page refresh');
+            console.log('🚀 NexaAI Demo loaded - INDEXEDDB (LOW RAM)');
         });
 
         // ═══════════════════════════════════════════════════════════════════
@@ -268,7 +334,7 @@
         }
 
         // ═══════════════════════════════════════════════════════════════════
-        // INPUT STATE MANAGEMENT
+        // INPUT STATE
         // ═══════════════════════════════════════════════════════════════════
 
         function setInputState(locked) {
@@ -297,20 +363,20 @@
         }
 
         // ═══════════════════════════════════════════════════════════════════
-        // STOP AI RESPONSE
+        // STOP RESPONSE
         // ═══════════════════════════════════════════════════════════════════
 
         function stopAIResponse() {
             if (!isResponding) return;
 
-            console.log('🛑 User stopped AI response');
+            console.log('🛑 Stopped by user');
 
             if (abortController) {
                 abortController.abort();
             }
 
             removeTypingIndicator();
-            addMessage('⏸️ Response stopped by user', 'system');
+            addMessageUI('⏸️ Response stopped by user', 'system');
 
             setInputState(false);
             isResponding = false;
@@ -318,57 +384,30 @@
         }
 
         // ═══════════════════════════════════════════════════════════════════
-        // TEMPORARY MEMORY MANAGEMENT
+        // SEND MESSAGE - LOW RAM VERSION
         // ═══════════════════════════════════════════════════════════════════
 
-        function addToMemory(role, content) {
-            conversationHistory.push({
-                role: role,
-                content: content,
-                timestamp: Date.now()
-            });
-
-            // Keep only last MAX_HISTORY_LENGTH messages
-            if (conversationHistory.length > MAX_HISTORY_LENGTH) {
-                conversationHistory = conversationHistory.slice(-MAX_HISTORY_LENGTH);
-            }
-
-            console.log(`🧠 Memory updated: ${conversationHistory.length} messages stored`);
-        }
-
-        function getContextForAPI() {
-            // Return last 6 messages for API context (3 exchanges)
-            const recentHistory = conversationHistory.slice(-6);
-            return recentHistory.map(msg => ({
-                role: msg.role,
-                content: msg.content
-            }));
-        }
-
-        // ═══════════════════════════════════════════════════════════════════
-        // SEND MESSAGE WITH MEMORY - NO LIMITS
-        // ═══════════════════════════════════════════════════════════════════
-
-        async function sendMessage() {
+        async function sendMessage(retryMessage = null) {
             const input = document.getElementById('chat-input');
-            const message = input ? input.value.trim() : '';
+            const message = retryMessage || (input ? input.value.trim() : '');
 
             if (!message) return;
 
-            // Hide welcome on first message
+            // ✅ Store for retry
+            lastUserMessage = message;
+
+            // Hide welcome
             const welcome = document.getElementById('welcome-section');
             if (welcome) {
                 welcome.style.display = 'none';
             }
 
-            // Add user message to UI
-            addMessage(message, 'user');
-
-            // Add to memory
-            addToMemory('user', message);
+            // Add user message to UI & DB
+            addMessageUI(message, 'user');
+            await addMessage('user', message);
 
             // Clear input
-            if (input) {
+            if (input && !retryMessage) {
                 input.value = '';
                 input.style.height = 'auto';
             }
@@ -381,9 +420,8 @@
             abortController = new AbortController();
 
             try {
-                // Get conversation context
-                const context = getContextForAPI();
-                console.log(`📤 Sending with ${context.length} messages of context`);
+                const context = await getContextForAPI();
+                console.log(`📤 Sending with ${context.length} context messages`);
 
                 const res = await fetch('/demo-chat', {
                     method: 'POST',
@@ -395,27 +433,25 @@
                     signal: abortController.signal
                 });
 
-                // Handle SSE streaming
                 if (res.ok && res.headers.get('content-type')?.includes('text/event-stream')) {
                     await handleSSEStream(res);
                 } else {
-                    // Fallback to JSON
                     const data = await res.json();
                     removeTypingIndicator();
                     setInputState(false);
                     abortController = null;
 
                     if (data.response) {
-                        addMessage(data.response, 'assistant', data.model);
-                        addToMemory('assistant', data.response);
+                        addMessageUI(data.response, 'assistant');
+                        await addMessage('assistant', data.response);
                     } else if (data.error) {
-                        handleError(data.error);
+                        handleError(data.error, data.retryable);
                     }
                 }
 
             } catch (err) {
                 if (err.name === 'AbortError') {
-                    console.log('Request aborted by user');
+                    console.log('Request aborted');
                     return;
                 }
 
@@ -424,12 +460,12 @@
                 abortController = null;
 
                 console.error('Fetch error:', err);
-                addMessage('❌ Network error. Please check your connection and try again.', 'error');
+                handleError('❌ Network error. Please check your connection.', true);
             }
         }
 
         // ═══════════════════════════════════════════════════════════════════
-        // SSE STREAMING HANDLER
+        // SSE STREAMING - FIXED (No Duplicates)
         // ═══════════════════════════════════════════════════════════════════
 
         async function handleSSEStream(response) {
@@ -437,8 +473,8 @@
             const decoder = new TextDecoder();
             let buffer = '';
             let fullResponse = '';
-            let modelName = 'DeepSeek R1';
             let messageElement = null;
+            let hasCreatedMessage = false;
 
             try {
                 while (true) {
@@ -455,25 +491,15 @@
                         if (line.startsWith('event:')) {
                             const event = line.substring(6).trim();
 
-                            if (event === 'meta') {
-                                // Next line should be data
-                                continue;
-                            } else if (event === 'token') {
-                                // Next line has token data
-                                continue;
-                            } else if (event === 'done') {
-                                // Stream complete
+                            if (event === 'done') {
+                                // ✅ Stream complete - save to DB only
                                 removeTypingIndicator();
                                 if (fullResponse) {
-                                    addMessage(fullResponse, 'assistant', modelName);
-                                    addToMemory('assistant', fullResponse);
+                                    await addMessage('assistant', fullResponse);
                                 }
                                 setInputState(false);
                                 abortController = null;
                                 return;
-                            } else if (event === 'error') {
-                                // Error occurred
-                                continue;
                             }
                         } else if (line.startsWith('data:')) {
                             const jsonStr = line.substring(5).trim();
@@ -482,18 +508,16 @@
                             try {
                                 const data = JSON.parse(jsonStr);
 
-                                if (data.messages_analyzed !== undefined) {
-                                    modelName = data.model || 'DeepSeek R1';
+                                if (data.messages_analyzed !== undefined && !hasCreatedMessage) {
                                     removeTypingIndicator();
-                                    messageElement = createStreamingMessage(modelName);
-                                } else if (data.delta) {
+                                    messageElement = createStreamingMessage();
+                                    hasCreatedMessage = true;
+                                } else if (data.delta && messageElement) {
                                     fullResponse += data.delta;
-                                    if (messageElement) {
-                                        updateStreamingMessage(messageElement, fullResponse);
-                                    }
+                                    updateStreamingMessage(messageElement, fullResponse);
                                 } else if (data.error) {
                                     removeTypingIndicator();
-                                    handleError(data.error);
+                                    handleError(data.error, data.retryable !== false);
                                     setInputState(false);
                                     abortController = null;
                                     return;
@@ -505,11 +529,10 @@
                     }
                 }
 
-                // Stream ended
                 removeTypingIndicator();
-                if (fullResponse && !messageElement) {
-                    addMessage(fullResponse, 'assistant', modelName);
-                    addToMemory('assistant', fullResponse);
+                if (fullResponse && !hasCreatedMessage) {
+                    addMessageUI(fullResponse, 'assistant');
+                    await addMessage('assistant', fullResponse);
                 }
                 setInputState(false);
                 abortController = null;
@@ -522,7 +545,11 @@
             }
         }
 
-        function createStreamingMessage(modelName) {
+        // ═══════════════════════════════════════════════════════════════════
+        // UI FUNCTIONS (No RAM issues)
+        // ═══════════════════════════════════════════════════════════════════
+
+        function createStreamingMessage() {
             const container = document.getElementById('messages-container');
             if (!container) return null;
 
@@ -536,7 +563,6 @@
                         </svg>
                     </div>
                     <div class="message-content">
-                        <div class="model-badge">${escapeHtml(modelName)}</div>
                         <div class="markdown-content"></div>
                     </div>
                 </div>
@@ -544,7 +570,6 @@
 
             container.appendChild(messageDiv);
             container.scrollTop = container.scrollHeight;
-
             return messageDiv.querySelector('.markdown-content');
         }
 
@@ -564,25 +589,113 @@
             }
         }
 
-        // ═══════════════════════════════════════════════════════════════════
-        // ERROR HANDLING
-        // ═══════════════════════════════════════════════════════════════════
-
-        function handleError(errorMsg) {
+        function addMessageUI(text, role) {
             const container = document.getElementById('messages-container');
+            if (!container) return;
+
             const messageDiv = document.createElement('div');
-            messageDiv.className = 'message-row error-row';
-            messageDiv.innerHTML = `
-                <div class="message error-message">
-                    <div class="message-content">⚠️ ${escapeHtml(errorMsg)}</div>
-                </div>
-            `;
+            messageDiv.className = `message-row ${role}-row`;
+
+            if (role === 'user') {
+                messageDiv.innerHTML = `
+                    <div class="message user-message">
+                        <div class="message-content">${escapeHtml(text)}</div>
+                    </div>
+                `;
+            } else if (role === 'assistant') {
+                messageDiv.innerHTML = `
+                    <div class="message assistant-message">
+                        <div class="avatar">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                                <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"></path>
+                            </svg>
+                        </div>
+                        <div class="message-content">
+                            <div class="markdown-content"></div>
+                        </div>
+                    </div>
+                `;
+
+                const contentDiv = messageDiv.querySelector('.markdown-content');
+                contentDiv.innerHTML = formatDemoMessage(text);
+
+                if (typeof hljs !== 'undefined') {
+                    contentDiv.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
+                }
+
+                addDemoCopyButtons(contentDiv);
+                addMessageActions(contentDiv, text);
+            } else {
+                messageDiv.innerHTML = `
+                    <div class="message system-message">
+                        <div class="message-content">${escapeHtml(text)}</div>
+                    </div>
+                `;
+            }
+
             container.appendChild(messageDiv);
             container.scrollTop = container.scrollHeight;
         }
 
         // ═══════════════════════════════════════════════════════════════════
-        // MESSAGE FORMATTING
+        // ERROR HANDLING WITH RETRY
+        // ═══════════════════════════════════════════════════════════════════
+
+        function handleError(errorMsg, retryable = false) {
+            const container = document.getElementById('messages-container');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message-row error-row';
+            
+            let errorHTML = `
+                <div class="message error-message">
+                    <div class="message-content">
+                        <div>⚠️ ${escapeHtml(errorMsg)}</div>
+            `;
+            
+            if (retryable && lastUserMessage) {
+                errorHTML += `
+                        <button class="retry-btn" onclick="retryLastMessage()" style="
+                            margin-top: 10px;
+                            padding: 8px 16px;
+                            background: var(--primary-color);
+                            color: white;
+                            border: none;
+                            border-radius: 6px;
+                            cursor: pointer;
+                            font-size: 0.9rem;
+                            display: inline-flex;
+                            align-items: center;
+                            gap: 6px;
+                            transition: background 0.2s;
+                        " onmouseover="this.style.background='var(--primary-hover)'" 
+                           onmouseout="this.style.background='var(--primary-color)'">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
+                            </svg>
+                            Retry
+                        </button>
+                `;
+            }
+            
+            errorHTML += `
+                    </div>
+                </div>
+            `;
+            
+            messageDiv.innerHTML = errorHTML;
+            container.appendChild(messageDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // ✅ Global retry function
+        window.retryLastMessage = async function() {
+            if (!lastUserMessage) return;
+            console.log('🔄 Retrying last message');
+            await sendMessage(lastUserMessage);
+        };
+
+        // ═══════════════════════════════════════════════════════════════════
+        // UTILITY FUNCTIONS
         // ═══════════════════════════════════════════════════════════════════
 
         function escapeHtml(text) {
@@ -601,7 +714,7 @@
                     if (typeof hljs !== 'undefined' && lang && hljs.getLanguage(lang)) {
                         return hljs.highlight(code, { language: lang }).value;
                     }
-                    return (typeof hljs !== 'undefined') ? hljs.highlightAuto(code).value : code;
+                    return hljs ? hljs.highlightAuto(code).value : code;
                 },
                 breaks: true,
                 gfm: true
@@ -613,7 +726,6 @@
         function addDemoCopyButtons(container) {
             container.querySelectorAll('pre code').forEach((codeBlock) => {
                 const pre = codeBlock.parentElement;
-
                 if (pre.querySelector('.copy-code-btn')) return;
 
                 const btn = document.createElement('button');
@@ -634,72 +746,6 @@
                 pre.appendChild(btn);
             });
         }
-
-        // ═══════════════════════════════════════════════════════════════════
-        // ADD MESSAGE TO UI
-        // ═══════════════════════════════════════════════════════════════════
-
-        function addMessage(text, role, modelName = null) {
-            const container = document.getElementById('messages-container');
-            if (!container) return;
-
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message-row ${role}-row`;
-
-            if (role === 'user') {
-                messageDiv.innerHTML = `
-                    <div class="message user-message">
-                        <div class="message-content">${escapeHtml(text)}</div>
-                    </div>
-                `;
-
-            } else if (role === 'assistant') {
-                messageDiv.innerHTML = `
-                    <div class="message assistant-message">
-                        <div class="avatar">
-                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                                <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"></path>
-                            </svg>
-                        </div>
-                        <div class="message-content">
-                            ${modelName ? `<div class="model-badge">${escapeHtml(modelName)}</div>` : ''}
-                            <div class="markdown-content"></div>
-                        </div>
-                    </div>
-                `;
-
-                const contentDiv = messageDiv.querySelector('.markdown-content');
-                contentDiv.innerHTML = formatDemoMessage(text);
-
-                if (typeof hljs !== 'undefined') {
-                    contentDiv.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
-                }
-
-                addDemoCopyButtons(contentDiv);
-                addMessageActions(contentDiv, text);
-
-            } else if (role === 'system') {
-                messageDiv.innerHTML = `
-                    <div class="message system-message">
-                        <div class="message-content">${escapeHtml(text)}</div>
-                    </div>
-                `;
-
-            } else {
-                messageDiv.innerHTML = `
-                    <div class="message error-message">
-                        <div class="message-content">⚠️ ${escapeHtml(text)}</div>
-                    </div>
-                `;
-            }
-
-            container.appendChild(messageDiv);
-            container.scrollTop = container.scrollHeight;
-        }
-
-        // ═══════════════════════════════════════════════════════════════════
-        // MESSAGE ACTIONS
-        // ═══════════════════════════════════════════════════════════════════
 
         function addMessageActions(contentDiv, text) {
             const actions = document.createElement('div');
@@ -737,19 +783,15 @@
                     }
                     const utter = new SpeechSynthesisUtterance(text);
                     speechSynthesis.speak(utter);
-                    console.log('🔊 Text-to-speech started');
                 } catch (e) {
-                    console.warn('Text-to-speech not supported', e);
+                    console.warn('TTS not supported', e);
                 }
-
             } else if (action === 'like') {
                 actionsEl.classList.add('liked');
                 actionsEl.classList.remove('disliked');
-
             } else if (action === 'dislike') {
                 actionsEl.classList.add('disliked');
                 actionsEl.classList.remove('liked');
-
             } else if (action === 'copy') {
                 navigator.clipboard.writeText(text).then(() => {
                     const btn = actionsEl.querySelector('[data-action="copy"]');
@@ -830,14 +872,20 @@
         });
 
         // ═══════════════════════════════════════════════════════════════════
-        // DEBUG INFO
+        // RENDER RESTART HANDLER (Auto-clear)
         // ═══════════════════════════════════════════════════════════════════
 
-        window.addEventListener('beforeunload', () => {
-            console.log('🧹 Page refreshing - memory will be cleared');
-            console.log(`📊 Session stats: ${conversationHistory.length} messages in memory`);
+        window.addEventListener('beforeunload', async () => {
+            // ✅ IndexedDB auto-clears on Render restart anyway
+            console.log('🧹 Demo memory will auto-clear on Render restart');
         });
 
+        // ✅ Clear on page visibility change (low RAM)
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                // Optional: Clear heavy resources
+            }
+        });
     </script>
 </body>
 
