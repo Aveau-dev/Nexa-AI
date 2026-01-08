@@ -4919,3 +4919,269 @@ pre, code {
 }
 
 
+
+
+
+/* ===== ALIGNMENT FIXES ===== */
+
+/* Message container - proper flex alignment */
+.message-row {
+  display: flex;
+  width: 100%;
+  margin-bottom: var(--space-16);
+  animation: fadeIn var(--duration-normal) var(--ease-standard);
+}
+
+.user-row {
+  justify-content: flex-end;  /* User messages on RIGHT */
+}
+
+.assistant-row {
+  justify-content: flex-start;  /* Assistant on LEFT */
+  align-items: flex-start;  /* Top align avatar with content */
+}
+
+/* Message bubbles */
+.message {
+  display: flex;
+  gap: var(--space-12);
+  align-items: flex-start;  /* Align avatar to top */
+}
+
+.user-row .message {
+  max-width: 75%;
+  flex-direction: row-reverse;  /* Avatar on right for user */
+}
+
+.assistant-row .message {
+  max-width: 85%;
+  flex-direction: row;  /* Avatar on left for assistant */
+}
+
+/* ===== FILE ATTACHMENT UI ===== */
+
+.input-inner {
+  position: relative;
+  display: flex;
+  flex-direction: column;  /* Stack file preview above input */
+  gap: var(--space-8);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-12);
+  transition: var(--transition);
+}
+
+.input-row {
+  display: flex;
+  gap: var(--space-12);
+  align-items: flex-end;
+  width: 100%;
+}
+
+/* File attachment button */
+.attach-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-base);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: var(--transition);
+  flex-shrink: 0;
+}
+
+.attach-button:hover {
+  background: var(--color-secondary);
+  color: var(--color-primary);
+}
+
+/* File preview area */
+.file-preview-area {
+  display: none;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  padding: var(--space-8);
+  background: var(--color-secondary);
+  border-radius: var(--radius-base);
+}
+
+.file-preview-area.has-files {
+  display: flex;
+}
+
+.file-preview-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-6) var(--space-12);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-base);
+  font-size: var(--font-size-sm);
+  max-width: 180px;
+}
+
+.file-preview-icon {
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.file-preview-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+}
+
+.remove-file {
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  padding: var(--space-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  transition: var(--transition);
+  flex-shrink: 0;
+}
+
+.remove-file:hover {
+  background: var(--color-error);
+  color: white;
+}
+
+/* ===== CANVAS/WELCOME SCREEN STYLE ===== */
+
+.welcome-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-32) var(--space-20);
+  text-align: center;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.logo-icon-large {
+  width: 48px;
+  height: 48px;
+  background: var(--color-primary);
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--space-20);
+  font-size: var(--font-size-2xl);
+  color: var(--color-btn-primary-text);
+}
+
+.main-heading {
+  font-size: var(--font-size-4xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+  margin-bottom: var(--space-16);
+  letter-spacing: var(--letter-spacing-tight);
+  line-height: var(--line-height-tight);
+}
+
+.welcome-subtext {
+  font-size: var(--font-size-base);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-32);
+  line-height: var(--line-height-normal);
+}
+
+/* Suggestion cards in welcome */
+.suggestion-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-12);
+  max-width: 700px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.suggestion-card {
+  padding: var(--space-16) var(--space-20);
+  background: var(--color-surface);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  text-align: left;
+}
+
+.suggestion-card:hover {
+  border-color: var(--color-primary);
+  background: var(--color-secondary);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.suggestion-icon {
+  font-size: 20px;
+  color: var(--color-primary);
+}
+
+.suggestion-text {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+  line-height: var(--line-height-normal);
+}
+
+/* ===== MOBILE RESPONSIVE FIXES ===== */
+
+@media (max-width: 480px) {
+  .user-row .message,
+  .assistant-row .message {
+    max-width: 95%;
+  }
+
+  .file-preview-item {
+    max-width: 140px;
+  }
+
+  .attach-button {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+  }
+
+  .send-button {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+  }
+}
+
+/* ===== INPUT DISABLED STATE ===== */
+
+.input-disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.input-disabled #chat-input {
+  background: var(--color-secondary);
+}
+
+.input-disabled .attach-button {
+  cursor: not-allowed;
+}
