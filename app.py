@@ -780,11 +780,11 @@ def demo_chat():
         messages_history.append({"role": "user", "content": message})
         messages_analyzed = len(messages_history)
 
-        model = "anthropic/claude-3-haiku:free"
+        model = "google/gemma-3n-e2b-it:free"
 
         def generate():
             # Meta event
-            meta_json = json.dumps({"messages_analyzed": messages_analyzed, "model": "deepseek/deepseek-r1"})
+            meta_json = json.dumps({"messages_analyzed": messages_analyzed, "model": "Gemma 3 Nano"})
             yield 'event: meta\n' + 'data: ' + meta_json + '\n\n'
 
             try:
@@ -1541,6 +1541,7 @@ if __name__ == '__main__':
         port=port,
         debug=debug
     )
+
 
 
 
