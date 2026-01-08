@@ -139,10 +139,10 @@
             </div>
         </div>
         <div class="nav-right">
-            <button class="nav-button secondary" onclick="location.href='{{ url_for(\'login\') }}'">
+            <button class="nav-button secondary" onclick="location.href='{{ url_for('login') }}'">
                 Login
             </button>
-            <button class="nav-button primary" onclick="location.href='{{ url_for(\'signup\') }}'">
+            <button class="nav-button primary" onclick="location.href='{{ url_for('signup') }}'">
                 Sign up
             </button>
             <button class="nav-button icon-only" type="button" onclick="openTermsModal()" title="Help">
@@ -200,7 +200,7 @@
                             🎁 Demo Mode – Unlimited · No history saved ·
                             <a href="javascript:void(0)" onclick="openTermsModal()"
                                 style="text-decoration:underline;cursor:pointer;">Terms</a> ·
-                            <a href="{{ url_for(\'signup\') }}" style="font-weight: 600;">Sign up for permanent history</a>
+                            <a href="{{ url_for('signup') }}" style="font-weight: 600;">Sign up for permanent history</a>
                         </span>
                     </div>
                 </div>
@@ -598,8 +598,6 @@
                 }
 
                 addDemoCopyButtons(contentDiv);
-
-                // ✅ ADD MESSAGE ACTIONS (was missing the call in streaming)
                 addMessageActions(contentDiv, text);
             } else {
                 messageDiv.innerHTML = `
@@ -732,11 +730,10 @@
         }
 
         // ═══════════════════════════════════════════════════════════════════
-        // MESSAGE ACTIONS - FIXED AND VISIBLE
+        // MESSAGE ACTIONS
         // ═══════════════════════════════════════════════════════════════════
 
         function addMessageActions(contentDiv, text) {
-            // Check if actions already exist
             if (contentDiv.querySelector('.message-actions')) {
                 return;
             }
@@ -766,7 +763,6 @@
                 </button>
             `;
 
-            // Add click handlers
             actions.addEventListener('click', (e) => {
                 const btn = e.target.closest('.msg-btn');
                 if (btn) {
