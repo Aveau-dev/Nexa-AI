@@ -43,6 +43,82 @@
         }
     </script>
 
+    <!-- INLINE STYLES FOR MESSAGE ACTIONS -->
+    <style>
+        /* Ensure message actions are visible */
+        .message-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            padding-top: 8px;
+            border-top: 1px solid var(--color-border, rgba(255,255,255,0.1));
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+
+        .message-actions:hover {
+            opacity: 1;
+        }
+
+        .msg-btn {
+            background: transparent;
+            border: 1px solid var(--color-border, rgba(255,255,255,0.15));
+            color: var(--text-secondary, #aaa);
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.2s;
+        }
+
+        .msg-btn:hover {
+            background: var(--color-hover, rgba(255,255,255,0.1));
+            border-color: var(--primary-color, #19c37d);
+            color: var(--text-primary, #fff);
+        }
+
+        .msg-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .message-actions.liked .msg-btn[data-action="like"] {
+            background: rgba(25, 195, 125, 0.2);
+            border-color: #19c37d;
+            color: #19c37d;
+        }
+
+        .message-actions.disliked .msg-btn[data-action="dislike"] {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: #ef4444;
+            color: #ef4444;
+        }
+
+        /* Copy code button styles */
+        .copy-code-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            padding: 4px 8px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 4px;
+            color: #fff;
+            font-size: 0.75rem;
+            cursor: pointer;
+            opacity: 0.7;
+            transition: all 0.2s;
+        }
+
+        .copy-code-btn:hover {
+            opacity: 1;
+            background: rgba(255,255,255,0.2);
+        }
+    </style>
+
     {% if current_user.is_authenticated %}
     <script>
         // Already logged in → go straight to dashboard
@@ -52,7 +128,7 @@
 </head>
 
 <body class="ds-body">
-    <!-- Nav - FIXED: Clean text without spacing -->
+    <!-- Nav -->
     <nav class="top-nav">
         <div class="nav-left">
             <div class="logo-container">
@@ -183,22 +259,12 @@
         </div>
     </div>
 
-    <!-- ✅ PURE DEMO SCRIPT - NO MEMORY/INDEXEDDB -->
+    <!-- DEMO CHAT SCRIPT -->
     <script>
-        /**
-         * NexaAI Demo Page - ZERO PERSISTENCE VERSION
-         * ✅ No IndexedDB
-         * ✅ No localStorage
-         * ✅ No cookies
-         * ✅ Fresh on every page load
-         * ✅ Clean navigation text
-         * ✅ Professional error UI
-         */
-
         'use strict';
 
         // ═══════════════════════════════════════════════════════════════════
-        // STATE MANAGEMENT - ZERO PERSISTENCE
+        // STATE MANAGEMENT
         // ═══════════════════════════════════════════════════════════════════
 
         let isResponding = false;
@@ -216,7 +282,7 @@
                     headers: { "Content-Type": "application/json" }
                 });
                 await res.json().catch(() => ({}));
-                console.log('✅ Demo session initialized - ZERO PERSISTENCE MODE');
+                console.log('✅ Demo session initialized');
             } catch (e) {
                 console.warn("Auto demo login failed", e);
             }
@@ -239,7 +305,7 @@
                 sendBtn.addEventListener('click', handleSendClick);
             }
 
-            console.log('🚀 NexaAI Demo - PURE SESSION MODE (No memory)');
+            console.log('🚀 NexaAI Demo - Pure session mode');
         });
 
         // ═══════════════════════════════════════════════════════════════════
@@ -312,7 +378,7 @@
         }
 
         // ═══════════════════════════════════════════════════════════════════
-        // SEND MESSAGE - NO MEMORY VERSION
+        // SEND MESSAGE
         // ═══════════════════════════════════════════════════════════════════
 
         async function sendMessage(retryMessage = null) {
@@ -321,29 +387,23 @@
 
             if (!message) return;
 
-            // ✅ Store for retry only (not persisted)
             lastUserMessage = message;
 
-            // Hide welcome
             const welcome = document.getElementById('welcome-section');
             if (welcome) {
                 welcome.style.display = 'none';
             }
 
-            // Add user message to UI ONLY (no storage)
             addMessageUI(message, 'user');
 
-            // Clear input
             if (input && !retryMessage) {
                 input.value = '';
                 input.style.height = 'auto';
             }
 
-            // Show typing
             showTypingIndicator();
             setInputState(true);
 
-            // Create abort controller
             abortController = new AbortController();
 
             try {
@@ -538,6 +598,8 @@
                 }
 
                 addDemoCopyButtons(contentDiv);
+
+                // ✅ ADD MESSAGE ACTIONS (was missing the call in streaming)
                 addMessageActions(contentDiv, text);
             } else {
                 messageDiv.innerHTML = `
@@ -552,7 +614,7 @@
         }
 
         // ═══════════════════════════════════════════════════════════════════
-        // ERROR HANDLING - PROFESSIONAL UI
+        // ERROR HANDLING
         // ═══════════════════════════════════════════════════════════════════
 
         function handleError(errorMsg, retryable = false) {
@@ -669,59 +731,91 @@
             });
         }
 
+        // ═══════════════════════════════════════════════════════════════════
+        // MESSAGE ACTIONS - FIXED AND VISIBLE
+        // ═══════════════════════════════════════════════════════════════════
+
         function addMessageActions(contentDiv, text) {
+            // Check if actions already exist
+            if (contentDiv.querySelector('.message-actions')) {
+                return;
+            }
+
             const actions = document.createElement('div');
             actions.className = 'message-actions';
             actions.innerHTML = `
-                <button class="msg-btn" data-action="listen" title="Listen">
+                <button class="msg-btn" data-action="listen" title="Read aloud">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
                         <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
                         <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
                     </svg>
+                    Listen
                 </button>
-                <button class="msg-btn" data-action="like" title="Like">👍</button>
-                <button class="msg-btn" data-action="dislike" title="Dislike">👎</button>
-                <button class="msg-btn" data-action="copy" title="Copy">
+                <button class="msg-btn" data-action="copy" title="Copy response">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                         <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                     </svg>
+                    Copy
+                </button>
+                <button class="msg-btn" data-action="like" title="Good response">
+                    👍 Like
+                </button>
+                <button class="msg-btn" data-action="dislike" title="Bad response">
+                    👎 Dislike
                 </button>
             `;
 
+            // Add click handlers
             actions.addEventListener('click', (e) => {
                 const btn = e.target.closest('.msg-btn');
-                if (btn) handleMessageAction(btn.dataset.action, text, actions);
+                if (btn) {
+                    handleMessageAction(btn.dataset.action, text, actions);
+                }
             });
 
             contentDiv.appendChild(actions);
+            console.log('✅ Message actions added');
         }
 
         function handleMessageAction(action, text, actionsEl) {
+            console.log('Action clicked:', action);
+
             if (action === 'listen') {
                 try {
                     if (speechSynthesis.speaking) {
                         speechSynthesis.cancel();
+                        return;
                     }
                     const utter = new SpeechSynthesisUtterance(text);
+                    utter.rate = 1.0;
+                    utter.pitch = 1.0;
                     speechSynthesis.speak(utter);
+                    console.log('🔊 Reading aloud...');
                 } catch (e) {
                     console.warn('TTS not supported', e);
+                    alert('Text-to-speech is not supported in your browser');
                 }
             } else if (action === 'like') {
                 actionsEl.classList.add('liked');
                 actionsEl.classList.remove('disliked');
+                console.log('👍 Liked');
             } else if (action === 'dislike') {
                 actionsEl.classList.add('disliked');
                 actionsEl.classList.remove('liked');
+                console.log('👎 Disliked');
             } else if (action === 'copy') {
                 navigator.clipboard.writeText(text).then(() => {
                     const btn = actionsEl.querySelector('[data-action="copy"]');
                     if (btn) {
                         const originalHTML = btn.innerHTML;
-                        btn.textContent = '✓';
+                        btn.innerHTML = '✓ Copied';
                         setTimeout(() => { btn.innerHTML = originalHTML; }, 1500);
                     }
+                    console.log('📋 Copied to clipboard');
+                }).catch(err => {
+                    console.error('Copy failed:', err);
+                    alert('Failed to copy to clipboard');
                 });
             }
         }
