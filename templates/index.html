@@ -43,9 +43,9 @@
         }
     </script>
 
-    <!-- INLINE STYLES FOR MESSAGE ACTIONS -->
+    <!-- INLINE STYLES FOR MESSAGE ACTIONS & FILE ATTACHMENTS -->
     <style>
-        /* Ensure message actions are visible */
+        /* Message Actions */
         .message-actions {
             display: flex;
             gap: 8px;
@@ -97,7 +97,7 @@
             color: #ef4444;
         }
 
-        /* Copy code button styles */
+        /* Copy code button */
         .copy-code-btn {
             position: absolute;
             top: 8px;
@@ -116,6 +116,99 @@
         .copy-code-btn:hover {
             opacity: 1;
             background: rgba(255,255,255,0.2);
+        }
+
+        /* FILE ATTACHMENT STYLES */
+        .file-preview-area {
+            display: none;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 8px;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+        }
+
+        .file-preview-area.has-files {
+            display: flex;
+        }
+
+        .file-preview-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            background: rgba(25, 195, 125, 0.1);
+            border: 1px solid rgba(25, 195, 125, 0.3);
+            border-radius: 6px;
+            font-size: 0.85rem;
+            color: var(--text-primary, #fff);
+        }
+
+        .file-preview-icon {
+            color: #19c37d;
+            font-size: 1.1rem;
+        }
+
+        .file-preview-name {
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: var(--text-secondary, #aaa);
+        }
+
+        .remove-file {
+            background: rgba(239, 68, 68, 0.2);
+            border: none;
+            padding: 2px 6px;
+            cursor: pointer;
+            color: #ef4444;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+        }
+
+        .remove-file:hover {
+            background: #ef4444;
+            color: white;
+        }
+
+        .attach-btn {
+            background: transparent;
+            border: 1px solid var(--color-border, rgba(255,255,255,0.15));
+            color: var(--text-secondary, #aaa);
+            padding: 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .attach-btn:hover {
+            background: rgba(25, 195, 125, 0.1);
+            border-color: #19c37d;
+            color: #19c37d;
+        }
+
+        .attach-btn svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        /* Update input-inner to include attach button */
+        .input-inner {
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
         }
     </style>
 
@@ -168,6 +261,9 @@
                         <p style="color: var(--text-tertiary); margin-top: 0.25rem; font-size: 0.8rem;">
                             ⚡ Pure demo mode - No data saved, fresh on every refresh
                         </p>
+                        <p style="color: var(--text-tertiary); margin-top: 0.25rem; font-size: 0.8rem;">
+                            📎 You can attach images (in demo mode, just UI preview - sign up for full AI vision)
+                        </p>
                     </div>
 
                     <div id="messages-container"></div>
@@ -178,8 +274,19 @@
             <!-- Input -->
             <div class="input-wrapper fixed-input">
                 <div class="input-box">
+                    <!-- File Preview Area -->
+                    <div class="file-preview-area" id="file-preview-area"></div>
+
                     <div class="input-inner">
+                        <!-- Attach Button -->
+                        <button class="attach-btn" id="attach-btn" title="Attach files (images, PDFs)">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                            </svg>
+                        </button>
+
                         <textarea id="chat-input" placeholder="Ask anything..." rows="1"></textarea>
+
                         <button class="send-button" id="send-btn" title="Send message">
                             <!-- send icon -->
                             <span id="send-icon">
@@ -195,6 +302,7 @@
                             </span>
                         </button>
                     </div>
+
                     <div class="input-footer">
                         <span class="demo-notice">
                             🎁 Demo Mode – Unlimited · No history saved ·
@@ -207,6 +315,9 @@
             </div>
         </main>
     </div>
+
+    <!-- Hidden File Input -->
+    <input type="file" id="file-input" multiple accept="image/*,.pdf,.txt">
 
     <!-- Terms Modal -->
     <div id="terms-modal" class="modal-overlay" style="display:none;">
@@ -240,15 +351,15 @@
                 <table style="width: 100%; border-collapse: collapse; margin-top: 0.5rem;">
                     <tr style="border-bottom: 1px solid var(--color-border);">
                         <td style="padding: 0.5rem;"><strong>Demo</strong></td>
-                        <td style="padding: 0.5rem;">Unlimited, no history, DeepSeek R1</td>
+                        <td style="padding: 0.5rem;">Unlimited, no history, DeepSeek R1, file UI preview</td>
                     </tr>
                     <tr style="border-bottom: 1px solid var(--color-border);">
                         <td style="padding: 0.5rem;"><strong>Free Account</strong></td>
-                        <td style="padding: 0.5rem;">4 AI models, permanent history, image gen</td>
+                        <td style="padding: 0.5rem;">4 AI models, permanent history, image gen, file analysis</td>
                     </tr>
                     <tr>
                         <td style="padding: 0.5rem;"><strong>Pro (Free trial)</strong></td>
-                        <td style="padding: 0.5rem;">All 9 models, DeepThink, Web, unlimited</td>
+                        <td style="padding: 0.5rem;">All 9 models, DeepThink, Web, unlimited, priority</td>
                     </tr>
                 </table>
 
@@ -259,7 +370,7 @@
         </div>
     </div>
 
-    <!-- DEMO CHAT SCRIPT -->
+    <!-- DEMO CHAT SCRIPT WITH FILE ATTACHMENTS -->
     <script>
         'use strict';
 
@@ -270,6 +381,120 @@
         let isResponding = false;
         let abortController = null;
         let lastUserMessage = '';
+
+        // ═══════════════════════════════════════════════════════════════════
+        // FILE ATTACHMENT MANAGER
+        // ═══════════════════════════════════════════════════════════════════
+
+        class FileAttachmentManager {
+            constructor() {
+                this.attachedFiles = [];
+                this.maxFiles = 5;
+                this.maxFileSize = 10 * 1024 * 1024; // 10MB
+                this.allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp', 
+                                      'application/pdf', 'text/plain'];
+                this.init();
+            }
+
+            init() {
+                const attachBtn = document.getElementById('attach-btn');
+                const fileInput = document.getElementById('file-input');
+
+                if (attachBtn && fileInput) {
+                    attachBtn.addEventListener('click', () => fileInput.click());
+                    fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
+                }
+            }
+
+            handleFileSelect(event) {
+                const files = Array.from(event.target.files);
+
+                if (this.attachedFiles.length + files.length > this.maxFiles) {
+                    alert(`Maximum ${this.maxFiles} files allowed`);
+                    return;
+                }
+
+                files.forEach(file => {
+                    if (!this.allowedTypes.includes(file.type)) {
+                        alert(`File type not supported: ${file.name}`);
+                        return;
+                    }
+
+                    if (file.size > this.maxFileSize) {
+                        alert(`File too large (max 10MB): ${file.name}`);
+                        return;
+                    }
+
+                    this.attachedFiles.push({
+                        file: file,
+                        id: Date.now() + Math.random(),
+                        name: file.name,
+                        type: file.type,
+                        size: file.size
+                    });
+                });
+
+                this.renderFilePreview();
+                event.target.value = '';
+            }
+
+            renderFilePreview() {
+                const previewArea = document.getElementById('file-preview-area');
+
+                if (!previewArea) return;
+
+                if (this.attachedFiles.length === 0) {
+                    previewArea.classList.remove('has-files');
+                    previewArea.innerHTML = '';
+                    return;
+                }
+
+                previewArea.classList.add('has-files');
+                previewArea.innerHTML = this.attachedFiles.map(fileData => `
+                    <div class="file-preview-item" data-file-id="${fileData.id}">
+                        <span class="file-preview-icon">📎</span>
+                        <span class="file-preview-name" title="${fileData.name}">${fileData.name}</span>
+                        <button class="remove-file" onclick="fileManager.removeFile(${fileData.id})" title="Remove">
+                            ✕
+                        </button>
+                    </div>
+                `).join('');
+            }
+
+            removeFile(fileId) {
+                this.attachedFiles = this.attachedFiles.filter(f => f.id !== fileId);
+                this.renderFilePreview();
+            }
+
+            async getFilesAsBase64() {
+                const promises = this.attachedFiles.map(fileData => {
+                    return new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve({
+                            name: fileData.name,
+                            type: fileData.type,
+                            data: reader.result.split(',')[1]
+                        });
+                        reader.onerror = reject;
+                        reader.readAsDataURL(fileData.file);
+                    });
+                });
+
+                return Promise.all(promises);
+            }
+
+            clearFiles() {
+                this.attachedFiles = [];
+                this.renderFilePreview();
+            }
+
+            hasFiles() {
+                return this.attachedFiles.length > 0;
+            }
+        }
+
+        // Initialize file manager
+        const fileManager = new FileAttachmentManager();
 
         // ═══════════════════════════════════════════════════════════════════
         // INITIALIZATION
@@ -305,7 +530,7 @@
                 sendBtn.addEventListener('click', handleSendClick);
             }
 
-            console.log('🚀 NexaAI Demo - Pure session mode');
+            console.log('🚀 NexaAI Demo - Pure session mode with file attachments');
         });
 
         // ═══════════════════════════════════════════════════════════════════
@@ -336,6 +561,7 @@
             const btn = document.getElementById('send-btn');
             const sendIcon = document.getElementById('send-icon');
             const stopIcon = document.getElementById('stop-icon');
+            const attachBtn = document.getElementById('attach-btn');
 
             isResponding = locked;
 
@@ -348,6 +574,12 @@
             if (btn) {
                 btn.disabled = false;
                 btn.title = locked ? 'Stop response' : 'Send message';
+            }
+
+            if (attachBtn) {
+                attachBtn.disabled = locked;
+                attachBtn.style.opacity = locked ? '0.5' : '1';
+                attachBtn.style.pointerEvents = locked ? 'none' : 'auto';
             }
 
             if (sendIcon && stopIcon) {
@@ -385,7 +617,10 @@
             const input = document.getElementById('chat-input');
             const message = retryMessage || (input ? input.value.trim() : '');
 
-            if (!message) return;
+            // Allow sending if there's a message OR files attached
+            if (!message && !fileManager.hasFiles()) {
+                return;
+            }
 
             lastUserMessage = message;
 
@@ -394,7 +629,13 @@
                 welcome.style.display = 'none';
             }
 
-            addMessageUI(message, 'user');
+            // Show user message with file indication
+            let displayMessage = message;
+            if (fileManager.hasFiles()) {
+                const fileNames = fileManager.attachedFiles.map(f => f.name).join(', ');
+                displayMessage += `\n\n📎 Attached: ${fileNames}`;
+            }
+            addMessageUI(displayMessage, 'user');
 
             if (input && !retryMessage) {
                 input.value = '';
@@ -407,10 +648,21 @@
             abortController = new AbortController();
 
             try {
+                // Prepare payload with files
+                const payload = { message: message };
+
+                if (fileManager.hasFiles()) {
+                    payload.files = await fileManager.getFilesAsBase64();
+                    console.log(`📎 Sending ${payload.files.length} file(s)`);
+                }
+
+                // Clear files after preparing payload
+                fileManager.clearFiles();
+
                 const res = await fetch('/demo-chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: message }),
+                    body: JSON.stringify(payload),
                     signal: abortController.signal
                 });
 
@@ -771,12 +1023,9 @@
             });
 
             contentDiv.appendChild(actions);
-            console.log('✅ Message actions added');
         }
 
         function handleMessageAction(action, text, actionsEl) {
-            console.log('Action clicked:', action);
-
             if (action === 'listen') {
                 try {
                     if (speechSynthesis.speaking) {
