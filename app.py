@@ -62,7 +62,8 @@ app.config['JSON_AS_ASCII'] = False
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
 
 # ═══════════════════════════════════════════════════════════════════════════
-# SUPABASE DATABASE CONFIGURATION - FIXED
+# ═══════════════════════════════════════════════════════════════════════════
+# SUPABASE DATABASE CONFIGURATION - FIXED WITH URL ENCODING
 # ═══════════════════════════════════════════════════════════════════════════
 
 database_url = os.getenv('DATABASE_URL') or os.getenv('DATABASE_URI')
@@ -71,6 +72,34 @@ if database_url:
     # Fix postgres:// to postgresql://
     if database_url.startswith('postgres://'):
         database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
+    # 🔧 FIX: Handle special characters in password
+    # If password contains !@#$ etc., URL-encode them
+    try:
+        from urllib.parse import urlparse, urlunparse, quote
+
+        parsed = urlparse(database_url)
+
+        # If password has special chars, we need to rebuild the URL
+        if parsed.password and any(char in parsed.password for char in '!@#$%^&*()'):
+            # Extract components
+            scheme = parsed.scheme
+            username = parsed.username
+            password = quote(parsed.password, safe='')  # URL-encode password
+            hostname = parsed.hostname
+            port = parsed.port
+            path = parsed.path
+
+            # Rebuild the URL with encoded password
+            if port:
+                netloc = f"{username}:{password}@{hostname}:{port}"
+            else:
+                netloc = f"{username}:{password}@{hostname}"
+
+            database_url = urlunparse((scheme, netloc, path, '', '', ''))
+            log.info("✅ Database password URL-encoded (contains special characters)")
+    except Exception as e:
+        log.warning(f"⚠️ Could not parse DATABASE_URL: {e}")
 
     # ⚠️ CRITICAL: Add SSL mode for Supabase
     if 'supabase' in database_url.lower():
@@ -1557,6 +1586,7 @@ if __name__ == '__main__':
         port=port,
         debug=debug
     )
+
 
 
 
