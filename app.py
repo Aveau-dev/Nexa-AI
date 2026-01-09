@@ -936,14 +936,14 @@ def demo_login():
 
 @app.route('/demo-chat', methods=['POST'])
 def demo_chat():
-    """Demo chat endpoint - Google Gemini 2.0 Flash Exp (Free, Fast, Vision-enabled)"""
+    """Demo chat endpoint - Google Gemini 2.5 Flash Lite (Free, Fast, Vision-enabled)"""
     try:
         from flask import Response, stream_with_context
         import json
 
         ip_address = request.remote_addr
 
-        # Rate limit check
+        # Rate limit check (10 messages per hour)
         if not check_demo_rate_limit(ip_address):
             return jsonify({
                 "error": "You have reached your demo mode limit (10 messages/hour). Please sign up for unlimited access!"
@@ -1004,7 +1004,7 @@ def demo_chat():
         })
 
         # Model info
-        model_name = "gemini-2.5-flash-lite"
+        model_name = "gemini-2.0-flash-exp"  # ✅ Changed to more stable model
         messages_analyzed = len(conversation_parts)
 
         def generate():
@@ -1025,13 +1025,13 @@ def demo_chat():
                         "temperature": 0.7,
                         "top_p": 0.95,
                         "top_k": 40,
-                        "max_output_tokens": 8192,
+                        "max_output_tokens": 4096,  # ✅ Reduced for stability
                     },
                     safety_settings=[
-                        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-                        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-                        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-                        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+                        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
+                        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
+                        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
+                        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
                     ]
                 )
 
@@ -1043,10 +1043,11 @@ def demo_chat():
                     chat = model.start_chat(history=[])
                     current_message = conversation_parts[0]["parts"]
 
-                # Stream response
+                # Stream response with timeout
                 response = chat.send_message(
                     current_message,
-                    stream=True
+                    stream=True,
+                    request_options={"timeout": 30}  # ✅ Added timeout
                 )
 
                 full_response = ""
@@ -1068,25 +1069,35 @@ def demo_chat():
                 error_msg = str(e)
                 log.error(f"Demo chat error: {error_msg}")
 
-                # Handle specific errors
-                if 'quota' in error_msg.lower() or 'rate limit' in error_msg.lower():
+                # Handle specific errors with better messages
+                if '429' in error_msg or 'quota' in error_msg.lower() or 'rate limit' in error_msg.lower():
                     error_json = json.dumps({
-                        "error": "Demo usage limit reached. Please sign up for unlimited access!",
-                        "retryable": False
+                        "error": "Google API rate limit reached. Please wait a few minutes or sign up for unlimited access.",
+                        "retryable": True
+                    })
+                elif '503' in error_msg or 'service unavailable' in error_msg.lower():
+                    error_json = json.dumps({
+                        "error": "Google AI service is temporarily unavailable. Please try again in a moment.",
+                        "retryable": True
                     })
                 elif 'api key' in error_msg.lower() or 'authentication' in error_msg.lower():
                     error_json = json.dumps({
-                        "error": "Demo service configuration error. Please sign up for full access.",
+                        "error": "API configuration error. Please sign up for full access.",
                         "retryable": False
                     })
                 elif 'timeout' in error_msg.lower():
                     error_json = json.dumps({
-                        "error": "Request timeout. Please try a shorter message or sign up.",
+                        "error": "Request timeout. Please try a shorter message.",
+                        "retryable": True
+                    })
+                elif 'model' in error_msg.lower() and 'not found' in error_msg.lower():
+                    error_json = json.dumps({
+                        "error": "Model temporarily unavailable. Please sign up for access to stable models.",
                         "retryable": True
                     })
                 else:
                     error_json = json.dumps({
-                        "error": "Demo service error. Please try again or sign up for full access.",
+                        "error": "Service error. Please try again or sign up for full access.",
                         "retryable": True
                     })
 
@@ -1096,7 +1107,9 @@ def demo_chat():
 
     except Exception as e:
         log.error(f"Demo chat fatal error: {str(e)}")
-        return jsonify({"error": "Server error. Please try again or sign up for full access."}), 500
+        return jsonify({
+            "error": "Server error. Please try again or sign up for full access."
+        }), 500
 
 # ═══════════════════════════════════════════════════════════════════
 # ROUTES - CHAT MANAGEMENT
@@ -1710,4 +1723,5 @@ if __name__ == '__main__':
     log.info("=" * 70)
 
     app.run(host='0.0.0.0', port=port, debug=debug)
+
 
