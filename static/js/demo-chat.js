@@ -8,6 +8,7 @@ let abortController = null;
 let lastUserMessage = '';
 let currentFile = null;
 let currentFileType = null;
+let currentFileBase64 = null;
 let imageGenMode = false;
 
 // ═══════════════════════════════════════════════════════════════════
@@ -58,7 +59,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         imageGenBtn.addEventListener('click', toggleImageGenMode);
     }
     
-    console.log('🚀 NexaAI Demo - Enhanced mode with Vision + Image Gen + Files');
+    console.log('🚀 NexaAI Demo - Enhanced with Vision + Image Gen + Reasoning');
 });
 
 // ═══════════════════════════════════════════════════════════════════
@@ -68,42 +69,55 @@ function handleFileSelect(event) {
     const file = event.target.files[0];
     if (!file) return;
     
+    // Check file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+        alert('File too large. Maximum size is 10MB.');
+        return;
+    }
+    
     currentFile = file;
     currentFileType = file.type;
     
-    // Show file preview
+    // Convert to base64
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        currentFileBase64 = e.target.result.split(',')[1]; // Get base64 part only
+        showFilePreview(file.name);
+    };
+    reader.readAsDataURL(file);
+}
+
+function showFilePreview(filename) {
     const uploadArea = document.getElementById('file-upload-area');
     const preview = document.getElementById('file-preview');
     
+    if (!uploadArea || !preview) return;
+    
     const fileIcon = currentFileType.startsWith('image/') ? '🖼️' : '📄';
-    const fileName = file.name.length > 30 ? file.name.substring(0, 27) + '...' : file.name;
+    const displayName = filename.length > 30 ? filename.substring(0, 27) + '...' : filename;
     
     preview.innerHTML = `
-        <span class="file-preview-icon">${fileIcon}</span>
-        <span class="file-preview-name">${fileName}</span>
-        <button class="file-remove-btn" onclick="clearFile()">✕</button>
+        <div class="file-preview-item">
+            <span class="file-preview-icon">${fileIcon}</span>
+            <span class="file-preview-name">${displayName}</span>
+            <button class="file-remove-btn" onclick="clearFile()">✕</button>
+        </div>
     `;
     
     uploadArea.classList.add('active');
-    
-    // If it's an image, prepare for vision
-    if (currentFileType.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            currentFile = e.target.result; // Base64 data
-        };
-        reader.readAsDataURL(file);
-    }
 }
 
-function clearFile() {
+window.clearFile = function() {
     currentFile = null;
     currentFileType = null;
+    currentFileBase64 = null;
+    
     const uploadArea = document.getElementById('file-upload-area');
     const fileInput = document.getElementById('file-input');
-    uploadArea.classList.remove('active');
-    fileInput.value = '';
-}
+    
+    if (uploadArea) uploadArea.classList.remove('active');
+    if (fileInput) fileInput.value = '';
+};
 
 // ═══════════════════════════════════════════════════════════════════
 // IMAGE GENERATION MODE
@@ -113,10 +127,12 @@ function toggleImageGenMode() {
     const btn = document.getElementById('image-gen-btn');
     const input = document.getElementById('chat-input');
     
+    if (!btn || !input) return;
+    
     if (imageGenMode) {
         btn.style.background = 'var(--color-primary)';
         btn.style.color = 'var(--color-btn-primary-text)';
-        input.placeholder = 'Describe the image you want to generate...';
+        input.placeholder = '✨ Describe the image you want to generate...';
     } else {
         btn.style.background = 'transparent';
         btn.style.color = 'var(--color-text-secondary)';
@@ -181,49 +197,58 @@ function stopAIResponse() {
         abortController.abort();
     }
     removeTypingIndicator();
-    addMessageUI('⏸️ Response stopped by user', 'system');
+    addSystemMessage('⏸️ Response stopped by user');
     setInputState(false);
     isResponding = false;
     abortController = null;
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// SEND MESSAGE (ENHANCED WITH IMAGE GEN & VISION)
+// SEND MESSAGE (ENHANCED)
 // ═══════════════════════════════════════════════════════════════════
 async function sendMessage(retryMessage = null) {
     const input = document.getElementById('chat-input');
     const message = retryMessage || (input ? input.value.trim() : '');
     
-    if (!message && !currentFile) return;
+    if (!message && !currentFileBase64) {
+        return;
+    }
     
     lastUserMessage = message;
     
+    // Hide welcome section
     const welcome = document.getElementById('welcome-section');
     if (welcome) {
         welcome.style.display = 'none';
     }
     
-    // Handle Image Generation Mode
-    if (imageGenMode && message) {
+    // Check for image generation keywords (automatic detection)
+    const imageKeywords = ['draw', 'generate image', 'create image', 'make image', 'paint', 'show me', 'illustrate'];
+    const autoDetectImage = imageKeywords.some(kw => message.toLowerCase().includes(kw));
+    
+    // Handle Image Generation Mode or auto-detection
+    if ((imageGenMode || autoDetectImage) && message && !currentFileBase64) {
         addMessageUI(message, 'user');
         if (input && !retryMessage) {
             input.value = '';
             input.style.height = 'auto';
         }
-        imageGenMode = false;
-        toggleImageGenMode(); // Reset button
+        if (imageGenMode) {
+            imageGenMode = false;
+            toggleImageGenMode(); // Reset button
+        }
         await generateImage(message);
         return;
     }
     
     // Display user message with file indicator
-    if (currentFile && currentFileType.startsWith('image/')) {
-        addMessageUI(message + '\n\n🖼️ *Image attached for analysis*', 'user');
-    } else if (currentFile) {
-        addMessageUI(message + '\n\n📄 *File attached for analysis*', 'user');
-    } else {
-        addMessageUI(message, 'user');
+    let userMessageDisplay = message;
+    if (currentFileBase64 && currentFileType.startsWith('image/')) {
+        userMessageDisplay += '\n\n🖼️ *Image attached for analysis*';
+    } else if (currentFileBase64) {
+        userMessageDisplay += '\n\n📄 *File attached for analysis*';
     }
+    addMessageUI(userMessageDisplay, 'user');
     
     if (input && !retryMessage) {
         input.value = '';
@@ -238,12 +263,12 @@ async function sendMessage(retryMessage = null) {
     try {
         const payload = {
             message: message,
-            model: 'google/gemini-2.0-flash-exp:free' // Vision-enabled model
+            context: getContextMessages()
         };
         
         // Add image data if present
-        if (currentFile && currentFileType.startsWith('image/')) {
-            payload.image = currentFile.split(',')[1]; // Get base64 part
+        if (currentFileBase64 && currentFileType.startsWith('image/')) {
+            payload.image = currentFileBase64;
         }
         
         const res = await fetch('/demo-chat', {
@@ -253,7 +278,10 @@ async function sendMessage(retryMessage = null) {
             signal: abortController.signal
         });
         
-        clearFile(); // Clear file after sending
+        // Clear file after sending
+        if (currentFileBase64) {
+            window.clearFile();
+        }
         
         if (res.ok && res.headers.get('content-type')?.includes('text/event-stream')) {
             await handleSSEStream(res);
@@ -281,6 +309,38 @@ async function sendMessage(retryMessage = null) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// GET CONTEXT MESSAGES
+// ═══════════════════════════════════════════════════════════════════
+function getContextMessages() {
+    const container = document.getElementById('messages-container');
+    if (!container) return [];
+    
+    const messages = [];
+    const messageRows = container.querySelectorAll('.message-row:not(.typing-indicator):not(.system-row)');
+    
+    // Get last 6 messages for context
+    const recentMessages = Array.from(messageRows).slice(-6);
+    
+    recentMessages.forEach(row => {
+        const isUser = row.classList.contains('user-row');
+        const content = row.querySelector('.message-content');
+        if (content) {
+            let text = content.textContent || content.innerText || '';
+            // Remove file indicators
+            text = text.replace(/🖼️.*Image attached.*\*/gi, '').trim();
+            text = text.replace(/📄.*File attached.*\*/gi, '').trim();
+            
+            messages.push({
+                role: isUser ? 'user' : 'assistant',
+                content: text
+            });
+        }
+    });
+    
+    return messages;
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // IMAGE GENERATION
 // ═══════════════════════════════════════════════════════════════════
 async function generateImage(prompt) {
@@ -288,27 +348,86 @@ async function generateImage(prompt) {
     setInputState(true);
     
     try {
-        // Using Pollinations AI (free)
-        const cleanPrompt = encodeURIComponent(prompt);
-        const seed = Math.floor(Math.random() * 10000);
-        const imageUrl = `https://image.pollinations.ai/prompt/${cleanPrompt}?width=1024&height=1024&nologo=true&seed=${seed}`;
+        // Clean prompt for image generation
+        let cleanPrompt = prompt.toLowerCase();
+        const prefixes = ['draw', 'generate image', 'create image', 'make image', 'paint', 'show me', 'illustrate'];
+        prefixes.forEach(prefix => {
+            cleanPrompt = cleanPrompt.replace(prefix, '').trim();
+        });
+        cleanPrompt = cleanPrompt || prompt;
+        
+        // Using Pollinations AI (free and reliable)
+        const encoded = encodeURIComponent(cleanPrompt);
+        const seed = Math.floor(Math.random() * 100000);
+        const imageUrl = `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=1024&nologo=true&seed=${seed}`;
+        
+        // Wait a moment for image to generate
+        await new Promise(resolve => setTimeout(resolve, 1500));
         
         removeTypingIndicator();
         
-        // Display generated image
-        addMessageUI(`
-            <p>I've generated an image based on your prompt:</p>
-            <img src="${imageUrl}" alt="Generated image" class="message-image" onclick="window.open('${imageUrl}', '_blank')">
-            <p><small>Click image to view full size · Powered by Pollinations AI</small></p>
-        `, 'assistant');
+        // Display generated image with actions
+        const imageHTML = `
+            <p style="margin-bottom: 12px;">✨ I've generated an image based on your description:</p>
+            <div class="generated-image-container">
+                <img src="${imageUrl}" 
+                     alt="Generated image" 
+                     class="message-image" 
+                     onclick="window.open('${imageUrl}', '_blank')"
+                     onerror="this.parentElement.innerHTML='<p>⚠️ Image failed to load. Please try again.</p>'">
+            </div>
+            <div class="image-actions">
+                <button class="btn-small" onclick="downloadImage('${imageUrl}')">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                    </svg>
+                    Download
+                </button>
+                <button class="btn-small" onclick="window.open('${imageUrl}', '_blank')">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/>
+                    </svg>
+                    Open Full Size
+                </button>
+                <button class="btn-small" onclick="regenerateImage('${cleanPrompt}')">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0118.8-4.3M22 12.5a10 10 0 01-18.8 4.2"/>
+                    </svg>
+                    Regenerate
+                </button>
+            </div>
+            <p style="font-size: 13px; color: var(--color-text-secondary); margin-top: 8px;">
+                💡 Click image to view full size · Powered by Pollinations AI
+            </p>
+        `;
         
+        addMessageUI(imageHTML, 'assistant', null, true);
         setInputState(false);
     } catch (error) {
+        console.error('Image generation error:', error);
         removeTypingIndicator();
         handleError('Failed to generate image. Please try again.', true);
         setInputState(false);
     }
 }
+
+window.downloadImage = function(url) {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `nexa-ai-image-${Date.now()}.png`;
+    a.target = '_blank';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+};
+
+window.regenerateImage = function(prompt) {
+    const input = document.getElementById('chat-input');
+    if (input) {
+        input.value = `generate image of ${prompt}`;
+    }
+    sendMessage();
+};
 
 // ═══════════════════════════════════════════════════════════════════
 // SSE STREAMING (ENHANCED WITH REASONING)
@@ -355,7 +474,7 @@ async function handleSSEStream(response) {
                             messageElement = createStreamingMessage();
                             hasCreatedMessage = true;
                         } else if (data.delta && messageElement) {
-                            // Check for reasoning markers
+                            // Check for reasoning markers (DeepSeek R1)
                             if (data.delta.includes('<think>') || data.delta.includes('<reasoning>')) {
                                 isReasoningMode = true;
                             }
@@ -367,8 +486,9 @@ async function handleSSEStream(response) {
                                 }
                             } else {
                                 fullResponse += data.delta;
-                                updateStreamingMessage(messageElement, fullResponse, reasoning);
                             }
+                            
+                            updateStreamingMessage(messageElement, fullResponse, reasoning);
                         } else if (data.error) {
                             removeTypingIndicator();
                             handleError(data.error, data.retryable !== false);
@@ -390,6 +510,7 @@ async function handleSSEStream(response) {
         setInputState(false);
         abortController = null;
     } catch (error) {
+        if (error.name === 'AbortError') return;
         console.error('Stream error:', error);
         removeTypingIndicator();
         setInputState(false);
@@ -420,7 +541,7 @@ function createStreamingMessage() {
     `;
     
     container.appendChild(messageDiv);
-    container.scrollTop = container.scrollHeight;
+    scrollToBottom();
     
     return messageDiv.querySelector('.markdown-content');
 }
@@ -430,42 +551,45 @@ function updateStreamingMessage(element, text, reasoning = '') {
     
     let html = '';
     
-    // Add reasoning block if present
+    // Add reasoning block if present (DeepSeek R1)
     if (reasoning) {
         const cleanReasoning = reasoning
             .replace(/<think>|<reasoning>/gi, '')
-            .replace(/<\/think>|<\/reasoning>/gi, '');
+            .replace(/<\/think>|<\/reasoning>/gi, '')
+            .trim();
         
-        html += `
-            <div class="reasoning-block">
-                <div class="reasoning-header">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <path d="M12 16v-4m0-4h.01"></path>
-                    </svg>
-                    <span>Reasoning</span>
-                </div>
-                <div class="reasoning-content">${escapeHtml(cleanReasoning)}</div>
-            </div>
-        `;
+        if (cleanReasoning) {
+            html += `
+                <details class="reasoning-block" open>
+                    <summary class="reasoning-header">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
+                        <span>💭 Reasoning Process</span>
+                    </summary>
+                    <div class="reasoning-content">${formatMarkdown(cleanReasoning)}</div>
+                </details>
+            `;
+        }
     }
     
-    html += formatDemoMessage(text);
+    html += formatMarkdown(text);
     element.innerHTML = html;
     
+    // Syntax highlighting
     if (typeof hljs !== 'undefined') {
-        element.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
+        element.querySelectorAll('pre code').forEach(block => {
+            hljs.highlightElement(block);
+        });
     }
     
-    addDemoCopyButtons(element);
-    
-    const container = document.getElementById('messages-container');
-    if (container) {
-        container.scrollTop = container.scrollHeight;
-    }
+    addCopyButtons(element);
+    scrollToBottom();
 }
 
-function addMessageUI(text, role, reasoning = '') {
+function addMessageUI(text, role, reasoning = '', isHTML = false) {
     const container = document.getElementById('messages-container');
     if (!container) return;
     
@@ -493,46 +617,64 @@ function addMessageUI(text, role, reasoning = '') {
         `;
         
         const contentDiv = messageDiv.querySelector('.markdown-content');
-        
         let html = '';
+        
+        // Add reasoning block if present
         if (reasoning) {
             const cleanReasoning = reasoning
                 .replace(/<think>|<reasoning>/gi, '')
-                .replace(/<\/think>|<\/reasoning>/gi, '');
+                .replace(/<\/think>|<\/reasoning>/gi, '')
+                .trim();
             
-            html += `
-                <div class="reasoning-block">
-                    <div class="reasoning-header">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <path d="M12 16v-4m0-4h.01"></path>
-                        </svg>
-                        <span>Reasoning</span>
-                    </div>
-                    <div class="reasoning-content">${escapeHtml(cleanReasoning)}</div>
-                </div>
-            `;
+            if (cleanReasoning) {
+                html += `
+                    <details class="reasoning-block">
+                        <summary class="reasoning-header">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                            </svg>
+                            <span>💭 Reasoning Process</span>
+                        </summary>
+                        <div class="reasoning-content">${isHTML ? cleanReasoning : formatMarkdown(cleanReasoning)}</div>
+                    </details>
+                `;
+            }
         }
         
-        html += formatDemoMessage(text);
+        html += isHTML ? text : formatMarkdown(text);
         contentDiv.innerHTML = html;
         
+        // Syntax highlighting
         if (typeof hljs !== 'undefined') {
-            contentDiv.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
+            contentDiv.querySelectorAll('pre code').forEach(block => {
+                hljs.highlightElement(block);
+            });
         }
         
-        addDemoCopyButtons(contentDiv);
+        addCopyButtons(contentDiv);
         addMessageActions(contentDiv, text);
-    } else {
-        messageDiv.innerHTML = `
-            <div class="message system-message">
-                <div class="message-content">${escapeHtml(text)}</div>
-            </div>
-        `;
     }
     
     container.appendChild(messageDiv);
-    container.scrollTop = container.scrollHeight;
+    scrollToBottom();
+}
+
+function addSystemMessage(text) {
+    const container = document.getElementById('messages-container');
+    if (!container) return;
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message-row system-row';
+    messageDiv.innerHTML = `
+        <div class="message system-message">
+            <div class="message-content">${escapeHtml(text)}</div>
+        </div>
+    `;
+    
+    container.appendChild(messageDiv);
+    scrollToBottom();
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -553,7 +695,7 @@ function handleError(errorMsg, retryable = false) {
                 </svg>
             </div>
             <div class="message-content">
-                <div><strong>⚠️ Error</strong></div>
+                <div style="font-weight: 600; margin-bottom: 4px;">⚠️ Error</div>
                 <div>${escapeHtml(errorMsg)}</div>
     `;
     
@@ -568,14 +710,10 @@ function handleError(errorMsg, retryable = false) {
         `;
     }
     
-    errorHTML += `
-            </div>
-        </div>
-    `;
-    
+    errorHTML += '</div></div>';
     messageDiv.innerHTML = errorHTML;
     container.appendChild(messageDiv);
-    container.scrollTop = container.scrollHeight;
+    scrollToBottom();
 }
 
 window.retryLastMessage = async function() {
@@ -593,7 +731,7 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-function formatDemoMessage(text) {
+function formatMarkdown(text) {
     if (typeof marked === 'undefined') {
         return escapeHtml(text).replace(/\n/g, '<br>');
     }
@@ -601,18 +739,29 @@ function formatDemoMessage(text) {
     marked.setOptions({
         highlight(code, lang) {
             if (typeof hljs !== 'undefined' && lang && hljs.getLanguage(lang)) {
-                return hljs.highlight(code, { language: lang }).value;
+                try {
+                    return hljs.highlight(code, { language: lang }).value;
+                } catch (e) {
+                    console.warn('Highlight error:', e);
+                }
             }
-            return hljs ? hljs.highlightAuto(code).value : code;
+            return typeof hljs !== 'undefined' ? hljs.highlightAuto(code).value : escapeHtml(code);
         },
         breaks: true,
-        gfm: true
+        gfm: true,
+        headerIds: false,
+        mangle: false
     });
     
-    return marked.parse(text);
+    try {
+        return marked.parse(text);
+    } catch (e) {
+        console.error('Markdown parse error:', e);
+        return escapeHtml(text).replace(/\n/g, '<br>');
+    }
 }
 
-function addDemoCopyButtons(container) {
+function addCopyButtons(container) {
     container.querySelectorAll('pre code').forEach((codeBlock) => {
         const pre = codeBlock.parentElement;
         if (pre.querySelector('.copy-code-btn')) return;
@@ -622,8 +771,11 @@ function addDemoCopyButtons(container) {
         btn.textContent = 'Copy';
         btn.addEventListener('click', () => {
             navigator.clipboard.writeText(codeBlock.textContent).then(() => {
-                btn.textContent = 'Copied!';
-                setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+                btn.textContent = '✓ Copied';
+                setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+            }).catch(() => {
+                btn.textContent = '✗ Failed';
+                setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
             });
         });
         
@@ -642,24 +794,22 @@ function addMessageActions(contentDiv, text) {
     actions.className = 'message-actions';
     actions.innerHTML = `
         <button class="msg-btn" data-action="listen" title="Read aloud">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                 <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
                 <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
             </svg>
-            Listen
         </button>
         <button class="msg-btn" data-action="copy" title="Copy response">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
             </svg>
-            Copy
         </button>
         <button class="msg-btn" data-action="like" title="Good response">
-            👍 Like
+            👍
         </button>
         <button class="msg-btn" data-action="dislike" title="Bad response">
-            👎 Dislike
+            👎
         </button>
     `;
     
@@ -674,13 +824,16 @@ function addMessageActions(contentDiv, text) {
 }
 
 function handleMessageAction(action, text, actionsEl) {
+    // Remove HTML tags for text-only actions
+    const plainText = text.replace(/<[^>]*>/g, '').replace(/\n\n+/g, '\n');
+    
     if (action === 'listen') {
         try {
             if (speechSynthesis.speaking) {
                 speechSynthesis.cancel();
                 return;
             }
-            const utter = new SpeechSynthesisUtterance(text);
+            const utter = new SpeechSynthesisUtterance(plainText);
             utter.rate = 1.0;
             utter.pitch = 1.0;
             speechSynthesis.speak(utter);
@@ -694,12 +847,12 @@ function handleMessageAction(action, text, actionsEl) {
         actionsEl.classList.add('disliked');
         actionsEl.classList.remove('liked');
     } else if (action === 'copy') {
-        navigator.clipboard.writeText(text).then(() => {
+        navigator.clipboard.writeText(plainText).then(() => {
             const btn = actionsEl.querySelector('[data-action="copy"]');
             if (btn) {
                 const originalHTML = btn.innerHTML;
-                btn.innerHTML = '✓ Copied';
-                setTimeout(() => { btn.innerHTML = originalHTML; }, 1500);
+                btn.innerHTML = '✓';
+                setTimeout(() => { btn.innerHTML = originalHTML; }, 2000);
             }
         }).catch(() => {
             alert('Failed to copy to clipboard');
@@ -729,7 +882,7 @@ function showTypingIndicator() {
     `;
     
     container.appendChild(typingDiv);
-    container.scrollTop = container.scrollHeight;
+    scrollToBottom();
 }
 
 function removeTypingIndicator() {
@@ -737,37 +890,50 @@ function removeTypingIndicator() {
     if (indicator) indicator.remove();
 }
 
+function scrollToBottom() {
+    const container = document.getElementById('messages-container');
+    if (container) {
+        requestAnimationFrame(() => {
+            container.scrollTop = container.scrollHeight;
+        });
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // MODAL HANDLERS
 // ═══════════════════════════════════════════════════════════════════
-function openTermsModal() {
+window.openTermsModal = function() {
     const modal = document.getElementById('terms-modal');
     if (!modal) return;
     modal.style.display = 'flex';
     document.documentElement.style.overflow = 'hidden';
     document.body.style.overflow = 'hidden';
-}
+};
 
-function closeTermsModal() {
+window.closeTermsModal = function() {
     const modal = document.getElementById('terms-modal');
     if (!modal) return;
     modal.style.display = 'none';
     document.documentElement.style.overflow = '';
     document.body.style.overflow = '';
-}
+};
 
+// Close modal on outside click
 document.addEventListener('click', (e) => {
     const modal = document.getElementById('terms-modal');
     if (modal && e.target === modal) {
-        closeTermsModal();
+        window.closeTermsModal();
     }
 });
 
+// Keyboard shortcuts
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         if (isResponding) {
             stopAIResponse();
         }
-        closeTermsModal();
+        window.closeTermsModal();
     }
 });
+
+console.log('✅ NexaAI Demo Chat Enhanced - Loaded Successfully');
