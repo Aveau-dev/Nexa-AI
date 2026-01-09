@@ -5615,3 +5615,294 @@ pre, code {
     background-size: 1000px 100%;
     animation: shimmer 1.5s infinite;
 }
+
+
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   ENHANCED FEATURES - Image Generation, File Upload, Reasoning
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Generated Image Container */
+.generated-image-container {
+    position: relative;
+    margin: var(--space-12) 0;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: var(--color-secondary);
+}
+
+.message-image {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    display: block;
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.message-image:hover {
+    transform: scale(1.02);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+/* Image Action Buttons */
+.image-actions {
+    display: flex;
+    gap: var(--space-8);
+    margin-top: var(--space-12);
+    flex-wrap: wrap;
+}
+
+.btn-small {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-6);
+    padding: var(--space-6) var(--space-12);
+    background: var(--color-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-base);
+    color: var(--color-text);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: var(--font-family-base);
+}
+
+.btn-small:hover {
+    background: var(--color-secondary-hover);
+    border-color: var(--color-primary);
+    transform: translateY(-1px);
+}
+
+.btn-small svg {
+    flex-shrink: 0;
+}
+
+/* Enhanced Reasoning Block (Collapsible) */
+.reasoning-block {
+    background: rgba(var(--color-teal-500-rgb), 0.05);
+    border: 1px solid rgba(var(--color-teal-500-rgb), 0.2);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-16);
+    overflow: hidden;
+}
+
+.reasoning-block summary {
+    list-style: none;
+}
+
+.reasoning-block summary::-webkit-details-marker {
+    display: none;
+}
+
+.reasoning-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-8);
+    padding: var(--space-10) var(--space-14);
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-primary);
+    background: rgba(var(--color-teal-500-rgb), 0.03);
+    transition: background 0.2s ease;
+    user-select: none;
+}
+
+.reasoning-header:hover {
+    background: rgba(var(--color-teal-500-rgb), 0.08);
+}
+
+.reasoning-header svg {
+    flex-shrink: 0;
+}
+
+.reasoning-content {
+    padding: var(--space-14);
+    font-size: var(--font-size-sm);
+    line-height: 1.7;
+    color: var(--color-text-secondary);
+    border-top: 1px solid rgba(var(--color-teal-500-rgb), 0.15);
+}
+
+/* File Upload Area - Enhanced */
+.file-upload-area {
+    display: none;
+    padding: var(--space-8) var(--space-12);
+    background: rgba(var(--color-teal-500-rgb), 0.05);
+    border-radius: var(--radius-base);
+    margin-bottom: var(--space-8);
+}
+
+.file-upload-area.active {
+    display: block;
+}
+
+.file-preview-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-8);
+    padding: var(--space-6) var(--space-10);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+}
+
+.file-preview-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.file-preview-name {
+    flex: 1;
+    color: var(--color-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.file-remove-btn {
+    background: none;
+    border: none;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    padding: var(--space-4) var(--space-8);
+    border-radius: var(--radius-sm);
+    font-size: 18px;
+    line-height: 1;
+    transition: all 0.2s ease;
+}
+
+.file-remove-btn:hover {
+    background: var(--color-error);
+    color: white;
+}
+
+/* Attach & Image Gen Buttons */
+.attach-button,
+.generate-image-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-base);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.attach-button:hover,
+.generate-image-btn:hover {
+    background: var(--color-secondary);
+    color: var(--color-primary);
+}
+
+/* Modal Table for Terms */
+.modal-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: var(--space-16) 0;
+    font-size: var(--font-size-sm);
+}
+
+.modal-table td {
+    padding: var(--space-10);
+    border: 1px solid var(--color-border);
+}
+
+.modal-table td:first-child {
+    font-weight: 600;
+    width: 35%;
+    background: rgba(var(--color-teal-500-rgb), 0.05);
+}
+
+/* System Message Styling */
+.system-row {
+    justify-content: center;
+    margin: var(--space-8) 0;
+}
+
+.system-message {
+    background: rgba(var(--color-slate-500-rgb), 0.1);
+    border: 1px solid rgba(var(--color-slate-500-rgb), 0.2);
+    padding: var(--space-10) var(--space-16);
+    border-radius: var(--radius-base);
+    text-align: center;
+    max-width: 500px;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+}
+
+/* Welcome Section Enhancements */
+.welcome-hint {
+    font-size: var(--font-size-base);
+    color: var(--color-text-secondary);
+    margin: var(--space-12) 0 var(--space-8) 0;
+}
+
+.welcome-demo-notice {
+    font-size: var(--font-size-sm);
+    color: var(--color-primary);
+    margin-top: var(--space-8);
+    font-weight: 500;
+}
+
+/* Message Spacer */
+.message-spacer {
+    height: 20px;
+    flex-shrink: 0;
+}
+
+/* Smooth Fade-in Animation */
+@keyframes fadeSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(15px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.message-row {
+    animation: fadeSlideIn 0.3s ease-out;
+}
+
+/* Input Row for File Upload */
+.input-row {
+    display: flex;
+    gap: var(--space-12);
+    align-items: flex-end;
+    width: 100%;
+}
+
+/* Mobile Responsive Navigation Text */
+@media (min-width: 481px) {
+    .nav-short-text {
+        display: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .nav-full-text {
+        display: none;
+    }
+}
+
+/* Stop Icon Hidden by Default */
+#stop-icon {
+    display: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   END ENHANCED FEATURES
+   ═══════════════════════════════════════════════════════════════════ */
