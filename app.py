@@ -937,7 +937,7 @@ def demo_login():
 
 @app.route('/demo-chat', methods=['POST'])
 def demo_chat():
-    """Demo chat endpoint - DeepSeek R1 via OpenRouter - SSE Streaming"""
+    """Demo chat endpoint - Qwen 2.5 VL via OpenRouter - SSE Streaming (Vision + Text)"""
     try:
         from flask import Response, stream_with_context
         import json
@@ -955,8 +955,8 @@ def demo_chat():
         context = data.get('context', [])
         image_data = data.get('image')  # For vision support
 
-        if not message:
-            return jsonify({"error": "Message cannot be empty"}), 400
+        if not message and not image_data:
+            return jsonify({"error": "Message or image required"}), 400
 
         # Check OpenRouter API key
         if not OPENROUTER_API_KEY:
@@ -967,13 +967,13 @@ def demo_chat():
         # Build conversation history with context (last 6 messages)
         messages_history = []
 
-        # Add system message for DeepSeek R1
+        # Add system message for Qwen 2.5 VL
         messages_history.append({
             "role": "system",
-            "content": "You are an AI assistant made by Aarav (NexaAI team) and always give decorated response with markdown. Use proper formatting, code blocks, lists, and emphasis to make responses clear and visually appealing. When reasoning through complex problems, use <think> tags to show your thought process."
+            "content": "You are NexaAI, an intelligent assistant created by Aarav. Always provide well-formatted responses using markdown. Use proper formatting, code blocks, lists, tables, and emphasis to make responses clear and visually appealing. Be helpful, accurate, and concise."
         })
 
-        # Add conversation context
+        # Add conversation context (last 6 messages)
         for ctx_msg in context[-6:]:
             if isinstance(ctx_msg, dict) and 'role' in ctx_msg and 'content' in ctx_msg:
                 messages_history.append({
@@ -981,30 +981,39 @@ def demo_chat():
                     "content": ctx_msg['content']
                 })
 
-        # Add current user message
+        # Add current user message (with or without image)
         if image_data:
-            # Vision support with Gemini (fallback for image analysis)
+            # Qwen 2.5 VL supports multi-modal input
             messages_history.append({
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": message},
-                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}}
+                    {"type": "text", "text": message or "Analyze this image"},
+                    {
+                        "type": "image_url", 
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{image_data}"
+                        }
+                    }
                 ]
             })
-            model = "google/gemini-2.0-flash-exp:free"  # Use Gemini for vision
         else:
+            # Text-only message
             messages_history.append({
                 "role": "user",
                 "content": message
             })
-            model = "deepseek/deepseek-r1-0528:free"  # Use DeepSeek R1 for text
 
+        # Always use Qwen 2.5 VL (supports both text and vision)
+        model = "qwen/qwen-2.5-vl-7b-instruct:free"
         messages_analyzed = len(messages_history)
 
         def generate():
             """SSE generator for streaming responses"""
             # Send metadata
-            meta_json = json.dumps({"messages_analyzed": messages_analyzed})
+            meta_json = json.dumps({
+                "messages_analyzed": messages_analyzed,
+                "model": model
+            })
             yield f"event: meta\ndata: {meta_json}\n\n"
 
             try:
@@ -1012,7 +1021,7 @@ def demo_chat():
                 headers = {
                     "Authorization": f"Bearer {OPENROUTER_API_KEY}",
                     "Content-Type": "application/json",
-                    "HTTP-Referer": "https://nexaai.com",
+                    "HTTP-Referer": request.headers.get('Referer', 'https://nexa-ai.onrender.com'),
                     "X-Title": "NexaAI Demo"
                 }
 
@@ -1021,24 +1030,31 @@ def demo_chat():
                     "messages": messages_history,
                     "stream": True,
                     "temperature": 0.7,
-                    "max_tokens": 4000
+                    "max_tokens": 4096,
+                    "top_p": 0.9
                 }
 
-                resp = requests.post(url, headers=headers, json=payload, stream=True, timeout=60)
+                resp = requests.post(url, headers=headers, json=payload, stream=True, timeout=90)
 
                 if resp.status_code != 200:
+                    error_text = resp.text
+                    logger.error(f"OpenRouter API error: {resp.status_code} - {error_text}")
+                    
                     error_json = json.dumps({
-                        "error": f"Demo API error ({resp.status_code}). Please sign up.",
+                        "error": f"Demo API error ({resp.status_code}). Please try again or sign up for full access.",
                         "retryable": True
                     })
                     yield f"event: error\ndata: {error_json}\n\n"
                     return
 
+                full_response = ""
+                
                 for line in resp.iter_lines():
                     if line:
                         line_str = line.decode('utf-8')
                         if line_str.startswith('data: '):
                             chunk = line_str[6:].strip()
+                            
                             if chunk == "[DONE]":
                                 yield f"event: done\ndata: {{}}\n\n"
                                 break
@@ -1048,37 +1064,44 @@ def demo_chat():
                                 delta = chunk_data.get('choices', [{}])[0].get('delta', {}).get('content', '')
 
                                 if delta:
+                                    full_response += delta
                                     token_json = json.dumps({"delta": delta})
                                     yield f"event: token\ndata: {token_json}\n\n"
 
                             except json.JSONDecodeError:
                                 continue
 
+                # Log completion
+                logger.info(f"Demo chat completed: {len(full_response)} chars generated")
+
             except requests.exceptions.Timeout:
+                logger.error("Demo chat timeout")
                 error_json = json.dumps({
-                    "error": "Request timeout. Please try a shorter message.",
+                    "error": "Request timeout. Please try a shorter message or sign up for full access.",
                     "retryable": True
                 })
                 yield f"event: error\ndata: {error_json}\n\n"
 
             except requests.exceptions.RequestException as e:
+                logger.error(f"Demo chat request error: {str(e)}")
                 err_str = str(e).lower()
+                
                 if any(x in err_str for x in ['quota', 'rate limit', '429', 'too many']):
                     error_json = json.dumps({
-                        "error": "Demo limit reached. Please sign up!",
+                        "error": "Demo limit reached. Sign up for unlimited access!",
                         "retryable": False
                     })
                 else:
                     error_json = json.dumps({
-                        "error": "Demo service unavailable.",
+                        "error": "Demo service temporarily unavailable. Please try again.",
                         "retryable": True
                     })
                 yield f"event: error\ndata: {error_json}\n\n"
 
             except Exception as e:
-                log.error(f"Demo stream error: {str(e)}")
+                logger.error(f"Demo stream error: {str(e)}")
                 error_json = json.dumps({
-                    "error": "An error occurred.",
+                    "error": "An unexpected error occurred. Please try again.",
                     "retryable": True
                 })
                 yield f"event: error\ndata: {error_json}\n\n"
@@ -1086,10 +1109,8 @@ def demo_chat():
         return Response(stream_with_context(generate()), mimetype='text/event-stream')
 
     except Exception as e:
-        log.error(f"Demo chat fatal error: {str(e)}")
+        logger.error(f"Demo chat fatal error: {str(e)}")
         return jsonify({"error": "Server error. Please try again."}), 500
-
-
 
 # ═══════════════════════════════════════════════════════════════════
 # ROUTES - CHAT MANAGEMENT
@@ -1719,4 +1740,5 @@ if __name__ == '__main__':
     log.info("=" * 70)
 
     app.run(host='0.0.0.0', port=port, debug=debug)
+
 
