@@ -103,18 +103,18 @@ else:
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Supabase-optimized connection pool settings
+
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_pre_ping': True,
     'pool_recycle': 280,
-    'pool_size': 5,
-    'max_overflow': 10,
+    'pool_size': 3,
+    'max_overflow': 5,
     'pool_timeout': 30,
     'connect_args': {
-        'connect_timeout': 10,
-        'options': '-c statement_timeout=30000'
+        'connect_timeout': 10
     }
 }
+
 
 # File upload configuration
 app.config['UPLOAD_FOLDER'] = os.getenv('UPLOAD_FOLDER', 'uploads')
@@ -1740,5 +1740,6 @@ if __name__ == '__main__':
     log.info("=" * 70)
 
     app.run(host='0.0.0.0', port=port, debug=debug)
+
 
 
