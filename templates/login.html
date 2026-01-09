@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - NexaAI</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2319c37d' d='M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z'/></svg>">
+    <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2319c37d' d='M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z'/></svg>">
     <link rel="stylesheet" href="{{ url_for('static', filename='Css/style.css') }}">
 </head>
+
 <body>
     <div class="auth-page">
         <div class="auth-container">
@@ -14,8 +17,8 @@
             <div class="auth-features">
                 <div class="auth-logo">
                     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                        <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
+                        <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                        <path d="M2 17l10 5 10-5M2 12l10 5 10-5" />
                     </svg>
                     <h2>NexaAI</h2>
                 </div>
@@ -59,13 +62,13 @@
 
                 <!-- Flash Messages -->
                 {% with messages = get_flashed_messages(with_categories=true) %}
-                    {% if messages %}
-                        {% for category, message in messages %}
-                            <div class="alert alert-{{ category }}" role="alert">
-                                {{ message }}
-                            </div>
-                        {% endfor %}
-                    {% endif %}
+                {% if messages %}
+                {% for category, message in messages %}
+                <div class="alert alert-{{ category }}" role="alert">
+                    {{ message }}
+                </div>
+                {% endfor %}
+                {% endif %}
                 {% endwith %}
 
                 <!-- Error Display (JavaScript) -->
@@ -75,28 +78,14 @@
                 <form method="POST" action="{{ url_for('login') }}" id="loginForm">
                     <div class="form-group">
                         <label for="email">Email Address</label>
-                        <input 
-                            type="email" 
-                            id="email" 
-                            name="email" 
-                            class="form-control"
-                            placeholder="your@email.com"
-                            required
-                            autofocus
-                        >
+                        <input type="email" id="email" name="email" class="form-control" placeholder="your@email.com"
+                            required autofocus>
                     </div>
 
                     <div class="form-group">
                         <label for="password">Password</label>
-                        <input 
-                            type="password" 
-                            id="password" 
-                            name="password" 
-                            class="form-control"
-                            placeholder="Enter your password"
-                            required
-                            minlength="6"
-                        >
+                        <input type="password" id="password" name="password" class="form-control"
+                            placeholder="Enter your password" required minlength="6">
                     </div>
 
                     <button type="submit" class="btn btn--primary btn--full-width">
@@ -158,58 +147,51 @@
             successDiv.style.display = 'block';
         }
 
-        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+        // For both login.html and signup.html - Update form submit handler
+        document.getElementById('auth-form').addEventListener('submit', async (e) => {
             e.preventDefault();
+            const submitBtn = document.getElementById('submit-btn');
+            const errorDiv = document.getElementById('error-message');
 
-            const email = document.getElementById('email').value.trim();
-            const password = document.getElementById('password').value;
-            const btn = this.querySelector('button[type="submit"]');
-            const btnText = document.getElementById('btn-text');
+            // Disable button and show loading
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Please wait...';
+            errorDiv.style.display = 'none';
 
-            // Client-side validation
-            if (!email || !password) {
-                showError('Please fill in all fields');
-                return;
-            }
-
-            if (password.length < 6) {
-                showError('Password must be at least 6 characters long');
-                return;
-            }
-
-            // Disable button
-            btn.disabled = true;
-            btnText.textContent = 'Logging in...';
+            const formData = {
+                email: document.getElementById('email').value.trim(),
+                password: document.getElementById('password').value,
+                name: document.getElementById('name')?.value.trim() // Only for signup
+            };
 
             try {
-                const response = await fetch('{{ url_for("login") }}', {
+                const response = await fetch(window.location.pathname, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ email, password })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
                 });
 
                 const data = await response.json();
 
                 if (data.success) {
-                    showSuccess('Login successful! Redirecting...');
-                    setTimeout(() => {
-                        window.location.href = data.redirect || '{{ url_for("dashboard") }}';
-                    }, 500);
+                    window.location.href = data.redirect;
                 } else {
-                    showError(data.error || 'Login failed. Please try again.');
-                    btn.disabled = false;
-                    btnText.textContent = 'Login';
+                    // Show error message
+                    errorDiv.textContent = data.error || 'An error occurred. Please try again.';
+                    errorDiv.style.display = 'block';
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Sign In'; // or 'Sign Up'
                 }
             } catch (error) {
-                console.error('Login error:', error);
-                showError('Connection error. Please try again.');
-                btn.disabled = false;
-                btnText.textContent = 'Login';
+                console.error('Auth error:', error);
+                errorDiv.textContent = 'Network error. Please check your connection and try again.';
+                errorDiv.style.display = 'block';
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Sign In'; // or 'Sign Up'
             }
         });
+
     </script>
 </body>
-</html>
 
+</html>
