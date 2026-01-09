@@ -1025,7 +1025,7 @@ def demo_chat():
                         "temperature": 0.7,
                         "top_p": 0.95,
                         "top_k": 40,
-                        "max_output_tokens": 4096,  # ✅ Reduced for stability
+                        
                     },
                     safety_settings=[
                         {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
@@ -1723,5 +1723,6 @@ if __name__ == '__main__':
     log.info("=" * 70)
 
     app.run(host='0.0.0.0', port=port, debug=debug)
+
 
 
