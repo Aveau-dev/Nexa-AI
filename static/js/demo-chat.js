@@ -59,7 +59,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         imageGenBtn.addEventListener('click', toggleImageGenMode);
     }
     
-    console.log('🚀 NexaAI Demo - Enhanced with Vision + Image Gen + Reasoning');
+    console.log('🚀 NexaAI Demo - Qwen 2.5 VL with Vision + Image Gen');
 });
 
 // ═══════════════════════════════════════════════════════════════════
@@ -81,7 +81,7 @@ function handleFileSelect(event) {
     // Convert to base64
     const reader = new FileReader();
     reader.onload = (e) => {
-        currentFileBase64 = e.target.result.split(',')[1]; // Get base64 part only
+        currentFileBase64 = e.target.result.split(',')[1];
         showFilePreview(file.name);
     };
     reader.readAsDataURL(file);
@@ -235,7 +235,7 @@ async function sendMessage(retryMessage = null) {
         }
         if (imageGenMode) {
             imageGenMode = false;
-            toggleImageGenMode(); // Reset button
+            toggleImageGenMode();
         }
         await generateImage(message);
         return;
@@ -368,38 +368,37 @@ async function generateImage(prompt) {
         
         // Display generated image with actions
         const imageHTML = `
-            <p style="margin-bottom: 12px;">✨ I've generated an image based on your description:</p>
-            <div class="generated-image-container">
-                <img src="${imageUrl}" 
-                     alt="Generated image" 
-                     class="message-image" 
-                     onclick="window.open('${imageUrl}', '_blank')"
-                     onerror="this.parentElement.innerHTML='<p>⚠️ Image failed to load. Please try again.</p>'">
-            </div>
-            <div class="image-actions">
-                <button class="btn-small" onclick="downloadImage('${imageUrl}')">
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-                    </svg>
-                    Download
-                </button>
-                <button class="btn-small" onclick="window.open('${imageUrl}', '_blank')">
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/>
-                    </svg>
-                    Open Full Size
-                </button>
-                <button class="btn-small" onclick="regenerateImage('${cleanPrompt}')">
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0118.8-4.3M22 12.5a10 10 0 01-18.8 4.2"/>
-                    </svg>
-                    Regenerate
-                </button>
-            </div>
-            <p style="font-size: 13px; color: var(--color-text-secondary); margin-top: 8px;">
-                💡 Click image to view full size · Powered by Pollinations AI
-            </p>
-        `;
+<p style="margin-bottom: 12px;">✨ I've generated an image based on your description:</p>
+<div class="generated-image-container">
+    <img src="${imageUrl}" 
+         alt="Generated image" 
+         class="message-image" 
+         onclick="window.open('${imageUrl}', '_blank')"
+         onerror="this.parentElement.innerHTML='<p>⚠️ Image failed to load. Please try again.</p>'">
+</div>
+<div class="image-actions">
+    <button class="btn-small" onclick="downloadImage('${imageUrl}')">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+        </svg>
+        Download
+    </button>
+    <button class="btn-small" onclick="window.open('${imageUrl}', '_blank')">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/>
+        </svg>
+        Open Full Size
+    </button>
+    <button class="btn-small" onclick="regenerateImage('${cleanPrompt}')">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0118.8-4.3M22 12.5a10 10 0 01-18.8 4.2"/>
+        </svg>
+        Regenerate
+    </button>
+</div>
+<p style="font-size: 13px; color: var(--color-text-secondary); margin-top: 8px;">
+    💡 Click image to view full size · Powered by Pollinations AI
+</p>`;
         
         addMessageUI(imageHTML, 'assistant', null, true);
         setInputState(false);
@@ -430,7 +429,7 @@ window.regenerateImage = function(prompt) {
 };
 
 // ═══════════════════════════════════════════════════════════════════
-// SSE STREAMING (ENHANCED WITH REASONING)
+// SSE STREAMING (ENHANCED)
 // ═══════════════════════════════════════════════════════════════════
 async function handleSSEStream(response) {
     const reader = response.body.getReader();
@@ -474,7 +473,7 @@ async function handleSSEStream(response) {
                             messageElement = createStreamingMessage();
                             hasCreatedMessage = true;
                         } else if (data.delta && messageElement) {
-                            // Check for reasoning markers (DeepSeek R1)
+                            // Check for reasoning markers
                             if (data.delta.includes('<think>') || data.delta.includes('<reasoning>')) {
                                 isReasoningMode = true;
                             }
@@ -488,7 +487,8 @@ async function handleSSEStream(response) {
                                 fullResponse += data.delta;
                             }
                             
-                            updateStreamingMessage(messageElement, fullResponse, reasoning);
+                            // 👇 FIX: Trim whitespace before updating
+                            updateStreamingMessage(messageElement, fullResponse.trimStart(), reasoning);
                         } else if (data.error) {
                             removeTypingIndicator();
                             handleError(data.error, data.retryable !== false);
@@ -505,7 +505,7 @@ async function handleSSEStream(response) {
         
         removeTypingIndicator();
         if (fullResponse && !hasCreatedMessage) {
-            addMessageUI(fullResponse, 'assistant', reasoning);
+            addMessageUI(fullResponse.trim(), 'assistant', reasoning);
         }
         setInputState(false);
         abortController = null;
@@ -519,7 +519,7 @@ async function handleSSEStream(response) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// UI FUNCTIONS (ENHANCED)
+// UI FUNCTIONS (ENHANCED WITH FIX)
 // ═══════════════════════════════════════════════════════════════════
 function createStreamingMessage() {
     const container = document.getElementById('messages-container');
@@ -534,9 +534,7 @@ function createStreamingMessage() {
                     <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"></path>
                 </svg>
             </div>
-            <div class="message-content">
-                <div class="markdown-content"></div>
-            </div>
+            <div class="message-content markdown-content"></div>
         </div>
     `;
     
@@ -549,9 +547,11 @@ function createStreamingMessage() {
 function updateStreamingMessage(element, text, reasoning = '') {
     if (!element) return;
     
+    // 👇 FIX: Trim text to remove leading/trailing whitespace
+    const trimmedText = text.trim();
     let html = '';
     
-    // Add reasoning block if present (DeepSeek R1)
+    // Add reasoning block if present
     if (reasoning) {
         const cleanReasoning = reasoning
             .replace(/<think>|<reasoning>/gi, '')
@@ -560,22 +560,21 @@ function updateStreamingMessage(element, text, reasoning = '') {
         
         if (cleanReasoning) {
             html += `
-                <details class="reasoning-block" open>
-                    <summary class="reasoning-header">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                        </svg>
-                        <span>💭 Reasoning Process</span>
-                    </summary>
-                    <div class="reasoning-content">${formatMarkdown(cleanReasoning)}</div>
-                </details>
-            `;
+<details class="reasoning-block" open>
+    <summary class="reasoning-header">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+        <span>💭 Reasoning Process</span>
+    </summary>
+    <div class="reasoning-content">${formatMarkdown(cleanReasoning)}</div>
+</details>`;
         }
     }
     
-    html += formatMarkdown(text);
+    html += formatMarkdown(trimmedText);
     element.innerHTML = html;
     
     // Syntax highlighting
@@ -593,13 +592,16 @@ function addMessageUI(text, role, reasoning = '', isHTML = false) {
     const container = document.getElementById('messages-container');
     if (!container) return;
     
+    // 👇 FIX: Trim text before processing
+    const trimmedText = text.trim();
+    
     const messageDiv = document.createElement('div');
     messageDiv.className = `message-row ${role}-row`;
     
     if (role === 'user') {
         messageDiv.innerHTML = `
             <div class="message user-message">
-                <div class="message-content">${escapeHtml(text).replace(/\n/g, '<br>')}</div>
+                <div class="message-content">${escapeHtml(trimmedText).replace(/\n/g, '<br>')}</div>
             </div>
         `;
     } else if (role === 'assistant') {
@@ -610,9 +612,7 @@ function addMessageUI(text, role, reasoning = '', isHTML = false) {
                         <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"></path>
                     </svg>
                 </div>
-                <div class="message-content">
-                    <div class="markdown-content"></div>
-                </div>
+                <div class="message-content markdown-content"></div>
             </div>
         `;
         
@@ -628,22 +628,21 @@ function addMessageUI(text, role, reasoning = '', isHTML = false) {
             
             if (cleanReasoning) {
                 html += `
-                    <details class="reasoning-block">
-                        <summary class="reasoning-header">
-                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="12" cy="12" r="10"></circle>
-                                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                                <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                            </svg>
-                            <span>💭 Reasoning Process</span>
-                        </summary>
-                        <div class="reasoning-content">${isHTML ? cleanReasoning : formatMarkdown(cleanReasoning)}</div>
-                    </details>
-                `;
+<details class="reasoning-block">
+    <summary class="reasoning-header">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+        <span>💭 Reasoning Process</span>
+    </summary>
+    <div class="reasoning-content">${isHTML ? cleanReasoning : formatMarkdown(cleanReasoning)}</div>
+</details>`;
             }
         }
         
-        html += isHTML ? text : formatMarkdown(text);
+        html += isHTML ? trimmedText : formatMarkdown(trimmedText);
         contentDiv.innerHTML = html;
         
         // Syntax highlighting
@@ -654,7 +653,7 @@ function addMessageUI(text, role, reasoning = '', isHTML = false) {
         }
         
         addCopyButtons(contentDiv);
-        addMessageActions(contentDiv, text);
+        addMessageActions(contentDiv, trimmedText);
     }
     
     container.appendChild(messageDiv);
@@ -736,6 +735,9 @@ function formatMarkdown(text) {
         return escapeHtml(text).replace(/\n/g, '<br>');
     }
     
+    // 👇 FIX: Trim text before rendering
+    const trimmed = text.trim();
+    
     marked.setOptions({
         highlight(code, lang) {
             if (typeof hljs !== 'undefined' && lang && hljs.getLanguage(lang)) {
@@ -754,10 +756,12 @@ function formatMarkdown(text) {
     });
     
     try {
-        return marked.parse(text);
+        const rendered = marked.parse(trimmed);
+        // 👇 FIX: Trim rendered HTML to remove extra whitespace
+        return rendered.trim();
     } catch (e) {
         console.error('Markdown parse error:', e);
-        return escapeHtml(text).replace(/\n/g, '<br>');
+        return escapeHtml(trimmed).replace(/\n/g, '<br>');
     }
 }
 
@@ -824,7 +828,6 @@ function addMessageActions(contentDiv, text) {
 }
 
 function handleMessageAction(action, text, actionsEl) {
-    // Remove HTML tags for text-only actions
     const plainText = text.replace(/<[^>]*>/g, '').replace(/\n\n+/g, '\n');
     
     if (action === 'listen') {
@@ -936,4 +939,4 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-console.log('✅ NexaAI Demo Chat Enhanced - Loaded Successfully');
+console.log('✅ NexaAI Demo - Qwen 2.5 VL Enhanced - Loaded Successfully');
