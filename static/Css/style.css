@@ -5185,3 +5185,143 @@ pre, code {
 .input-disabled .attach-button {
   cursor: not-allowed;
 }
+
+
+/* ============================================
+   FIX: Remove Image Icon & Improve Send Button
+   ============================================ */
+
+/* 1. HIDE the attachment/paperclip icon */
+.attach-button,
+button[onclick*="attachFile"],
+.file-attach-btn,
+input[type="file"] + label,
+label[for="image-upload"] {
+    display: none !important;
+}
+
+/* 2. Clean up input area without attachment button */
+.input-inner {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    padding: 12px;
+    transition: all 0.2s ease;
+}
+
+.input-row {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    width: 100%;
+}
+
+/* 3. IMPROVED Send Button - Proper styling */
+.send-button,
+#send-btn,
+button[onclick*="sendMessage"] {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    background: var(--color-primary);
+    border: none;
+    border-radius: 10px;
+    color: var(--color-btn-primary-text);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.send-button:hover:not(:disabled),
+#send-btn:hover:not(:disabled) {
+    background: var(--color-primary-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(var(--color-teal-500-rgb), 0.3);
+}
+
+.send-button:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.send-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Send button icon sizing */
+.send-button svg,
+#send-btn svg {
+    width: 20px;
+    height: 20px;
+    display: block;
+}
+
+/* 4. Input field takes full available space */
+#chat-input,
+textarea[name="message"] {
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--color-text);
+    font-size: 16px;
+    font-family: var(--font-family-base);
+    resize: none;
+    outline: none;
+    max-height: 200px;
+    line-height: 1.5;
+    padding: 0;
+}
+
+#chat-input::placeholder {
+    color: var(--color-text-secondary);
+    opacity: 0.6;
+}
+
+/* 5. Mobile responsive adjustments */
+@media (max-width: 480px) {
+    .send-button {
+        width: 40px;
+        height: 40px;
+        min-width: 40px;
+    }
+
+    .send-button svg {
+        width: 18px;
+        height: 18px;
+    }
+}
+
+/* 6. Remove any image upload related elements */
+.image-upload-container,
+.file-upload-trigger,
+.attachment-area {
+    display: none !important;
+}
+
+/* 7. Clean input wrapper */
+.input-wrapper {
+    position: sticky;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 1rem;
+    background: var(--color-background);
+    border-top: 1px solid var(--color-border);
+    z-index: 50;
+}
+
+.input-box {
+    max-width: 900px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+/* END OF FIX */
+
