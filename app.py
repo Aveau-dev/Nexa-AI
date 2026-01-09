@@ -213,73 +213,60 @@ def check_demo_rate_limit(ip_address):
 
 FREE_MODELS = [
     {
-        'id': 'gemini-flash',
-        'name': 'Gemini 2.5 Flash',
-        'model': 'gemini-2.0-flash-exp',
-        'provider': 'google',
-        'vision': True,
-        'tier': 'free',
-        'rank': 1,
-        'description': '⚡ Fast and efficient with vision',
-        'speed': 'Very Fast',
-        'context': '1M tokens',
-        'demo_enabled': True
+        "id": "deepseek-r1",
+        "name": "DeepSeek R1 (Reasoning)",
+        "model": "deepseek/deepseek-r1-0528:free",
+        "provider": "openrouter",
+        "vision": False,
+        "tier": "free",
+        "rank": 1,
+        "description": "Advanced reasoning AI - Shows thought process",
+        "speed": "Medium",
+        "context": "64K tokens",
+        "demo_enabled": True,
+        "has_reasoning": True
     },
     {
-        'id': 'nexa-llama',
-        'name': 'Nexa Llama 3.2 (Local)',
-        'model': 'llama-3.2-1b-instruct',
-        'provider': 'nexa',
-        'vision': False,
-        'tier': 'free',
-        'rank': 2,
-        'description': '🖥️ Private local AI - No API key needed',
-        'speed': 'Fast',
-        'context': '128K tokens',
-        'requires_nexa': True,
-        'demo_enabled': False
+        "id": "gemini-flash",
+        "name": "Gemini 2.0 Flash",
+        "model": "google/gemini-2.0-flash-exp:free",
+        "provider": "openrouter",
+        "vision": True,
+        "tier": "free",
+        "rank": 2,
+        "description": "Fast with vision support - Image analysis",
+        "speed": "Very Fast",
+        "context": "1M tokens",
+        "demo_enabled": True
     },
     {
-        'id': 'gpt-3.5-turbo',
-        'name': 'ChatGPT 3.5 Turbo',
-        'model': 'openai/gpt-3.5-turbo',
-        'provider': 'openrouter',
-        'vision': False,
-        'tier': 'free',
-        'rank': 3,
-        'description': '🤖 OpenAI GPT-3.5 - Fast and reliable',
-        'speed': 'Fast',
-        'context': '16K tokens',
-        'demo_enabled': False
+        "id": "gpt-3.5-turbo",
+        "name": "ChatGPT 3.5 Turbo",
+        "model": "openai/gpt-3.5-turbo",
+        "provider": "openrouter",
+        "vision": False,
+        "tier": "free",
+        "rank": 3,
+        "description": "OpenAI GPT-3.5 - Fast and reliable",
+        "speed": "Fast",
+        "context": "16K tokens",
+        "demo_enabled": False
     },
     {
-        'id': 'claude-haiku',
-        'name': 'Claude 3 Haiku',
-        'model': 'anthropic/claude-3-haiku',
-        'provider': 'openrouter',
-        'vision': True,
-        'tier': 'free',
-        'rank': 4,
-        'description': '🎨 Fast Claude with vision support',
-        'speed': 'Very Fast',
-        'context': '200K tokens',
-        'demo_enabled': False
-    },
-    {
-        'id': 'deepseek-chat',
-        'name': 'DeepSeek Chat',
-        'model': 'deepseek/deepseek-chat',
-        'provider': 'openrouter',
-        'vision': False,
-        'tier': 'free',
-        'limit': 50,
-        'rank': 5,
-        'description': '💡 Powerful for code & reasoning (50/day)',
-        'speed': 'Fast',
-        'context': '64K tokens',
-        'demo_enabled': False
+        "id": "claude-haiku",
+        "name": "Claude 3 Haiku",
+        "model": "anthropic/claude-3-haiku",
+        "provider": "openrouter",
+        "vision": True,
+        "tier": "free",
+        "rank": 4,
+        "description": "Fast Claude with vision support",
+        "speed": "Very Fast",
+        "context": "200K tokens",
+        "demo_enabled": False
     }
 ]
+
 
 PREMIUM_MODELS = [
     {
@@ -780,93 +767,122 @@ def demo_login():
 
 
 
-@app.route("/demo-chat", methods=["POST"])
+@app.route('/demo-chat', methods=['POST'])
 def demo_chat():
-    """Demo chat endpoint - Gemma 3 Nano via OpenRouter SSE Streaming"""
+    """Demo chat endpoint - DeepSeek R1 via OpenRouter - SSE Streaming"""
     try:
         from flask import Response, stream_with_context
         import json
 
         ip_address = request.remote_addr
-
+        
         # Rate limit check
         if not check_demo_rate_limit(ip_address):
             return jsonify({
-                'error': '⏰ You have reached your demo mode limit (10 messages/hour). Please sign up for unlimited access!'
+                "error": "You have reached your demo mode limit (10 messages/hour). Please sign up for unlimited access!"
             }), 429
 
         data = request.get_json() or {}
-        message = (data.get("message") or "").strip()
-        context = data.get("context", [])
+        message = data.get('message', '').strip()
+        context = data.get('context', [])
+        image_data = data.get('image')  # For vision support
 
         if not message:
-            return jsonify({'error': 'Message cannot be empty'}), 400
+            return jsonify({"error": "Message cannot be empty"}), 400
 
         # Check OpenRouter API key
         if not OPENROUTER_API_KEY:
             return jsonify({
-                'error': 'Demo mode requires OpenRouter API key. Please sign up for full access.'
+                "error": "Demo mode requires OpenRouter API key. Please sign up for full access."
             }), 503
 
         # Build conversation history with context (last 6 messages)
         messages_history = []
+        
+        # Add system message for DeepSeek R1
+        messages_history.append({
+            "role": "system",
+            "content": "You are an AI assistant made by Aarav (NexaAI team) and always give decorated response with markdown. Use proper formatting, code blocks, lists, and emphasis to make responses clear and visually appealing. When reasoning through complex problems, use <think> tags to show your thought process."
+        })
+        
+        # Add conversation context
         for ctx_msg in context[-6:]:
             if isinstance(ctx_msg, dict) and 'role' in ctx_msg and 'content' in ctx_msg:
                 messages_history.append({
                     "role": ctx_msg['role'],
                     "content": ctx_msg['content']
                 })
-        messages_history.append({"role": "user", "content": message})
+        
+        # Add current user message
+        if image_data:
+            # Vision support with Gemini (fallback for image analysis)
+            messages_history.append({
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": message},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}}
+                ]
+            })
+            model = "google/gemini-2.0-flash-exp:free"  # Use Gemini for vision
+        else:
+            messages_history.append({
+                "role": "user",
+                "content": message
+            })
+            model = "deepseek/deepseek-r1-0528:free"  # Use DeepSeek R1 for text
+
         messages_analyzed = len(messages_history)
 
-        model = "google/gemma-3n-e2b-it:free"
-
         def generate():
-            # ✅ REMOVED model name from meta - won't show badge
+            """SSE generator for streaming responses"""
+            # Send metadata
             meta_json = json.dumps({"messages_analyzed": messages_analyzed})
-            yield 'event: meta\n' + 'data: ' + meta_json + '\n\n'
+            yield f"event: meta\ndata: {meta_json}\n\n"
 
             try:
                 url = "https://openrouter.ai/api/v1/chat/completions"
                 headers = {
-                    "Authorization": "Bearer " + OPENROUTER_API_KEY,
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
                     "Content-Type": "application/json",
                     "HTTP-Referer": "https://nexaai.com",
                     "X-Title": "NexaAI Demo"
                 }
+
                 payload = {
                     "model": model,
                     "messages": messages_history,
                     "stream": True,
                     "temperature": 0.7,
-                    "max_tokens": 3000
+                    "max_tokens": 4000
                 }
 
-                resp = requests.post(url, headers=headers, json=payload, stream=True, timeout=45)
+                resp = requests.post(url, headers=headers, json=payload, stream=True, timeout=60)
 
                 if resp.status_code != 200:
                     error_json = json.dumps({
-                        "error": "Demo API error (" + str(resp.status_code) + "). Please sign up.",
-                        "retryable": True  # ✅ Mark as retryable
+                        "error": f"Demo API error ({resp.status_code}). Please sign up.",
+                        "retryable": True
                     })
-                    yield 'event: error\n' + 'data: ' + error_json + '\n\n'
+                    yield f"event: error\ndata: {error_json}\n\n"
                     return
 
                 for line in resp.iter_lines():
                     if line:
-                        line_str = line.decode("utf-8")
-                        if line_str.startswith("data: "):
+                        line_str = line.decode('utf-8')
+                        if line_str.startswith('data: '):
                             chunk = line_str[6:].strip()
                             if chunk == "[DONE]":
-                                yield 'event: done\n' + 'data: {}\n\n'
+                                yield f"event: done\ndata: {{}}\n\n"
                                 break
 
                             try:
                                 chunk_data = json.loads(chunk)
-                                delta = chunk_data.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                                delta = chunk_data.get('choices', [{}])[0].get('delta', {}).get('content', '')
+
                                 if delta:
                                     token_json = json.dumps({"delta": delta})
-                                    yield 'event: token\n' + 'data: ' + token_json + '\n\n'
+                                    yield f"event: token\ndata: {token_json}\n\n"
+
                             except json.JSONDecodeError:
                                 continue
 
@@ -875,10 +891,11 @@ def demo_chat():
                     "error": "Request timeout. Please try a shorter message.",
                     "retryable": True
                 })
-                yield 'event: error\n' + 'data: ' + error_json + '\n\n'
+                yield f"event: error\ndata: {error_json}\n\n"
+
             except requests.exceptions.RequestException as e:
                 err_str = str(e).lower()
-                if any(x in err_str for x in ["quota", "rate limit", "429", "too many"]):
+                if any(x in err_str for x in ['quota', 'rate limit', '429', 'too many']):
                     error_json = json.dumps({
                         "error": "Demo limit reached. Please sign up!",
                         "retryable": False
@@ -888,20 +905,22 @@ def demo_chat():
                         "error": "Demo service unavailable.",
                         "retryable": True
                     })
-                yield 'event: error\n' + 'data: ' + error_json + '\n\n'
+                yield f"event: error\ndata: {error_json}\n\n"
+
             except Exception as e:
-                log.error("Demo stream error: " + str(e))
+                log.error(f"Demo stream error: {str(e)}")
                 error_json = json.dumps({
                     "error": "An error occurred.",
                     "retryable": True
                 })
-                yield 'event: error\n' + 'data: ' + error_json + '\n\n'
+                yield f"event: error\ndata: {error_json}\n\n"
 
-        return Response(stream_with_context(generate()), mimetype="text/event-stream")
+        return Response(stream_with_context(generate()), mimetype='text/event-stream')
 
     except Exception as e:
-        log.error("Demo chat fatal error: " + str(e))
-        return jsonify({'error': 'Server error. Please try again.'}), 500
+        log.error(f"Demo chat fatal error: {str(e)}")
+        return jsonify({"error": "Server error. Please try again."}), 500
+
 
 
 
@@ -1596,6 +1615,7 @@ if __name__ == '__main__':
         port=port,
         debug=debug
     )
+
 
 
 
