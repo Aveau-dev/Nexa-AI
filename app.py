@@ -936,7 +936,7 @@ def demo_login():
 
 @app.route('/demo-chat', methods=['POST'])
 def demo_chat():
-    """Demo chat endpoint - Streaming with OpenRouter"""
+    """Demo chat endpoint - Google Gemini 2.0 Flash Exp (Free, Fast, Vision-enabled)"""
     try:
         from flask import Response, stream_with_context
         import json
@@ -957,156 +957,146 @@ def demo_chat():
         if not message and not image_data:
             return jsonify({"error": "Message or image required"}), 400
 
-        # Check OpenRouter API key
-        if not OPENROUTER_API_KEY:
+        # Check Google API key
+        if not GOOGLE_API_KEY or not genai:
             return jsonify({
-                "error": "Demo mode requires OpenRouter API key. Please sign up for full access."
+                "error": "Demo mode requires Google API key. Please sign up for full access."
             }), 503
 
-        # Build conversation history
-        messages_history = []
+        log.info(f"Demo chat request - IP: {ip_address}, has_image: {bool(image_data)}")
 
-        # Add system message
-        messages_history.append({
-            "role": "system",
-            "content": "You are NexaAI, an intelligent assistant created by Aarav. Always provide well-formatted responses using markdown."
-        })
+        # Build conversation history for Gemini
+        conversation_parts = []
 
-        # Add context (last 6 messages)
+        # Add context (last 6 messages for efficiency)
         for ctx_msg in context[-6:]:
             if isinstance(ctx_msg, dict) and 'role' in ctx_msg and 'content' in ctx_msg:
-                messages_history.append({
-                    "role": ctx_msg['role'],
-                    "content": ctx_msg['content']
+                role = ctx_msg['role']
+                content = ctx_msg['content']
+
+                # Gemini uses 'user' and 'model' roles
+                gemini_role = 'model' if role == 'assistant' else 'user'
+                conversation_parts.append({
+                    "role": gemini_role,
+                    "parts": [content]
                 })
 
-        # Add current message
-        if image_data:
-            messages_history.append({
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": message or "Analyze this image"},
-                    {
-                        "type": "image_url", 
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{image_data}"
-                        }
-                    }
-                ]
-            })
-        else:
-            messages_history.append({
-                "role": "user",
-                "content": message
-            })
+        # Prepare current message with optional image
+        current_parts = []
 
-        model = "google/gemma-3-27b-it:free"
-        messages_analyzed = len(messages_history)
+        if message:
+            current_parts.append(message)
+
+        if image_data:
+            try:
+                # Decode base64 image for Gemini
+                image_bytes = base64.b64decode(image_data)
+                img = Image.open(BytesIO(image_bytes))
+                current_parts.append(img)
+                log.info("Image attached to demo request")
+            except Exception as e:
+                log.warning(f"Failed to process image: {e}")
+
+        # Add current message to conversation
+        conversation_parts.append({
+            "role": "user",
+            "parts": current_parts if current_parts else ["Hello"]
+        })
+
+        # Model info
+        model_name = "gemini-2.5-flash-lite"
+        messages_analyzed = len(conversation_parts)
 
         def generate():
-            """SSE generator for streaming responses"""
-            # Send metadata
-            meta_json = json.dumps({
-                "messages_analyzed": messages_analyzed,
-                "model": model
-            })
-            yield f"event: meta\ndata: {meta_json}\n\n"
-
+            """SSE generator for streaming Gemini responses"""
             try:
-                url = "https://openrouter.ai/api/v1/chat/completions"
-                headers = {
-                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                    "Content-Type": "application/json",
-                    "HTTP-Referer": request.headers.get('Referer', 'https://nexa-ai.onrender.com'),
-                    "X-Title": "NexaAI Demo"
-                }
+                # Send metadata
+                meta_json = json.dumps({
+                    "messages_analyzed": messages_analyzed,
+                    "model": model_name,
+                    "provider": "Google Generative AI"
+                })
+                yield f"event: meta\ndata: {meta_json}\n\n"
 
-                payload = {
-                    "model": model,
-                    "messages": messages_history,
-                    "stream": True,
-                    "temperature": 0.7,
-                    "max_tokens": 4096,
-                    "top_p": 0.9
-                }
+                # Initialize Gemini model with streaming
+                model = genai.GenerativeModel(
+                    model_name=model_name,
+                    generation_config={
+                        "temperature": 0.7,
+                        "top_p": 0.95,
+                        "top_k": 40,
+                        "max_output_tokens": 8192,
+                    },
+                    safety_settings=[
+                        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+                    ]
+                )
 
-                resp = requests.post(url, headers=headers, json=payload, stream=True, timeout=90)
+                # Start chat with history (excluding current message)
+                if len(conversation_parts) > 1:
+                    chat = model.start_chat(history=conversation_parts[:-1])
+                    current_message = conversation_parts[-1]["parts"]
+                else:
+                    chat = model.start_chat(history=[])
+                    current_message = conversation_parts[0]["parts"]
 
-                if resp.status_code != 200:
-                    error_text = resp.text
-                    log.error(f"OpenRouter API error: {resp.status_code} - {error_text}")  # ✅ FIXED: logger -> log
-
-                    error_json = json.dumps({
-                        "error": f"Demo API error ({resp.status_code}). Please try again or sign up for full access.",
-                        "retryable": True
-                    })
-                    yield f"event: error\ndata: {error_json}\n\n"
-                    return
+                # Stream response
+                response = chat.send_message(
+                    current_message,
+                    stream=True
+                )
 
                 full_response = ""
 
-                for line in resp.iter_lines():
-                    if line:
-                        line_str = line.decode('utf-8')
-                        if line_str.startswith('data: '):
-                            chunk = line_str[6:].strip()
+                for chunk in response:
+                    if chunk.text:
+                        delta = chunk.text
+                        full_response += delta
 
-                            if chunk == "[DONE]":
-                                yield f"event: done\ndata: {{}}\n\n"
-                                break
+                        token_json = json.dumps({"delta": delta})
+                        yield f"event: token\ndata: {token_json}\n\n"
 
-                            try:
-                                chunk_data = json.loads(chunk)
-                                delta = chunk_data.get('choices', [{}])[0].get('delta', {}).get('content', '')
+                # Send completion event
+                yield f"event: done\ndata: {{}}\n\n"
 
-                                if delta:
-                                    full_response += delta
-                                    token_json = json.dumps({"delta": delta})
-                                    yield f"event: token\ndata: {token_json}\n\n"
+                log.info(f"Demo chat completed: {len(full_response)} chars, model: {model_name}")
 
-                            except json.JSONDecodeError:
-                                continue
+            except Exception as e:
+                error_msg = str(e)
+                log.error(f"Demo chat error: {error_msg}")
 
-                # Log completion
-                log.info(f"Demo chat completed: {len(full_response)} chars generated")  # ✅ FIXED: logger -> log
-
-            except requests.exceptions.Timeout:
-                log.error("Demo chat timeout")  # ✅ FIXED: logger -> log
-                error_json = json.dumps({
-                    "error": "Request timeout. Please try a shorter message or sign up for full access.",
-                    "retryable": True
-                })
-                yield f"event: error\ndata: {error_json}\n\n"
-
-            except requests.exceptions.RequestException as e:
-                log.error(f"Demo chat request error: {str(e)}")  # ✅ FIXED: logger -> log
-                err_str = str(e).lower()
-
-                if any(x in err_str for x in ['quota', 'rate limit', '429', 'too many']):
+                # Handle specific errors
+                if 'quota' in error_msg.lower() or 'rate limit' in error_msg.lower():
                     error_json = json.dumps({
-                        "error": "Demo limit reached. Sign up for unlimited access!",
+                        "error": "Demo usage limit reached. Please sign up for unlimited access!",
                         "retryable": False
+                    })
+                elif 'api key' in error_msg.lower() or 'authentication' in error_msg.lower():
+                    error_json = json.dumps({
+                        "error": "Demo service configuration error. Please sign up for full access.",
+                        "retryable": False
+                    })
+                elif 'timeout' in error_msg.lower():
+                    error_json = json.dumps({
+                        "error": "Request timeout. Please try a shorter message or sign up.",
+                        "retryable": True
                     })
                 else:
                     error_json = json.dumps({
-                        "error": "Demo service temporarily unavailable. Please try again.",
+                        "error": "Demo service error. Please try again or sign up for full access.",
                         "retryable": True
                     })
-                yield f"event: error\ndata: {error_json}\n\n"
 
-            except Exception as e:
-                log.error(f"Demo stream error: {str(e)}")  # ✅ FIXED: logger -> log
-                error_json = json.dumps({
-                    "error": "An unexpected error occurred. Please try again.",
-                    "retryable": True
-                })
                 yield f"event: error\ndata: {error_json}\n\n"
 
         return Response(stream_with_context(generate()), mimetype='text/event-stream')
 
     except Exception as e:
-        log.error(f"Demo chat fatal error: {str(e)}")  # ✅ FIXED: logger -> log
-        return jsonify({"error": "Server error. Please try again."}), 500
+        log.error(f"Demo chat fatal error: {str(e)}")
+        return jsonify({"error": "Server error. Please try again or sign up for full access."}), 500
 
 # ═══════════════════════════════════════════════════════════════════
 # ROUTES - CHAT MANAGEMENT
@@ -1720,3 +1710,4 @@ if __name__ == '__main__':
     log.info("=" * 70)
 
     app.run(host='0.0.0.0', port=port, debug=debug)
+
