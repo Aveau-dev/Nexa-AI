@@ -938,5 +938,20 @@ document.addEventListener('keydown', (e) => {
         window.closeTermsModal();
     }
 });
+const sendBtn = document.getElementById('send-btn');
+const sendIcon = sendBtn.querySelector('#send-icon');
+const stopIcon = sendBtn.querySelector('#stop-icon');
+
+// When sending message:
+function showStopButton() {
+    sendIcon.style.display = 'none';
+    stopIcon.style.display = 'block';
+}
+
+// When generation complete:
+function showSendButton() {
+    sendIcon.style.display = 'block';
+    stopIcon.style.display = 'none';
+}
 
 console.log('✅ NexaAI Demo - Qwen 2.5 VL Enhanced - Loaded Successfully');
