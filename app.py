@@ -1004,7 +1004,7 @@ def demo_chat():
             })
 
         # Always use Qwen 2.5 VL (supports both text and vision)
-        model = "qwen/qwen-2.5-vl-7b-instruct:free"
+        model = "google/gemma-3-27b-it:free"
         messages_analyzed = len(messages_history)
 
         def generate():
@@ -1740,6 +1740,7 @@ if __name__ == '__main__':
     log.info("=" * 70)
 
     app.run(host='0.0.0.0', port=port, debug=debug)
+
 
 
 
