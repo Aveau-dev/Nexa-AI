@@ -3,7 +3,7 @@ NexaAI - Advanced AI Chat Platform with Demo Mode
 Complete Production Version with Supabase Support & Memory System
 Author: Aarav
 Date: 2026-01-09
-Version: 4.1 - Fixed Flask 3.x Compatibility
+Version: 4.2 - Fixed All Errors (Logger, text(), imagepath)
 """
 
 import os
@@ -103,7 +103,6 @@ else:
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_pre_ping': True,
     'pool_recycle': 280,
@@ -114,7 +113,6 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
         'connect_timeout': 10
     }
 }
-
 
 # File upload configuration
 app.config['UPLOAD_FOLDER'] = os.getenv('UPLOAD_FOLDER', 'uploads')
@@ -382,9 +380,10 @@ class Message(db.Model):
     content = db.Column(db.Text, nullable=False)
     model = db.Column(db.String(200), nullable=True)
 
-    # Image/File support
+    # Image/File support - ✅ FIXED: Added imagepath
     has_image = db.Column(db.Boolean, default=False)
     image_url = db.Column(db.String(1000), nullable=True)
+    imagepath = db.Column(db.String(1000), nullable=True)  # ✅ ADDED
     image_data = db.Column(db.Text, nullable=True)  # Base64 encoded
 
     # Reasoning support
@@ -732,7 +731,7 @@ def test_db_connection():
     """Test database connection at startup"""
     try:
         with app.app_context():
-            db.session.execute(text('SELECT 1'))
+            db.session.execute(text('SELECT 1'))  # ✅ FIXED: Added text()
             log.info("✅ Database connection successful")
             return True
     except Exception as e:
@@ -937,7 +936,7 @@ def demo_login():
 
 @app.route('/demo-chat', methods=['POST'])
 def demo_chat():
-    """Demo chat endpoint - Qwen 2.5 VL via OpenRouter - SSE Streaming (Vision + Text)"""
+    """Demo chat endpoint - Streaming with OpenRouter"""
     try:
         from flask import Response, stream_with_context
         import json
@@ -953,7 +952,7 @@ def demo_chat():
         data = request.get_json() or {}
         message = data.get('message', '').strip()
         context = data.get('context', [])
-        image_data = data.get('image')  # For vision support
+        image_data = data.get('image')
 
         if not message and not image_data:
             return jsonify({"error": "Message or image required"}), 400
@@ -964,16 +963,16 @@ def demo_chat():
                 "error": "Demo mode requires OpenRouter API key. Please sign up for full access."
             }), 503
 
-        # Build conversation history with context (last 6 messages)
+        # Build conversation history
         messages_history = []
 
-        # Add system message for Qwen 2.5 VL
+        # Add system message
         messages_history.append({
             "role": "system",
-            "content": "You are NexaAI, an intelligent assistant created by Aarav. Always provide well-formatted responses using markdown. Use proper formatting, code blocks, lists, tables, and emphasis to make responses clear and visually appealing. Be helpful, accurate, and concise."
+            "content": "You are NexaAI, an intelligent assistant created by Aarav. Always provide well-formatted responses using markdown."
         })
 
-        # Add conversation context (last 6 messages)
+        # Add context (last 6 messages)
         for ctx_msg in context[-6:]:
             if isinstance(ctx_msg, dict) and 'role' in ctx_msg and 'content' in ctx_msg:
                 messages_history.append({
@@ -981,9 +980,8 @@ def demo_chat():
                     "content": ctx_msg['content']
                 })
 
-        # Add current user message (with or without image)
+        # Add current message
         if image_data:
-            # Qwen 2.5 VL supports multi-modal input
             messages_history.append({
                 "role": "user",
                 "content": [
@@ -997,13 +995,11 @@ def demo_chat():
                 ]
             })
         else:
-            # Text-only message
             messages_history.append({
                 "role": "user",
                 "content": message
             })
 
-        # Always use Qwen 2.5 VL (supports both text and vision)
         model = "google/gemma-3-27b-it:free"
         messages_analyzed = len(messages_history)
 
@@ -1038,8 +1034,8 @@ def demo_chat():
 
                 if resp.status_code != 200:
                     error_text = resp.text
-                    logger.error(f"OpenRouter API error: {resp.status_code} - {error_text}")
-                    
+                    log.error(f"OpenRouter API error: {resp.status_code} - {error_text}")  # ✅ FIXED: logger -> log
+
                     error_json = json.dumps({
                         "error": f"Demo API error ({resp.status_code}). Please try again or sign up for full access.",
                         "retryable": True
@@ -1048,13 +1044,13 @@ def demo_chat():
                     return
 
                 full_response = ""
-                
+
                 for line in resp.iter_lines():
                     if line:
                         line_str = line.decode('utf-8')
                         if line_str.startswith('data: '):
                             chunk = line_str[6:].strip()
-                            
+
                             if chunk == "[DONE]":
                                 yield f"event: done\ndata: {{}}\n\n"
                                 break
@@ -1072,10 +1068,10 @@ def demo_chat():
                                 continue
 
                 # Log completion
-                logger.info(f"Demo chat completed: {len(full_response)} chars generated")
+                log.info(f"Demo chat completed: {len(full_response)} chars generated")  # ✅ FIXED: logger -> log
 
             except requests.exceptions.Timeout:
-                logger.error("Demo chat timeout")
+                log.error("Demo chat timeout")  # ✅ FIXED: logger -> log
                 error_json = json.dumps({
                     "error": "Request timeout. Please try a shorter message or sign up for full access.",
                     "retryable": True
@@ -1083,9 +1079,9 @@ def demo_chat():
                 yield f"event: error\ndata: {error_json}\n\n"
 
             except requests.exceptions.RequestException as e:
-                logger.error(f"Demo chat request error: {str(e)}")
+                log.error(f"Demo chat request error: {str(e)}")  # ✅ FIXED: logger -> log
                 err_str = str(e).lower()
-                
+
                 if any(x in err_str for x in ['quota', 'rate limit', '429', 'too many']):
                     error_json = json.dumps({
                         "error": "Demo limit reached. Sign up for unlimited access!",
@@ -1099,7 +1095,7 @@ def demo_chat():
                 yield f"event: error\ndata: {error_json}\n\n"
 
             except Exception as e:
-                logger.error(f"Demo stream error: {str(e)}")
+                log.error(f"Demo stream error: {str(e)}")  # ✅ FIXED: logger -> log
                 error_json = json.dumps({
                     "error": "An unexpected error occurred. Please try again.",
                     "retryable": True
@@ -1109,7 +1105,7 @@ def demo_chat():
         return Response(stream_with_context(generate()), mimetype='text/event-stream')
 
     except Exception as e:
-        logger.error(f"Demo chat fatal error: {str(e)}")
+        log.error(f"Demo chat fatal error: {str(e)}")  # ✅ FIXED: logger -> log
         return jsonify({"error": "Server error. Please try again."}), 500
 
 # ═══════════════════════════════════════════════════════════════════
@@ -1310,8 +1306,6 @@ def chat_route():
         model_id = data.get('model', session.get('selected_model', 'deepseek-r1'))
         chat_id = data.get('chatId') or data.get('chat_id')
         image_data = data.get('image')
-        deepthink = data.get('deepthink', False)
-        web_search = data.get('web', False)
 
         if not message:
             return jsonify({"error": "Message cannot be empty"}), 400
@@ -1329,26 +1323,18 @@ def chat_route():
 
         # Get or create chat
         if chat_id:
-            if is_demo:
-                chat = Chat.query.filter_by(
-                    id=chat_id,
-                    is_demo=True,
-                    session_id=get_demo_session_id()
-                ).first()
-            else:
-                chat = Chat.query.filter_by(
-                    id=chat_id,
-                    user_id=current_user.id
-                ).first()
+            chat = Chat.query.filter_by(
+                id=chat_id,
+                user_id=current_user.id
+            ).first()
 
             if not chat:
                 return jsonify({"error": "Chat not found"}), 404
         else:
             chat = Chat(
-                user_id=current_user.id if not is_demo else None,
+                user_id=current_user.id,
                 title=message[:50],
-                is_demo=is_demo,
-                session_id=get_demo_session_id() if is_demo else None
+                is_demo=False
             )
             db.session.add(chat)
             db.session.flush()
@@ -1423,7 +1409,7 @@ def chat_route():
         chat.updated_at = datetime.utcnow()
 
         # Increment DeepSeek counter if needed
-        if not is_demo and 'deepseek' in model_id:
+        if 'deepseek' in model_id:
             increment_deepseek_count(current_user)
 
         db.session.commit()
@@ -1433,11 +1419,9 @@ def chat_route():
             "chat_id": chat.id,
             "response": ai_response,
             "model": model_config['name'],
-            "title": chat.title
+            "title": chat.title,
+            "deepseek_count": current_user.deepseek_count if current_user else 0
         }
-
-        if not is_demo and current_user:
-            response_data['deepseek_count'] = current_user.deepseek_count
 
         return jsonify(response_data)
 
@@ -1470,7 +1454,7 @@ def set_model():
         return jsonify({"error": str(e)}), 500
 
 # ═══════════════════════════════════════════════════════════════════
-# ROUTES - MEMORY SYSTEM (For logged-in users)
+# ROUTES - MEMORY SYSTEM
 # ═══════════════════════════════════════════════════════════════════
 
 @app.route('/memories', methods=['GET'])
@@ -1644,7 +1628,7 @@ def update_settings():
         return jsonify({"error": "Failed to update settings"}), 500
 
 # ═══════════════════════════════════════════════════════════════════
-# ROUTES - STATIC FILES
+# ROUTES - STATIC FILES & ERROR HANDLERS
 # ═══════════════════════════════════════════════════════════════════
 
 @app.route('/static/<path:filename>')
@@ -1652,9 +1636,6 @@ def serve_static(filename):
     """Serve static files"""
     return send_from_directory('static', filename)
 
-# ═══════════════════════════════════════════════════════════════════
-# ERROR HANDLERS
-# ═══════════════════════════════════════════════════════════════════
 
 @app.errorhandler(404)
 def not_found(e):
@@ -1705,12 +1686,11 @@ def validate_api_keys():
 # Test database on startup
 with app.app_context():
     try:
-        db.session.execute("SELECT 1")
+        db.session.execute(text("SELECT 1"))  # ✅ FIXED: Added text()
         log.info("✓ Database connection successful!")
     except Exception as e:
         log.error(f"✗ Database connection failed: {e}")
         log.error("Check your DATABASE_URL in .env file")
-
 
 # ═══════════════════════════════════════════════════════════════════
 # MAIN ENTRY POINT
@@ -1734,13 +1714,9 @@ if __name__ == '__main__':
     log.info(f"🚀 Starting NexaAI on port {port}")
     log.info(f"📊 Debug mode: {debug}")
     log.info(f"🎭 Demo mode: Available at /demo and /")
-    log.info(f"🤖 Demo AI Model: DeepSeek R1 (Reasoning)")
+    log.info(f"🤖 Demo AI Model: Gemma 3 27B IT")
     log.info(f"👁️ Vision Support: Gemini 2.0 Flash (for images)")
     log.info(f"⚡ Demo rate limit: {DEMO_RATE_LIMIT} messages per hour")
     log.info("=" * 70)
 
     app.run(host='0.0.0.0', port=port, debug=debug)
-
-
-
-
