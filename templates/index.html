@@ -1,32 +1,37 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
+
 <head>
     <meta name="google-site-verification" content="1xRfZx8fEbwT18xMYj4l1UFl5jRckIrbs2uk4STqF6Y" />
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NexaAI – Modern AI Assistant</title>
-    <meta name="description" content="NexaAI is a modern, free, multi-model AI assistant platform. Chat with GPT-4, Claude, Gemini, DeepSeek, and more.">
-    <meta name="keywords" content="AI, NexaAI, chatbot, GPT-4, Claude, Gemini, DeepSeek, OpenRouter, AI assistant, LLM, FOSS, chat history, free, ai tools">
+    <meta name="description"
+        content="NexaAI is a modern, free, multi-model AI assistant platform. Chat with GPT-4, Claude, Gemini, DeepSeek, and more.">
+    <meta name="keywords"
+        content="AI, NexaAI, chatbot, GPT-4, Claude, Gemini, DeepSeek, OpenRouter, AI assistant, LLM, FOSS, chat history, free, ai tools">
     <link rel="canonical" href="https://nexa-ai.onrender.com/">
     <meta name="robots" content="index, follow">
-    
+
     <!-- Green shield favicon -->
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2319c37d' d='M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z'/></svg>">
-    
+    <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2319c37d' d='M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z'/></svg>">
+
     <!-- Main CSS -->
     <link rel="stylesheet" href="/static/Css/style.css">
-    
+
     <!-- Open Graph / Twitter -->
     <meta property="og:title" content="NexaAI – AI Chat Assistant" />
-    <meta property="og:description" content="A smart, free AI chat dashboard supporting GPT-4, Claude, Gemini, and more." />
+    <meta property="og:description"
+        content="A smart, free AI chat dashboard supporting GPT-4, Claude, Gemini, and more." />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="https://nexa-ai.onrender.com/static/og-image.png" />
-    
+
     <!-- Markdown + syntax highlighting -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-    
+
     <!-- Polyfills -->
     <script>
         if (!window.Promise) {
@@ -37,6 +42,7 @@
         }
     </script>
 </head>
+
 <body class="ds-body">
     <!-- Nav -->
     <nav class="top-nav">
@@ -87,27 +93,31 @@
                     <div id="file-upload-area" class="file-upload-area">
                         <div id="file-preview" class="file-preview"></div>
                     </div>
-                    
+
                     <div class="input-inner">
                         <!-- File & Image Upload Button -->
                         <button class="attach-button" id="attach-btn" title="Upload image or file">
-                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path
+                                    d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
                             </svg>
                         </button>
-                        <input type="file" id="file-input" accept="image/*,.pdf,.txt,.doc,.docx,.py,.js,.json" style="display:none;">
-                        
+                        <input type="file" id="file-input" accept="image/*,.pdf,.txt,.doc,.docx,.py,.js,.json"
+                            style="display:none;">
+
                         <textarea id="chat-input" placeholder="Ask anything..." rows="1"></textarea>
-                        
+
                         <!-- Image Generation Button -->
                         <button class="generate-image-btn" id="image-gen-btn" title="Generate image">
-                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                                <circle cx="8.5" cy="8.5" r="1.5"/>
-                                <polyline points="21 15 16 10 5 21"/>
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                <circle cx="8.5" cy="8.5" r="1.5" />
+                                <polyline points="21 15 16 10 5 21" />
                             </svg>
                         </button>
-                        
+
                         <button class="send-button" id="send-btn" title="Send message">
                             <span id="send-icon">
                                 <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
@@ -121,7 +131,7 @@
                             </span>
                         </button>
                     </div>
-                    
+
                     <div class="input-footer">
                         <span class="demo-notice">
                             🎁 Demo Mode – Unlimited · No history saved ·
@@ -145,7 +155,7 @@
                 <h3>🔒 Privacy & Data Use</h3>
                 <p>Demo mode has <strong>NO data persistence</strong> - your conversation is lost when you refresh
                     or close the page. Nothing is saved to our servers. Sign up for permanent chat history.</p>
-                
+
                 <h3>⚠️ AI Limitations</h3>
                 <ul>
                     <li>AI responses may contain inaccurate or outdated information</li>
@@ -153,7 +163,7 @@
                     <li>Always verify important information from authoritative sources</li>
                     <li>AI may occasionally produce biased or inappropriate content</li>
                 </ul>
-                
+
                 <h3>✅ Acceptable Use</h3>
                 <ul>
                     <li>Be respectful and constructive in your queries</li>
@@ -161,12 +171,12 @@
                     <li>Do not use for illegal activities or harmful purposes</li>
                     <li>Content moderation policies apply</li>
                 </ul>
-                
+
                 <h3>🎁 Demo vs Full Access</h3>
                 <table class="modal-table">
                     <tr>
                         <td><strong>Demo</strong></td>
-                        <td>Unlimited, no history, Vision + Image Gen</td>
+                        <td>DeepSeek R1 with reasoning, vision, image gen</td>
                     </tr>
                     <tr>
                         <td><strong>Free Account</strong></td>
@@ -174,10 +184,11 @@
                     </tr>
                     <tr>
                         <td><strong>Pro (Free trial)</strong></td>
-                        <td>All 9 models, Reasoning AI, unlimited</td>
+                        <td>All 9 models, unlimited access, priority support</td>
                     </tr>
                 </table>
-                
+
+
                 <p class="modal-footer-text">
                     By using NexaAI, you agree to these terms. We respect your privacy and never sell your data.
                 </p>
@@ -188,4 +199,5 @@
     <!-- DEMO CHAT SCRIPT -->
     <script src="/static/js/demo-chat.js"></script>
 </body>
+
 </html>
