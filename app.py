@@ -1681,6 +1681,16 @@ def validate_api_keys():
 
     return len(issues) == 0
 
+# Test database on startup
+with app.app_context():
+    try:
+        db.session.execute("SELECT 1")
+        log.info("✓ Database connection successful!")
+    except Exception as e:
+        log.error(f"✗ Database connection failed: {e}")
+        log.error("Check your DATABASE_URL in .env file")
+
+
 # ═══════════════════════════════════════════════════════════════════
 # MAIN ENTRY POINT
 # ═══════════════════════════════════════════════════════════════════
@@ -1709,3 +1719,4 @@ if __name__ == '__main__':
     log.info("=" * 70)
 
     app.run(host='0.0.0.0', port=port, debug=debug)
+
