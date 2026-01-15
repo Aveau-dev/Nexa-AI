@@ -1004,7 +1004,7 @@ def demo_chat():
         })
 
         # Model info
-        model_name = "gemini-2.0-flash-exp"  # ✅ Changed to more stable model
+        model_name = "google/gemma-3-27b-it:free"  # ✅ Changed to more stable model
         messages_analyzed = len(conversation_parts)
 
         def generate():
@@ -1723,6 +1723,7 @@ if __name__ == '__main__':
     log.info("=" * 70)
 
     app.run(host='0.0.0.0', port=port, debug=debug)
+
 
 
 
